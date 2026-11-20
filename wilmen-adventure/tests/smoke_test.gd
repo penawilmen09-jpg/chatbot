@@ -137,8 +137,8 @@ func _test_powers(game, scene: PackedScene) -> void:
 		Input.action_press("skill")
 		await _frames(3)
 		Input.action_release("skill")
-		await _frames(30)
 		_check(p.skill_cd > 0.0 or p.shield_t > 0.0, "mundo %d: el poder se activó" % w)
+		await _frames(30)
 		Input.action_press("jump")
 		await _frames(4)
 		Input.action_release("jump")
@@ -155,7 +155,7 @@ func _test_bosses(game, scene: PackedScene) -> void:
 	for n in [4, 8, 12, 16, 20]:
 		var lvl = await _new_level(game, scene, n)
 		var b = lvl.boss
-		lvl.player.position = Vector2(lvl.gate_x + 48.0, lvl.boss_home_y)
+		lvl.player.position = Vector2(lvl.gate_x + 8.0, lvl.boss_home_y)
 		lvl.player.camera.reset_smoothing()
 		lvl.player.celebrate()  # invulnerable: solo probamos los ataques del jefe
 		await _frames(30)
