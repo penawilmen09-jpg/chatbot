@@ -1,17 +1,29 @@
 # WILMEN AI
 
-Generador de textos con IA en español (modo demostración: no necesita claves API, base de datos ni variables de entorno).
+Generador de textos con inteligencia artificial real (Google Gemini, plan gratuito) en español: correos, publicaciones, historias, guiones, descripciones e ideas de negocio.
 
-## Probar en GitHub Codespaces (sin comandos)
+La clave de Gemini se guarda solo en el servidor, en la variable `GEMINI_API_KEY`. Nunca se escribe en el código ni se sube a GitHub.
 
-1. En GitHub, abre el repositorio y pulsa **Code → Codespaces → Create codespace on main**.
-2. Espera a que termine de preparar el entorno; la aplicación se inicia sola.
-3. Cuando aparezca el aviso del puerto 3000, pulsa **Abrir en el navegador** (o abre la pestaña **Puertos** y toca el enlace de "WILMEN AI").
-4. Elige el tipo y el tono, escribe lo que necesitas y pulsa **Generar**.
+## Conseguir la clave gratuita (desde el teléfono)
 
-Si el servidor no está en marcha, ejecuta `pnpm dev` en la terminal del Codespace.
+1. Abre https://aistudio.google.com/apikey en Chrome e inicia sesión con tu cuenta de Google.
+2. Acepta los términos si te los pide y pulsa **Crear clave de API** (Create API key). Elige o crea un proyecto.
+3. Copia la clave. No actives facturación ni pagos: el plan gratuito no los necesita.
+
+## Configurarla en GitHub Codespaces
+
+1. En GitHub abre https://github.com/settings/codespaces (Settings → Codespaces).
+2. En **Secrets** pulsa **New secret**. Nombre: `GEMINI_API_KEY`. Valor: la clave copiada.
+3. En **Repository access** elige el repositorio `chatbot` y guarda.
+4. Crea el Codespace (**Code → Codespaces → Create codespace on main**). Si ya tenías uno abierto, reconstrúyelo o créalo de nuevo para que lea el secreto.
+5. Abre el puerto 3000 desde la pestaña **Puertos** y usa el generador.
+
+Sin clave, la aplicación muestra un aviso en español en lugar de generar texto.
+
+Variable opcional: `GEMINI_MODEL` (por defecto `gemini-flash-latest`).
 
 ---
+
 
 <a href="https://chatbot.ai-sdk.dev/demo">
   <img alt="Chatbot" src="app/(chat)/opengraph-image.png">

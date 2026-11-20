@@ -22,9 +22,6 @@ export default function Home() {
               WILMEN AI
             </span>
           </div>
-          <span className="rounded-full border border-amber-400/30 bg-amber-500/10 px-3 py-1 text-amber-200 text-xs">
-            Modo demostración
-          </span>
         </header>
 
         <section className="mx-auto mb-10 max-w-2xl text-center sm:mb-14">
@@ -36,14 +33,14 @@ export default function Home() {
           </h1>
           <p className="mt-4 text-balance text-base text-zinc-400 sm:text-lg">
             Tu asistente de escritura con inteligencia artificial. Correos,
-            publicaciones, descripciones e ideas, todo en español.
+            publicaciones, historias, guiones y más, todo en español.
           </p>
         </section>
 
         <Generator />
 
         <footer className="mt-12 text-center text-xs text-zinc-500">
-          WILMEN AI · Versión de prueba con respuestas de demostración
+          WILMEN AI · Textos generados con inteligencia artificial
         </footer>
       </div>
     </main>

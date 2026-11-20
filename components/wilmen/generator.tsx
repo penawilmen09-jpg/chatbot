@@ -1,14 +1,14 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { TIPOS, type TipoId, TONOS, type TonoId } from "@/lib/demo-generator";
+import { TIPOS, type TipoId, TONOS, type TonoId } from "@/lib/generator-config";
 
 const MAX = 2000;
 
 const EJEMPLOS = [
-  "Un correo para pedir una reunión con un cliente nuevo",
-  "Publicación para anunciar la apertura de mi cafetería",
-  "Descripción de unos audífonos inalámbricos resistentes al agua",
+  "Una publicación para anunciar la apertura de mi cafetería",
+  "Una historia corta sobre un robot que aprende a pintar",
+  "Un guion de 30 segundos para un video sobre ahorrar dinero",
 ];
 
 export function Generator() {
