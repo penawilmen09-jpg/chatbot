@@ -4,21 +4,12 @@ extends SceneTree
 ## fondo ni escenario. El color de fondo vacío de Godot se pinta de magenta: si se ve magenta,
 ## el jugador vería una franja negra.
 ##
-##   xvfb-run -a godot --path . --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd
+##   xvfb-run -a godot --path . --resolution 2400x1080 --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd
+## (un proceso por resolución: el tamaño de ventana inicial es el que fija la relación de aspecto;
+##  con `-- --live` además redimensiona la ventana con el nivel cargado, como hace Android al rotar)
 ##
 ## Imprime una línea por captura y termina con código 1 si alguna deja ver zonas sin cubrir.
 
-const RESOLUTIONS := [
-	Vector2i(1280, 720),   # 16:9
-	Vector2i(2400, 1080),  # 20:9 (móviles actuales)
-	Vector2i(2340, 1080),  # 19.5:9 (iPhone/Android)
-	Vector2i(2560, 1080),  # 21:9
-	Vector2i(2960, 1440),  # 18.5:9
-	Vector2i(3200, 1440),  # 20:9 QHD
-	Vector2i(1920, 1200),  # 16:10 (tabletas)
-	Vector2i(1600, 1200),  # 4:3
-	Vector2i(800, 480),    # 5:3
-]
 const BAD_LIMIT_PCT := 0.02
 const SHOT_DIR := "/tmp/shots"
 
@@ -39,8 +30,9 @@ func _frames(n: int) -> void:
 
 
 func _set_res(r: Vector2i) -> void:
+	root.size = r
 	DisplayServer.window_set_size(r)
-	await _frames(8)
+	await _frames(10)
 	await process_frame
 
 
@@ -70,8 +62,9 @@ func _teleport(lvl, x: float, y: float) -> void:
 	await _frames(45)
 
 
-func _shot(res: Vector2i, tag: String) -> void:
+func _shot(tag: String, lvl = null) -> void:
 	await RenderingServer.frame_post_draw
+	var res: Vector2i = DisplayServer.window_get_size()
 	var img: Image = root.get_texture().get_image()
 	var w: int = img.get_width()
 	var h: int = img.get_height()
@@ -102,9 +95,25 @@ func _shot(res: Vector2i, tag: String) -> void:
 	var pct: float = 100.0 * float(bad) / float(maxi(1, total))
 	var vis: Vector2 = root.get_visible_rect().size
 	var ok: bool = pct <= BAD_LIMIT_PCT
+	var cam_msg: String = ""
+	if lvl != null and lvl.camera != null:
+		# la vista de la cámara debe quedar DENTRO del nivel (si no, se ve fuera del escenario)
+		var c: Vector2 = lvl.camera.get_screen_center_position()
+		var left: float = c.x - vis.x * 0.5
+		var right: float = c.x + vis.x * 0.5
+		var top: float = c.y - vis.y * 0.5
+		var bottom: float = c.y + vis.y * 0.5
+		var max_bottom: float = maxf(lvl.nrows * 16.0, vis.y)
+		var over_l: float = maxf(0.0, lvl.camera.limit_left - left)
+		var over_r: float = maxf(0.0, right - lvl.camera.limit_right)
+		var over_t: float = maxf(0.0, -top)
+		var over_b: float = maxf(0.0, bottom - max_bottom)
+		cam_msg = " cam[x %.0f..%.0f de 0..%d, fuera: izq %.1f der %.1f arr %.1f abj %.1f]" % [left, right, lvl.cols * 16, over_l, over_r, over_t, over_b]
+		if over_l > 0.6 or over_r > 0.6 or over_t > 0.6 or over_b > 0.6:
+			ok = false
 	_captures += 1
-	print("  %s RENDER %dx%d %-34s vista=%dx%d sin_cubrir=%.3f%% (izq %d, der %d, arr %d, abajo %d)" % [
-		"ok  " if ok else "FALLO", res.x, res.y, tag, int(vis.x), int(vis.y), pct, edge_l, edge_r, edge_t, edge_b])
+	print("  %s RENDER %dx%d %-34s vista=%dx%d sin_cubrir=%.3f%% (izq %d, der %d, arr %d, abajo %d)%s" % [
+		"ok  " if ok else "FALLO", res.x, res.y, tag, int(vis.x), int(vis.y), pct, edge_l, edge_r, edge_t, edge_b, cam_msg])
 	if not ok:
 		_failed += 1
 	if not ok or tag.begins_with("L1 inicio"):
@@ -113,16 +122,16 @@ func _shot(res: Vector2i, tag: String) -> void:
 		_shots_saved += 1
 
 
-func _scenario_level(res: Vector2i, n: int, label: String) -> void:
+func _scenario_level(n: int, label: String) -> void:
 	var lvl = await _load_level(n)
-	await _shot(res, "%s inicio" % label)
+	await _shot("%s inicio" % label, lvl)
 	var w_px: float = lvl.cols * 16.0
 	await _teleport(lvl, w_px * 0.5, 120.0)
-	await _shot(res, "%s mitad" % label)
+	await _shot("%s mitad" % label, lvl)
 	await _teleport(lvl, w_px - 40.0, 120.0)
-	await _shot(res, "%s final (limite derecho)" % label)
+	await _shot("%s final (limite derecho)" % label, lvl)
 	await _teleport(lvl, 40.0, 120.0)
-	await _shot(res, "%s limite izquierdo" % label)
+	await _shot("%s limite izquierdo" % label, lvl)
 	await _free_level(lvl)
 
 
@@ -132,47 +141,49 @@ func _run() -> void:
 	RenderingServer.set_default_clear_color(Color(1, 0, 1))
 	_scene = load("res://levels/level.tscn")
 	var display: String = DisplayServer.get_name()
-	print("Servidor de pantalla: %s | driver: %s" % [display, RenderingServer.get_video_adapter_name()])
 	if display == "headless":
 		print("FALLO: esta prueba necesita pantalla (usa xvfb-run)")
 		quit(2)
 		return
+	await _frames(10)
+	var win: Vector2i = DisplayServer.window_get_size()
+	var vis: Vector2 = root.get_visible_rect().size
+	print("== ventana %dx%d (%.2f:1) | vista lógica %dx%d | %s ==" % [win.x, win.y, float(win.x) / float(win.y), int(vis.x), int(vis.y), RenderingServer.get_video_adapter_name()])
+	var expect_w: float = 270.0 * float(win.x) / float(win.y)
+	if float(win.y) > 0.0 and absf(vis.x - maxf(480.0, expect_w)) > 2.0 and absf(vis.y - 270.0) > 2.0 and (float(win.x) / float(win.y)) >= 16.0 / 9.0:
+		print("  FALLO la vista lógica no se adapta a la relación de aspecto de la ventana")
+		_failed += 1
 
-	for res in RESOLUTIONS:
-		print("== %dx%d (relación %.2f:1) ==" % [res.x, res.y, float(res.x) / float(res.y)])
-		_game.levels = {}
-		await _set_res(res)
-		await _scenario_level(res, 1, "L1")
-		await _scenario_level(res, 56, "L56 islas")
-		await _scenario_level(res, 91, "L91 final")
+	var live: bool = OS.get_cmdline_user_args().has("--live")
+	if not live:
+		# un nivel de cada mundo: cielo/fondos, límites derecho e izquierdo de la cámara
+		for w in range(1, 11):
+			_game.levels = {}
+			await _scenario_level((w - 1) * 10 + 1, "M%d" % w)
 		# jefe: la cámara se bloquea en la arena
 		_game.levels = {}
 		var lvl = await _load_level(10)
 		await _teleport(lvl, lvl.gate_x + 8.0, lvl.boss_home_y)
-		await _shot(res, "L10 jefe: entrada a la arena")
+		await _shot("L10 jefe: entrada a la arena", lvl)
 		lvl.player.celebrate()
 		await _teleport(lvl, lvl.cols * 16.0 - 60.0, lvl.boss_home_y)
-		await _shot(res, "L10 jefe: pared derecha")
+		await _shot("L10 jefe: pared derecha", lvl)
 		await _teleport(lvl, lvl.gate_x + 24.0, lvl.boss_home_y)
-		await _shot(res, "L10 jefe: pared izquierda")
+		await _shot("L10 jefe: pared izquierda", lvl)
 		await _free_level(lvl)
-
-	# Android cambia el tamaño de la ventana DESPUÉS de crear el nivel (rotación, barras del sistema):
-	print("== cambios de tamaño con el nivel ya cargado ==")
-	_game.levels = {}
-	await _set_res(Vector2i(1280, 720))
-	var live = await _load_level(1)
-	var seq: Array = [Vector2i(1280, 720), Vector2i(2400, 1080), Vector2i(1600, 1200), Vector2i(2960, 1440), Vector2i(1280, 720), Vector2i(3200, 1440)]
-	for r in seq:
-		await _set_res(r)
-		await _frames(20)
-		await _shot(r, "L1 redimensionado en vivo")
-		await _teleport(live, live.cols * 8.0, 120.0)
-		await _shot(r, "L1 redimensionado en vivo (mitad)")
-		await _teleport(live, live.cols * 16.0 - 40.0, 120.0)
-		await _shot(r, "L1 redimensionado en vivo (final)")
-		await _teleport(live, 60.0, 120.0)
-	await _free_level(live)
+	else:
+		# Android cambia el tamaño de la ventana DESPUÉS de crear el nivel (rotación, barras del sistema)
+		_game.levels = {}
+		var l2 = await _load_level(1)
+		var seq: Array = [Vector2i(1280, 720), Vector2i(2400, 1080), Vector2i(1600, 1200), Vector2i(2960, 1440), Vector2i(1280, 720), Vector2i(3200, 1440)]
+		for r in seq:
+			await _set_res(r)
+			await _frames(20)
+			await _shot("L1 redimensionado en vivo", l2)
+			await _teleport(l2, l2.cols * 16.0 - 40.0, 120.0)
+			await _shot("L1 redimensionado en vivo (final)", l2)
+			await _teleport(l2, 60.0, 120.0)
+		await _free_level(l2)
 
 	print("CAPTURAS: %d | con zonas sin cubrir: %d | PNG guardados: %d" % [_captures, _failed, _shots_saved])
 	print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))

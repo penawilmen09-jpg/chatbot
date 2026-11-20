@@ -40,13 +40,20 @@ jobs:
           godot --headless --path . --import || true
           godot --headless --path . --import
 
-      - name: Prueba de render en 9 resoluciones
+      - name: Prueba de render en 9 relaciones de aspecto (un proceso de Godot por resolución)
         run: |
-          set -o pipefail
           export LIBGL_ALWAYS_SOFTWARE=1
-          xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd 2>&1 | tee /tmp/render.log
-          grep -E "FALLO" /tmp/render.log | head -60 || true
-          grep -q "RESULTADO: TODO OK" /tmp/render.log
+          FAIL=0
+          for RES in 1280x720 2400x1080 2340x1080 2560x1080 2960x1440 3200x1440 1920x1200 1600x1200 800x480; do
+            echo "################ $RES"
+            xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --resolution $RES --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd 2>&1 | tee -a /tmp/render.log | grep -E "==|FALLO|CAPTURAS|RESULTADO" || true
+            grep -q "RESULTADO: TODO OK" <(tail -n 12 /tmp/render.log) || FAIL=1
+          done
+          echo "################ redimensionado en vivo (como al rotar en Android)"
+          xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --resolution 1280x720 --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd -- --live 2>&1 | tee -a /tmp/render.log | grep -E "==|FALLO|CAPTURAS|RESULTADO|RENDER" || true
+          grep -q "RESULTADO: TODO OK" <(tail -n 12 /tmp/render.log) || FAIL=1
+          echo "fallos totales de líneas: $(grep -c 'FALLO' /tmp/render.log)"
+          exit $FAIL
 
       - name: Capturas y registro
         if: always()
