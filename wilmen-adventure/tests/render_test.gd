@@ -155,10 +155,24 @@ func _run() -> void:
 		_failed += 1
 
 	var live: bool = OS.get_cmdline_user_args().has("--live")
+	var rotate: bool = OS.get_cmdline_user_args().has("--rotate")
 	if OS.get_cmdline_user_args().has("--legacy-parallax"):
 		Engine.set_meta("legacy_parallax", true)
 		print("(modo medición: ParallaxBackground antiguo)")
-	if not live:
+	if rotate:
+		# Android arranca en vertical y rota a horizontal con el nivel ya creado (orientación "sensor")
+		_game.levels = {}
+		var l3 = await _load_level(1)
+		for r in [Vector2i(2000, 933), Vector2i(933, 2000), Vector2i(2400, 1080), Vector2i(1080, 2400), Vector2i(2340, 1080)]:
+			await _set_res(r)
+			await _frames(25)
+			if r.x > r.y:
+				await _shot("rotacion a horizontal", l3)
+				await _teleport(l3, l3.cols * 16.0 - 40.0, 120.0)
+				await _shot("rotacion a horizontal (final)", l3)
+				await _teleport(l3, 60.0, 120.0)
+		await _free_level(l3)
+	elif not live:
 		# un nivel de cada mundo: cielo/fondos, límites derecho e izquierdo de la cámara
 		for w in range(1, 11):
 			_game.levels = {}

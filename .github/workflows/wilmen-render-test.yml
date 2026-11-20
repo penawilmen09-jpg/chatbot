@@ -49,6 +49,22 @@ jobs:
             xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --resolution $RES --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd -- --legacy-parallax 2>&1 | tee -a /tmp/render_legacy.log | grep -E "==|FALLO|CAPTURAS|RESULTADO|M1 inicio" || true
           done
 
+      - name: Rotación vertical -> horizontal con el nivel ya creado (fondo ANTIGUO, informativo)
+        continue-on-error: true
+        run: |
+          export LIBGL_ALWAYS_SOFTWARE=1
+          echo "################ ANTIGUO rotación"
+          xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --resolution 933x2000 --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd -- --rotate --legacy-parallax 2>&1 | tee -a /tmp/render_legacy.log | grep -E "==|RENDER|CAPTURAS|RESULTADO" || true
+          echo "################ ANTIGUO redimensionado en vivo"
+          xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --resolution 1280x720 --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd -- --live --legacy-parallax 2>&1 | tee -a /tmp/render_legacy.log | grep -E "==|RENDER|CAPTURAS|RESULTADO" || true
+
+      - name: Rotación vertical -> horizontal (fondo NUEVO, bloquea)
+        run: |
+          export LIBGL_ALWAYS_SOFTWARE=1
+          echo "################ NUEVO rotación"
+          xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --resolution 933x2000 --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd -- --rotate 2>&1 | tee -a /tmp/render.log | grep -E "==|RENDER|CAPTURAS|RESULTADO" || true
+          tail -n 12 /tmp/render.log | grep -q "RESULTADO: TODO OK"
+
       - name: Prueba de render en 11 relaciones de aspecto (un proceso de Godot por resolución)
         run: |
           export LIBGL_ALWAYS_SOFTWARE=1
