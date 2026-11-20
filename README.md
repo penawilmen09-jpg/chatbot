@@ -1,3 +1,18 @@
+# WILMEN AI
+
+Generador de textos con IA en español (modo demostración: no necesita claves API, base de datos ni variables de entorno).
+
+## Probar en GitHub Codespaces (sin comandos)
+
+1. En GitHub, abre el repositorio y pulsa **Code → Codespaces → Create codespace on main**.
+2. Espera a que termine de preparar el entorno; la aplicación se inicia sola.
+3. Cuando aparezca el aviso del puerto 3000, pulsa **Abrir en el navegador** (o abre la pestaña **Puertos** y toca el enlace de "WILMEN AI").
+4. Elige el tipo y el tono, escribe lo que necesitas y pulsa **Generar**.
+
+Si el servidor no está en marcha, ejecuta `pnpm dev` en la terminal del Codespace.
+
+---
+
 <a href="https://chatbot.ai-sdk.dev/demo">
   <img alt="Chatbot" src="app/(chat)/opengraph-image.png">
   <h1 align="center">Chatbot</h1>
