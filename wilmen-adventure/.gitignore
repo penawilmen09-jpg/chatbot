@@ -9,3 +9,6 @@ build/
 export_credentials.cfg
 preview_*.png
 __pycache__/
+android/build/
+android/.build_version
+android/.gradle/

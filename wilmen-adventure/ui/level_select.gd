@@ -356,7 +356,9 @@ func _level_button(n: int, highest: int) -> Button:
 
 	if current:
 		_current_btn = b
-		var tw := create_tween().set_loops()
+		# El tween debe pertenecer al BOTÓN (b.create_tween): si pertenece a la pantalla, al cambiar de
+		# mundo el botón se libera y el tween en bucle queda apuntando a un objeto muerto.
+		var tw := b.create_tween().set_loops()
 		tw.tween_property(b, "modulate", Color(1.25, 1.25, 1.0), 0.6).set_trans(Tween.TRANS_SINE)
 		tw.tween_property(b, "modulate", Color.WHITE, 0.6).set_trans(Tween.TRANS_SINE)
 

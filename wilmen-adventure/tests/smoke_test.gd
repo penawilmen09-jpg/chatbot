@@ -88,6 +88,7 @@ func _run() -> void:
 	await _test_powers()
 	await _test_bosses()
 	await _test_flow()
+	await _test_touch_controls()
 	await _test_menus()
 	await _bot_level_one()
 	print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
@@ -717,4 +718,90 @@ func _bot_level_one() -> void:
 	Input.action_release("move_right")
 	Input.action_release("jump")
 	_check(lvl.player.position.x > start_x + 60.0 or lvl.player.dead, "el jugador avanza o muere (x: %d -> %d)" % [start_x, lvl.player.position.x])
+	await _free_level(lvl)
+
+
+# ============================================ 13. controles táctiles ========
+func _touch(idx: int, pos: Vector2, pressed: bool) -> void:
+	var ev := InputEventScreenTouch.new()
+	ev.index = idx
+	ev.position = pos
+	ev.pressed = pressed
+	Input.parse_input_event(ev)
+
+
+func _drag(idx: int, pos: Vector2) -> void:
+	var ev := InputEventScreenDrag.new()
+	ev.index = idx
+	ev.position = pos
+	Input.parse_input_event(ev)
+
+
+func _test_touch_controls() -> void:
+	print("Controles táctiles: multitáctil, arrastre, botón de pausa")
+	_game.settings["touch"] = "on"
+	var lvl = await _load_level(1)
+	var hud = lvl.hud
+	var btn: Dictionary = {}
+	for c in hud._touch.get_children():
+		btn[c.action] = c
+	_check(btn.size() == 4 and btn.has("move_left") and btn.has("move_right") and btn.has("jump") and btn.has("skill"), "hay 4 botones táctiles: izquierda, derecha, salto y poder")
+	var small: Array = []
+	for k in btn:
+		var r: Rect2 = btn[k].get_global_rect()
+		if r.size.x < 60.0 or r.size.y < 60.0:
+			small.append(k)
+	_check(small.is_empty(), "los botones son grandes (>= 60 px lógicos de lado; pequeños: %s)" % str(small))
+	var pj: Vector2 = btn["jump"].get_global_rect().get_center()
+	var pr: Vector2 = btn["move_right"].get_global_rect().get_center()
+	var pl: Vector2 = btn["move_left"].get_global_rect().get_center()
+	var ps: Vector2 = btn["skill"].get_global_rect().get_center()
+	_touch(0, pj, true)
+	await _frames(2)
+	_check(Input.is_action_pressed("jump"), "un dedo en SALTO pulsa la acción")
+	_touch(1, pr, true)
+	await _frames(2)
+	_check(Input.is_action_pressed("jump") and Input.is_action_pressed("move_right"), "dos dedos a la vez: salto + derecha (multitáctil)")
+	_touch(2, ps, true)
+	await _frames(2)
+	_check(Input.is_action_pressed("skill"), "tres dedos: también el poder")
+	_touch(0, pj, false)
+	await _frames(2)
+	_check(not Input.is_action_pressed("jump") and Input.is_action_pressed("move_right") and Input.is_action_pressed("skill"), "soltar un dedo solo suelta su botón")
+	_touch(2, ps, false)
+	_drag(1, pl)  # arrastrar el dedo de derecha a izquierda
+	await _frames(2)
+	_check(Input.is_action_pressed("move_left") and not Input.is_action_pressed("move_right"), "arrastrar el dedo cambia de derecha a izquierda")
+	_touch(1, pl, false)
+	await _frames(2)
+	_check(not Input.is_action_pressed("move_left"), "al soltar todo no queda ninguna acción atascada")
+	# el personaje responde de verdad a los botones táctiles
+	var x0: float = lvl.player.position.x
+	_touch(3, pr, true)
+	await _frames(40)
+	var moved: float = lvl.player.position.x - x0
+	_touch(3, pr, false)
+	await _frames(2)
+	_check(moved > 25.0, "mantener DERECHA mueve a Wilmen (%.0f px)" % moved)
+	var y0: float = lvl.player.position.y
+	_touch(4, pj, true)
+	await _frames(12)
+	var rose: float = y0 - lvl.player.position.y
+	_touch(4, pj, false)
+	await _frames(2)
+	_check(rose > 8.0, "pulsar SALTO hace saltar a Wilmen (%.0f px)" % rose)
+	# botón de pausa de la interfaz
+	var pause_btn = null
+	for c2 in hud._root.get_children():
+		if c2 is Button and (c2 as Button).text == "II":
+			pause_btn = c2
+	_check(pause_btn != null, "existe el botón de pausa")
+	if pause_btn != null:
+		pause_btn.pressed.emit()
+		await _frames(3)
+		_check(paused, "el botón de pausa pausa el juego")
+		lvl.toggle_pause()
+		await _frames(3)
+		_check(not paused, "y se reanuda")
+	_game.settings["touch"] = "auto"
 	await _free_level(lvl)

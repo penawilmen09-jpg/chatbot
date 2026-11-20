@@ -108,15 +108,23 @@ func _show_options() -> void:
 	o.add_child(center)
 	var panel := PanelContainer.new()
 	center.add_child(panel)
-	var v := VBoxContainer.new()
-	v.add_theme_constant_override("separation", 6)
-	panel.add_child(v)
+	var outer := VBoxContainer.new()
+	outer.add_theme_constant_override("separation", 6)
+	panel.add_child(outer)
 	var t := UiTheme.label("OPCIONES", 20)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	v.add_child(t)
-	v.add_child(AudioPanel.build(300.0))
-	var touch := UiTheme.button("", Vector2(300, 34))
-	v.add_child(touch)
+	outer.add_child(t)
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 16)
+	outer.add_child(cols)
+
+	# --- columna izquierda: audio y controles
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 6)
+	cols.add_child(left)
+	left.add_child(AudioPanel.build(250.0))
+	var touch := UiTheme.button("", Vector2(250, 34))
+	left.add_child(touch)
 	var names := {"auto": "Auto", "on": "Sí", "off": "No"}
 	var upd := func():
 		touch.text = "Controles táctiles: %s" % names[str(Game.settings.get("touch", "auto"))]
@@ -127,21 +135,46 @@ func _show_options() -> void:
 		var cur: int = order.find(str(Game.settings.get("touch", "auto")))
 		Game.set_setting("touch", order[(cur + 1) % 3])
 		upd.call())
-	var reset := UiTheme.button("Borrar progreso", Vector2(300, 34))
-	v.add_child(reset)
+	var status := UiTheme.label("", 10, Color("#8affb0"))
+	status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	status.custom_minimum_size = Vector2(250, 28)
+	left.add_child(status)
+
+	# --- columna derecha: copia de seguridad, borrar, volver
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override("separation", 6)
+	cols.add_child(right)
+	var copy := UiTheme.button("Copiar mi partida", Vector2(170, 34))
+	right.add_child(copy)
+	copy.pressed.connect(func():
+		Audio.play_sfx("click")
+		DisplayServer.clipboard_set(Game.export_save_string())
+		status.text = "Partida copiada al portapapeles. Pégala en una nota para guardarla.")
+	var restore := UiTheme.button("Restaurar partida", Vector2(170, 34))
+	right.add_child(restore)
+	restore.pressed.connect(func():
+		Audio.play_sfx("click")
+		if Game.import_save_string(DisplayServer.clipboard_get()):
+			status.text = "Partida restaurada (la anterior se guardó aparte)."
+			get_tree().create_timer(0.8).timeout.connect(func(): get_tree().reload_current_scene())
+		else:
+			status.text = "El portapapeles no contiene una partida válida.")
+	var reset := UiTheme.button("Borrar progreso", Vector2(170, 34))
+	right.add_child(reset)
 	reset.pressed.connect(func():
 		if reset.text == "Borrar progreso":
-			reset.text = "¿Seguro? Pulsa otra vez"
+			reset.text = "¿Seguro? Otra vez"
+			status.text = "Se guardará una copia antes de borrar."
 		else:
 			Game.reset_progress()
 			Audio.play_sfx("back")
 			_close_options()
 			get_tree().reload_current_scene())
-	var back := UiTheme.button("Volver", Vector2(300, 34))
+	var back := UiTheme.button("Volver", Vector2(170, 34))
 	back.pressed.connect(func():
 		Audio.play_sfx("back")
 		_close_options())
-	v.add_child(back)
+	right.add_child(back)
 	add_child(o)
 	_options = o
 	back.grab_focus()
