@@ -1,27 +1,59 @@
 # WILMEN ADVENTURE
 
 Juego de plataformas 2D de 16 bits para **Android** hecho con **Godot 4.3 y GDScript**.
-20 niveles, 5 mundos, 5 jefes, 5 poderes, guardado automático. Funciona sin Internet, sin
+100 niveles, 10 mundos, 10 jefes, 10 poderes, guardado automático. Funciona sin Internet, sin
 anuncios y sin compras. Todo el arte y el audio son originales y se generan con los scripts de
 `tools/` (no hay recursos externos).
 
-## Estado honesto de este proyecto
+## Versión 2.0: 100 niveles, 10 mundos
 
-| Qué | Estado |
-|---|---|
-| Sintaxis de los 23 scripts GDScript | Comprobada con `gdparse` (gramática de GDScript 4) |
-| Rutas `res://`, escenas, sonidos y músicas referenciadas | Comprobadas por script: todas existen |
-| 20 niveles: inicio → meta y las 3 gemas alcanzables | **Validado** con `tools/levelgen.py --check` (modelo de saltos conservador; ver abajo) |
-| Fusión de colisiones del terreno | Probada con una réplica en Python sobre los 20 niveles |
-| Arte (personaje, enemigos, jefes, tiles, fondos) | Generado y revisado visualmente en imágenes |
-| **Ejecución dentro de Godot** | **NO probada**: el entorno donde se escribió no permitió ejecutar el motor |
-| **Sensación de juego** (saltos, dificultad, jefes) | **NO probada**: hay que jugarlo y ajustar |
-| **Música y efectos** | Generados y comprobados por código, **no escuchados** |
-| **APK de Android / controles táctiles en un móvil** | **NO generado ni probado** |
+| Mundo | Niveles | Jefe | Poder | Mecánicas propias |
+|---|---|---|---|---|
+| 1 Bosque Esmeralda | 1-10 | Rey Tronco | Chispa Esmeralda | resortes, bloques ocultos |
+| 2 Cuevas de Cristal | 11-20 | Golem de Cristal | Impulso de Cristal | túneles, ascensores, plataformas móviles |
+| 3 Desierto Perdido | 21-30 | Rey Escarabajo | Escudo Solar | fosos anchos, pinchos |
+| 4 Reino de Hielo | 31-40 | Yeti Gélido | Aliento Helado | suelo resbaladizo |
+| 5 Castillo de las Sombras | 41-50 | Señor de las Sombras | Paso Sombrío | lava |
+| 6 Islas Voladoras | 51-60 | Águila Tormenta | Ráfaga Celeste | corrientes de viento, islas, plataformas frágiles |
+| 7 Reino Volcánico | 61-70 | Dragón de Magma | Llamarada | géiseres de lava, lava |
+| 8 Jungla Salvaje | 71-80 | Gorila Ancestral | Salto Salvaje | barro, plataformas frágiles |
+| 9 Mundo Mecánico | 81-90 | Coloso Mecánico | Pulso Eléctrico | cintas transportadoras, prensas |
+| 10 Reino Final | 91-100 | Emperador del Vacío | Nova Final | todas las anteriores |
 
-Es decir: el proyecto está completo y preparado, pero es normal que la primera ejecución en Godot
-destape algún error de ejecución o necesite ajustes. Para detectarlos rápido hay una prueba
-automática dentro del motor (`tests/smoke_test.gd`, ver más abajo).
+En cada mundo: niveles 1-9 normales (el **7 es una cámara secreta** con tesoro y música propia) y el **10 es el jefe**.
+Los 20 niveles de la versión 1 se conservan íntegros: son los niveles 1-3 y 10 de los mundos 1-5.
+
+**Desbloqueo (sin pagos ni anuncios).** Partida nueva: solo el nivel 1. El nivel *n+1* se abre únicamente cuando
+**todos** los niveles 1..n están completados (llegar a la meta). Se valida en tres sitios: el mapa
+(`Game.start_level()`), el botón *Siguiente* y la propia escena del nivel (`level.gd` rechaza cargar un nivel
+bloqueado aunque se abra directamente). Perder no desbloquea nada. Se guarda automáticamente.
+
+**Migración del guardado.** Un guardado de la versión 1 (20 niveles) se convierte solo al primer arranque
+(copia de seguridad en `wilmen_save_v1_backup.json`): los niveles completados, gemas, puntuaciones, vidas y
+ajustes se conservan. Como los niveles nuevos (4-9 de cada mundo) no se habían jugado, el desbloqueo consecutivo
+te devuelve a ellos; tus niveles antiguos siguen marcados como completados y se rejuegan cuando los alcances.
+
+**Recompensas de mundo.** Derrotar al jefe por primera vez: +3 vidas y +5000 puntos.
+
+**Música (31 pistas originales sintetizadas).** Una canción principal por mundo (10), una alternativa por mundo
+para los niveles 5-9 (10), música secreta (niveles x7), de castillo (niveles 6-9 de los mundos 5 y 10),
+4 de jefe (mundos 1-3, 4-6, 7-9 y final), victoria de nivel, victoria de mundo, derrota, mapa y título.
+Cambian solas con fundido cruzado (crossfade). Volumen y silencio independientes para música y efectos
+(Opciones y menú de pausa).
+
+## Estado de las pruebas
+
+Todas se ejecutan **dentro de Godot 4.3 (headless)** en GitHub Actions (`.github/workflows/wilmen-android-apk.yml`):
+
+- Validación de los 100 niveles (`python3 tools/levelgen.py --check`): inicio→meta y 3 gemas alcanzables, sin duplicados.
+- `tests/smoke_test.gd`: recursos y audio, ausencia de red, desbloqueo (partida nueva, carga directa de niveles
+  bloqueados, completar/saltar/perder), migración y persistencia, carga de los 100 niveles, música por mundo y
+  de jefe, los 10 jefes completos, mecánicas nuevas, enemigos, poderes, menús y un bot.
+- `tests/persist_write.gd` + `tests/persist_check.gd`: dos procesos de Godot distintos (cerrar y abrir el juego).
+- Tras exportar: el APK se firma, se comprueba su firma y que **no** pide el permiso INTERNET.
+
+No se puede probar automáticamente: la sensación de juego (dificultad, saltos, jefes), cómo suena la música,
+la respuesta de los botones táctiles en un móvil real ni la instalación del APK en un dispositivo.
 
 ## Cómo abrirlo y jugar en el ordenador
 
@@ -33,15 +65,15 @@ Controles de teclado: flechas o **A/D** mover · **Espacio / W / Z** saltar (pul
 el doble salto) · **X / Shift / K** poder · **Esc / P** pausa. También funciona un mando.
 Los botones táctiles aparecen solos en móviles; en el ordenador se activan en Opciones → Controles táctiles.
 
-## Prueba automática en el motor
+## Probar en el motor
 
 ```bash
 godot --headless --path wilmen-adventure --import
 godot --headless --path wilmen-adventure --script res://tests/smoke_test.gd
+godot --headless --path wilmen-adventure --script res://tests/persist_write.gd
+godot --headless --path wilmen-adventure --script res://tests/persist_check.gd
 ```
-
-Carga los 20 niveles, comprueba que cada uno tiene jugador, meta, 3 gemas (y jefe + puerta en los
-niveles 4, 8, 12, 16 y 20) y deja correr un "bot" 8 segundos en el nivel 1. Devuelve código 0 si todo va bien.
+(o `tests/run_all.sh`; imprime `ok`/`FALLO` y devuelve código 0/1).
 
 ## Crear el APK
 
@@ -56,33 +88,11 @@ niveles 4, 8, 12, 16 y 20) y deja correr un "bot" 8 segundos en el nivel 1. Devu
    Paquete: `com.wilmen.adventure`, orientación horizontal (sensor), arm64 + armeabi-v7a.
 5. Para publicar en Google Play necesitas una clave de firma propia (release) y exportar AAB; no se incluye ninguna clave en el repositorio.
 
-### Opción B – Con GitHub Actions
-El flujo `.github/workflows/wilmen-android-apk.yml` instala Godot, las plantillas y el SDK, ejecuta la
-prueba de humo y exporta un APK de depuración como artefacto descargable. Se lanza desde la pestaña
-**Actions → WILMEN ADVENTURE - APK de Android → Run workflow**. *(Escrito siguiendo la documentación
-de Godot, pero no se ha ejecutado todavía.)*
-
-## El juego
-
-**Mundos y niveles** (x-4 es siempre un jefe):
-
-| Mundo | Niveles | Jefe | Poder de Wilmen |
-|---|---|---|---|
-| 1 Bosque Esmeralda | Claro del Bosque · Sendero de las Raíces · Copas de los Árboles · Guarida del Rey Tronco | Rey Tronco | Chispa Esmeralda (proyectil que rebota) |
-| 2 Cuevas de Cristal | Galería Brillante · Lago Subterráneo · Mina Abandonada · Corazón de Cristal | Golem de Cristal | Impulso de Cristal (embestida que rompe bloques) |
-| 3 Desierto Perdido | Dunas Doradas · Oasis Espejismo · Ruinas de Arena · Tumba del Escarabajo | Rey Escarabajo | Escudo Solar (invulnerable 4 s) |
-| 4 Reino de Hielo (suelo resbaladizo) | Llanura Helada · Cumbres Nevadas · Cavernas de Escarcha · Trono del Yeti | Yeti Gélido | Aliento Helado (congela enemigos) |
-| 5 Castillo de las Sombras (lava) | Puente Sombrío · Salón de Antorchas · Torre del Vacío · El Señor de las Sombras | Señor de las Sombras | Paso Sombrío (teletransporte corto) |
-
-**Sistemas**: movimiento con aceleración, salto de altura variable, *coyote time*, *jump buffer*, doble salto;
-3 corazones por vida, vidas (se gana una cada 100 monedas), puntuación, 3 gemas por nivel, bloques de
-ladrillo rompibles, bloques `?`, bloques de corazón, **bloques ocultos** (vida extra y monedas), nichos secretos,
-resortes, plataformas móviles, pinchos, lava, puntos de control, meta. Enemigos: caminante (persigue sin
-tirarse por los bordes), pinchudo (no se pisa), saltarín, volador y tirador, con el aspecto de cada mundo.
-Cada jefe tiene 3-4 ataques propios y una fase 2 más rápida; si pierdes una vida el combate se reinicia.
-
-**Guardado**: automático al completar un nivel, al volver al menú y al pasar la app a segundo plano
-(`user://wilmen_save.json`: niveles desbloqueados, gemas, mejores puntuaciones, vidas, ajustes).
+### Opción B – Con GitHub Actions (recomendada)
+Cada *push* que cambie `wilmen-adventure/` (o *Actions → Run workflow*) valida los niveles, ejecuta las pruebas en
+Godot y, si pasan, exporta un **APK release** firmado y lo publica como artefacto `WilmenAdventure-APK-2.0.N`.
+El *version code* sube solo (100 + nº de ejecución) y la clave de firma es siempre la misma (`android/README.md`),
+así que cada APK nuevo se instala encima del anterior. Para Google Play usa tu propia clave (ver `android/README.md`).
 
 ## Estructura
 
