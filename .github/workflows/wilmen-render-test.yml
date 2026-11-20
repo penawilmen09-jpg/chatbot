@@ -1,0 +1,59 @@
+name: WILMEN ADVENTURE - Prueba de render (pantalla completa, varias resoluciones)
+
+# Dibuja el juego con Godot + Mesa (GPU por software) bajo Xvfb en 9 relaciones de aspecto y mide los
+# píxeles que no cubre ningún fondo/escenario (franjas negras). Guarda capturas como artefacto.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "wilmen-adventure/**"
+      - ".github/workflows/wilmen-render-test.yml"
+
+env:
+  GODOT_VERSION: "4.3"
+
+jobs:
+  render:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: wilmen-adventure
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependencias gráficas (Xvfb, Mesa)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0 libegl1 libxcursor1 libxinerama1 libxi6 libxrandr2 libxkbcommon0 libasound2
+          mkdir -p /tmp/shots
+
+      - name: Descargar Godot
+        run: |
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -O /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          sudo mv /tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+
+      - name: Importar recursos
+        run: |
+          godot --headless --path . --import || true
+          godot --headless --path . --import
+
+      - name: Prueba de render en 9 resoluciones
+        run: |
+          set -o pipefail
+          export LIBGL_ALWAYS_SOFTWARE=1
+          xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd 2>&1 | tee /tmp/render.log
+          grep -E "FALLO" /tmp/render.log | head -60 || true
+          grep -q "RESULTADO: TODO OK" /tmp/render.log
+
+      - name: Capturas y registro
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wilmen-render-shots
+          path: |
+            /tmp/shots
+            /tmp/render.log
+          if-no-files-found: ignore
