@@ -519,6 +519,10 @@ CHUNKS = {
     "conveyor": c_conveyor, "crusher": c_crusher, "islands": c_islands, "treasure": c_treasure,
 }
 
+import geo  # noqa: E402  (geometría v3: colinas, montañas, puentes, lagos...)
+geo.bind(sys.modules[__name__])
+CHUNKS.update(geo.NEW_CHUNKS)
+
 _Z = dict(flat=0, gap=0, stairs=0, platforms=0, blocks=0, wall=0, spikes=0, tunnel=0, moving=0, vertical=0,
           gauntlet=0, ice=0, crumble=0, wind=0, geyser=0, mud=0, conveyor=0, crusher=0, islands=0, treasure=0)
 
@@ -675,18 +679,18 @@ def build_boss(n, seed):
     ground(lv, 0, 14, GT0)
     lv.set(3, GT0 - 1, "P")
     x = 14
-    wts = dict(WORLD_WEIGHTS[world])
-    wts["gauntlet"] = 0
-    names = [k for k, v in wts.items() if v > 0 for _ in range(v)]
     gem_chunks = list(GEM_CHUNKS)
     rnd.shuffle(gem_chunks)
-    plan = [rnd.choice(names) for _ in range(2 + world // 3)]
-    for gc in gem_chunks:
+    zones = geo.recipe_plan(world, 9, 0.0, rnd)
+    base = [geo.map_chunk(world, c) for z in zones for c in z]
+    plan = []
+    for i, gc in enumerate(gem_chunks):
+        plan.extend(base[i * 3:i * 3 + 3])
         plan.append(gc)
-        plan.append(rnd.choice(names))
     for name in plan:
         if x > approach - 24 and name not in gem_chunks:
             continue
+        x += geo.pre_adjust(lv, x, ctx, name)
         wd = run_chunk(lv, x, ctx, name)
         x += wd
         ground(lv, x, x + 2, ctx["gt"])
@@ -726,6 +730,8 @@ def build_boss(n, seed):
     lv.set(total - 5, GT0 - 1, "F")
     lv.set(approach + 6, GT0 - 1, "h")
     lv.set(approach + 38, GT0 - 1, "h")
+    geo.scenery(lv, ctx, world, 3, approach - 6, protect_x=[3])
+    geo.arena_props(lv, ctx, world, approach, total)
     return lv, ctx
 
 
@@ -932,7 +938,67 @@ def validate(rows, n):
 
 
 # ----------------------------------------------------------------- MAIN ---
-LEGACY = {1, 2, 3, 10, 11, 12, 13, 20, 21, 22, 23, 30, 31, 32, 33, 40, 41, 42, 43, 50}  # niveles de la versión 1
+def build_regular(n, seed, secret=False):
+    """v3: cada nivel sigue su receta de 3 zonas (ver worlds_def.RECIPES) con geometría variada y atrezo propio."""
+    world, idx, d = level_params(n)
+    rnd = random.Random(seed)
+    pool = enemy_pool(world, min(idx - 1, 5))
+    if secret:
+        pool = ["w", "j"][: 1 + (world > 3)]
+    lava = world == 7 or (world == 5 and idx in (1, 4)) or (world == 10 and idx == 6)
+    ctx = dict(rnd=rnd, gt=GT0, d=d, world=world, pool=pool, gems=0, lava=lava)
+    lv = Lv(900)
+    ground(lv, 0, 14, GT0)
+    lv.set(3, GT0 - 1, "P")
+    x = 14
+    gem_chunks = list(GEM_CHUNKS)
+    rnd.shuffle(gem_chunks)
+    zones = geo.recipe_plan(world, idx, d, rnd)
+    bounds = []
+    for zi, zone in enumerate(zones):
+        bounds.append(x)
+        names = [geo.map_chunk(world, c) for c in zone]
+        names.insert(1 + rnd.randint(0, max(0, len(names) - 2)), gem_chunks[zi])
+        if zi < 2:
+            names.append("checkpoint")
+        for name in names:
+            x += geo.pre_adjust(lv, x, ctx, name)
+            wd = run_chunk(lv, x, ctx, name)
+            x += wd
+            ground(lv, x, x + 2, ctx["gt"])
+            x += 2
+    # llegada a la meta siempre a la altura estándar
+    while ctx["gt"] > 14:
+        ground(lv, x, x + 2, ctx["gt"])
+        ctx["gt"] -= 1
+        x += 2
+    ground(lv, x, x + 16, ctx["gt"])
+    gt = ctx["gt"]
+    lv.set(x + 9, gt - 1, "F")
+    for xx in (x + 3, x + 6):
+        lv.set(xx, gt - 1, "d")
+    coin_line(lv, x + 2, x + 8, gt - 3)
+    total = x + 16
+    ensure_enemies(lv, ctx, (2 if secret else 4 + int(d * 14)), 22, total - 18)
+    prot = [xx for xx in range(total) for yy in range(R) if lv.g[yy][xx] in "PFCS"]
+    ctx["fav"] = geo.scenery(lv, ctx, world, geo_zone(idx), total, protect_x=prot)
+    ctx["bounds"] = bounds
+    out = Lv(total)
+    for y in range(R):
+        for xx in range(total):
+            out.g[y][xx] = lv.g[y][xx]
+    return out, ctx
+
+
+def geo_zone(idx):
+    from worlds_def import zone_of
+    return zone_of(idx)
+
+
+# ajustes de semilla para que dos niveles del mismo mundo no se parezcan (ver variety_check)
+SALT = {6: 1}
+LEGACY = set()  # v3: los 100 niveles se regeneran con la nueva geometría; el progreso guardado no depende del diseño
+_LEGACY_V1 = {1, 2, 3, 10, 11, 12, 13, 20, 21, 22, 23, 30, 31, 32, 33, 40, 41, 42, 43, 50}  # niveles de la versión 1
 
 
 def level_text(n, rows, seed):
@@ -962,7 +1028,7 @@ def generate(only_missing=True):
             continue
         boss = n % 10 == 0
         secret = (n - 1) % 10 + 1 == 7
-        seed = 5000 + n * 131
+        seed = 5000 + n * 131 + SALT.get(n, 0) * 7919
         ok = False
         for attempt in range(80):
             s = seed + attempt
@@ -999,8 +1065,51 @@ def check_only():
         if errs:
             print("nivel %3d: %s" % (n, errs))
             bad += 1
+    bad += variety_check()
     print("niveles revisados: 100 | con errores: %d" % bad)
     sys.exit(1 if bad else 0)
+
+
+def _profile(rows, samples=48):
+    """Altura de la superficie transitable por columna (remuestreada): la 'silueta' del nivel."""
+    w = max(len(r) for r in rows)
+    rows = [r.ljust(w) for r in rows]
+    prof = []
+    for x in range(w):
+        y_s = R
+        for y in range(R - 1, 2, -1):
+            if rows[y][x] == "#" and rows[y - 1][x] != "#":
+                y_s = y
+                break
+        prof.append(y_s)
+    return [prof[int(i * (w - 1) / (samples - 1))] for i in range(samples)]
+
+
+def variety_check():
+    """Los niveles de un mundo no pueden parecerse: silueta distinta, desniveles reales y atrezo variado."""
+    bad = 0
+    profs = {}
+    for n in range(1, 101):
+        rows = read_rows(n)
+        prof = _profile(rows)
+        profs[n] = prof
+        span = max(prof) - min(prof)
+        props = set(ch for r in rows for ch in r if ch in "123456789")
+        if n % 10 != 0 and span < 4:
+            print("nivel %3d: demasiado llano (desnivel de %d filas)" % (n, span))
+            bad += 1
+        if len(props) < 4:
+            print("nivel %3d: poco atrezo (%d tipos)" % (n, len(props)))
+            bad += 1
+    for w in range(10):
+        ids = [w * 10 + i for i in range(1, 10)]
+        for i, a in enumerate(ids):
+            for b in ids[i + 1:]:
+                diff = sum(abs(x - y) for x, y in zip(profs[a], profs[b])) / len(profs[a])
+                if diff < 0.9:
+                    print("niveles %d y %d: siluetas casi iguales (diferencia media %.2f)" % (a, b, diff))
+                    bad += 1
+    return bad
 
 
 if __name__ == "__main__":

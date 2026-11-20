@@ -17,6 +17,7 @@ const GeyserScene := preload("res://items/geyser.tscn")
 const CrusherScene := preload("res://items/crusher.tscn")
 const ChunkScript := preload("res://levels/terrain_chunk.gd")
 const ParallaxBgScript := preload("res://levels/parallax_bg.gd")
+const PropsData := preload("res://levels/props_data.gd")
 const HudScript := preload("res://ui/hud.gd")
 const UiTheme := preload("res://ui/ui_theme.gd")
 const CHUNK_COLS := 24
@@ -123,11 +124,26 @@ func _build_background() -> void:
 	# Fondo propio (ver parallax_bg.gd): cubre todo el ancho visible en cualquier relación de aspecto.
 	var bg = ParallaxBgScript.new()
 	bg.world = world
+	bg.level_idx = Game.index_in_world(number)
+	bg.zone = zone_of_level(bg.level_idx)
 	add_child(bg)
+
+
+func zone_of_level(idx: int) -> int:
+	## 0: niveles 1-3, 1: niveles 4-6, 2: niveles 7-9, 3: arena del jefe (nivel 10)
+	if idx >= 10:
+		return 3
+	if idx <= 3:
+		return 0
+	if idx <= 6:
+		return 1
+	return 2
 
 
 func _build_terrain() -> void:
 	var decor_tex: Texture2D = load("res://assets/decor/decor_w%d.png" % world)
+	var props_tex: Texture2D = load("res://assets/decor/props_w%d.png" % world)
+	var prop_rects: Array = PropsData.PROPS[world]
 	# --- dibujo por trozos
 	for cx in range(0, cols, CHUNK_COLS):
 		var chunk = ChunkScript.new()
@@ -137,13 +153,28 @@ func _build_terrain() -> void:
 		chunk.x1 = cx + CHUNK_COLS
 		chunk.tiles = _tileset
 		chunk.decor = decor_tex
+		chunk.props = props_tex
+		chunk.prop_rects = prop_rects
 		for y in range(nrows):
 			var r: String = rows[y]
 			for x in range(cx, mini(cx + CHUNK_COLS, cols)):
-				if r[x] == "L":
+				var ch: String = r[x]
+				if ch == "L":
 					chunk.has_lava = true
-				elif r[x] == ">" or r[x] == "<":
+				elif ch == ">" or ch == "<":
 					chunk.has_belt = true
+				elif ch == "a" or ch == "|":
+					chunk.animated = true
+				else:
+					var pi: int = "123456789".find(ch)
+					if pi >= 0 and pi < prop_rects.size() and int(prop_rects[pi][4]) > 1:
+						chunk.animated = true
+		# fosos (vacío bajo el mapa): el líquido del fondo también se anima
+		var rb: String = rows[nrows - 1]
+		for x in range(cx, mini(cx + CHUNK_COLS, cols)):
+			if rb[x] == " ":
+				chunk.animated = true
+				break
 		add_child(chunk)
 
 	# --- colisiones sólidas (rectángulos fusionados)

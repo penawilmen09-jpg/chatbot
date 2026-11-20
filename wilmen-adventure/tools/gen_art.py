@@ -1696,8 +1696,12 @@ def main():
     gen_ui_icons()
     gen_enemies()
     gen_bosses()
-    gen_backgrounds()
     gen_icon()
+    # v3: atrezo, líquidos/cascadas, fondos de 4 zonas (módulos propios; importan este fichero)
+    import gen_props
+    import gen_bg
+    gen_props.main()
+    gen_bg.main()
     print("arte generado en", ASSETS)
 
 

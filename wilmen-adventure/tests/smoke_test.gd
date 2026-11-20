@@ -1,4 +1,7 @@
 extends SceneTree
+
+const PropsData := preload("res://levels/props_data.gd")
+const AmbientData := preload("res://levels/ambient_data.gd")
 ## Batería de pruebas de WILMEN ADVENTURE dentro del motor (Godot 4.3 headless).
 ##
 ##   godot --headless --path . --import
@@ -107,13 +110,35 @@ func _test_resources() -> void:
 		_check(ResourceLoader.exists(p) and load(p) != null, "escena %s" % p)
 	for w in range(1, 11):
 		var ok: bool = true
-		for p in ["res://assets/tiles/tiles_w%d.png" % w, "res://assets/tiles/mplatform_w%d.png" % w,
-				"res://assets/decor/decor_w%d.png" % w, "res://assets/enemies/enemies_w%d.png" % w,
-				"res://assets/bosses/boss_%d.png" % w, "res://assets/backgrounds/bg_w%d_far.png" % w,
-				"res://assets/backgrounds/bg_w%d_mid.png" % w, "res://assets/backgrounds/bg_w%d_near.png" % w]:
+		var files: Array = ["res://assets/tiles/tiles_w%d.png" % w, "res://assets/tiles/mplatform_w%d.png" % w,
+				"res://assets/decor/decor_w%d.png" % w, "res://assets/decor/props_w%d.png" % w, "res://assets/enemies/enemies_w%d.png" % w,
+				"res://assets/bosses/boss_%d.png" % w]
+		for z in range(4):
+			for nm in ["far", "mid", "near"]:
+				files.append("res://assets/backgrounds/bg_w%d_z%d_%s.png" % [w, z, nm])
+		for p in files:
 			if not ResourceLoader.exists(p) or load(p) == null:
 				ok = false
 				print("    falta: ", p)
+		var tex: Texture2D = load("res://assets/tiles/tiles_w%d.png" % w)
+		if tex == null or tex.get_width() < 26 * 16:
+			ok = false
+			print("    tiles_w%d.png no incluye líquido/cascada/pared de fondo" % w)
+		var atlas: Texture2D = load("res://assets/decor/props_w%d.png" % w)
+		var rects: Array = PropsData.PROPS.get(w, [])
+		if rects.size() != 9:
+			ok = false
+			print("    props_data.gd: el mundo %d no tiene 9 elementos" % w)
+		else:
+			for r in rects:
+				if atlas == null or int(r[0]) + int(r[2]) * int(r[4]) > atlas.get_width() or int(r[3]) > atlas.get_height():
+					ok = false
+					print("    atrezo fuera del atlas en el mundo %d: %s" % [w, str(r)])
+		for z in range(4):
+			var amb: Dictionary = AmbientData.for_level(w, z, 1 + z * 3)
+			if int(amb["particle_total"]) > AmbientData.MAX_PARTICLES:
+				ok = false
+				print("    demasiadas partículas en mundo %d zona %d: %d" % [w, z, int(amb["particle_total"])])
 		_check(ok, "arte completo del mundo %d" % w)
 	var missing_levels: Array = []
 	for n in range(1, 101):
