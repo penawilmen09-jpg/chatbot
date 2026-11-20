@@ -40,19 +40,28 @@ jobs:
           godot --headless --path . --import || true
           godot --headless --path . --import
 
-      - name: Prueba de render en 9 relaciones de aspecto (un proceso de Godot por resolución)
+      - name: Línea base - fondo ANTIGUO (informativo, no bloquea)
+        continue-on-error: true
+        run: |
+          export LIBGL_ALWAYS_SOFTWARE=1
+          for RES in 2000x933 1600x720 2400x1080; do
+            echo "################ ANTIGUO $RES"
+            xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --resolution $RES --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd -- --legacy-parallax 2>&1 | tee -a /tmp/render_legacy.log | grep -E "==|FALLO|CAPTURAS|RESULTADO|M1 inicio" || true
+          done
+
+      - name: Prueba de render en 11 relaciones de aspecto (un proceso de Godot por resolución)
         run: |
           export LIBGL_ALWAYS_SOFTWARE=1
           FAIL=0
-          for RES in 1280x720 2400x1080 2340x1080 2560x1080 2960x1440 3200x1440 1920x1200 1600x1200 800x480; do
+          for RES in 1280x720 2000x933 1600x720 2400x1080 2340x1080 2560x1080 2960x1440 3200x1440 1920x1200 1600x1200 800x480; do
             echo "################ $RES"
             xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --resolution $RES --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd 2>&1 | tee -a /tmp/render.log | grep -E "==|FALLO|CAPTURAS|RESULTADO" || true
-            grep -q "RESULTADO: TODO OK" <(tail -n 12 /tmp/render.log) || FAIL=1
+            tail -n 12 /tmp/render.log | grep -q "RESULTADO: TODO OK" || FAIL=1
           done
           echo "################ redimensionado en vivo (como al rotar en Android)"
-          xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --resolution 1280x720 --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd -- --live 2>&1 | tee -a /tmp/render.log | grep -E "==|FALLO|CAPTURAS|RESULTADO|RENDER" || true
-          grep -q "RESULTADO: TODO OK" <(tail -n 12 /tmp/render.log) || FAIL=1
-          echo "fallos totales de líneas: $(grep -c 'FALLO' /tmp/render.log)"
+          xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --resolution 1280x720 --rendering-driver opengl3 --audio-driver Dummy --script res://tests/render_test.gd -- --live 2>&1 | tee -a /tmp/render.log | grep -E "==|FALLO|CAPTURAS|RESULTADO" || true
+          tail -n 12 /tmp/render.log | grep -q "RESULTADO: TODO OK" || FAIL=1
+          echo "líneas con FALLO: $(grep -c 'FALLO' /tmp/render.log)"
           exit $FAIL
 
       - name: Capturas y registro
@@ -62,5 +71,7 @@ jobs:
           name: wilmen-render-shots
           path: |
             /tmp/shots
+            /tmp/render.log
+            /tmp/render_legacy.log
             /tmp/render.log
           if-no-files-found: ignore

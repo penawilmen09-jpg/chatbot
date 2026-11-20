@@ -118,7 +118,7 @@ func _shot(tag: String, lvl = null) -> void:
 		_failed += 1
 	if not ok or tag.begins_with("L1 inicio"):
 		DirAccess.make_dir_recursive_absolute(SHOT_DIR)
-		img.save_png("%s/%dx%d_%s.png" % [SHOT_DIR, res.x, res.y, tag.replace(" ", "_").replace("/", "-")])
+		img.save_png("%s/%dx%d_%s.png" % [SHOT_DIR, res.x, res.y, tag.replace(" ", "_").replace("/", "-").replace(":", "").replace("(", "").replace(")", "")])
 		_shots_saved += 1
 
 
@@ -155,6 +155,9 @@ func _run() -> void:
 		_failed += 1
 
 	var live: bool = OS.get_cmdline_user_args().has("--live")
+	if OS.get_cmdline_user_args().has("--legacy-parallax"):
+		Engine.set_meta("legacy_parallax", true)
+		print("(modo medición: ParallaxBackground antiguo)")
 	if not live:
 		# un nivel de cada mundo: cielo/fondos, límites derecho e izquierdo de la cámara
 		for w in range(1, 11):

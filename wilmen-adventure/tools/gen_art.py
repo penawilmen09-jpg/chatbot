@@ -1098,6 +1098,36 @@ def silhouette(w, layer):
     return im
 
 
+
+# ---------------------------------------------------------------------------
+# CORRECCIÓN (franjas oscuras en el cielo): ImageDraw SOBRESCRIBE el alfa en vez de mezclar, así que las
+# nubes/nebulosas/rayos "translúcidos" dejaban píxeles semitransparentes en la capa lejana y por ellos asomaba
+# el color de fondo del motor. La capa lejana debe ser SIEMPRE totalmente opaca: se vuelve a componer sobre el
+# degradado puro y se comprueba que no queda ningún píxel transparente.
+def sky_gradient(w):
+    P = WORLDS[w]
+    im = Image.new("RGBA", (BW, BH), CLEAR)
+    d = ImageDraw.Draw(im)
+    top, bot = C(P["sky_top"]), C(P["sky_bot"])
+    for y in range(BH):
+        t = min(1.0, y / 270.0)
+        t = round(t * 24) / 24
+        d.line([(0, y), (BW, y)], fill=lerp(top, bot, t))
+    return im
+
+
+_bg_far_raw = bg_far
+
+
+def bg_far(w):
+    raw = _bg_far_raw(w)
+    base = sky_gradient(w)
+    base.alpha_composite(raw)
+    lo = min(base.getchannel("A").getdata())
+    assert lo == 255, "bg_w%d_far tiene píxeles transparentes (alfa mínimo %d)" % (w, lo)
+    return base
+
+
 def gen_backgrounds():
     for w in WORLDS:
         save(bg_far(w), "backgrounds", "bg_w%d_far.png" % w)

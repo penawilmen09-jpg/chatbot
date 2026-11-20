@@ -56,6 +56,8 @@ var _sprite: AnimatedSprite2D
 var _was_on_floor: bool = true
 var _dust_t: float = 0.0
 var _squash_tw: Tween = null
+var _cam_x: float = 0.0
+const CAM_Y := -14.0
 
 
 func _ready() -> void:
@@ -217,14 +219,15 @@ func _update_visuals(dir: float, on_floor: bool, delta: float) -> void:
 	if shield_t > 0.0 or dash_t > 0.0:
 		queue_redraw()
 	if camera != null:
+		# Anticipación y temblor se aplican a la POSICIÓN de la cámara (hija del jugador) y no a
+		# Camera2D.offset: el offset se suma DESPUÉS de los límites y dejaba ver fuera del nivel.
 		var target_x: float = facing * 26.0
-		var cur: Vector2 = camera.offset
-		cur.x = lerpf(cur.x, target_x, minf(1.0, 3.0 * delta))
+		_cam_x = lerpf(_cam_x, target_x, minf(1.0, 3.0 * delta))
 		_shake = maxf(0.0, _shake - 30.0 * delta)
+		var shake_v := Vector2.ZERO
 		if _shake > 0.0:
-			camera.offset = cur + Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
-		else:
-			camera.offset = Vector2(cur.x, 0.0)
+			shake_v = Vector2(randf_range(-_shake, _shake), randf_range(-_shake, _shake))
+		camera.position = Vector2(_cam_x, CAM_Y) + shake_v
 
 
 func _draw() -> void:

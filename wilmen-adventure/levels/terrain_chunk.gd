@@ -21,6 +21,7 @@ var tiles: Texture2D
 var decor: Texture2D
 var has_lava: bool = false
 var has_belt: bool = false
+var extra_rows: int = 12  # relleno bajo la última fila (pantallas más altas que el mapa)
 
 var _phase: int = 0
 var _timer: float = 0.0
@@ -50,6 +51,7 @@ func _tile(idx: int, x: int, y: int) -> void:
 
 
 func _draw() -> void:
+	_draw_below()
 	for y in range(rows.size()):
 		var r: String = rows[y]
 		for x in range(x0, mini(x1, r.length())):
@@ -75,3 +77,16 @@ func _draw() -> void:
 				"d":
 					if decor != null:
 						draw_texture(decor, Vector2(x * TILE + 8 - 12, y * TILE + 16 - 32))
+
+
+func _draw_below() -> void:
+	## Continúa hacia abajo el relleno del suelo para que, en pantallas altas (4:3), no se vea el fondo bajo el mapa.
+	if rows.is_empty():
+		return
+	var last: int = rows.size() - 1
+	var r: String = rows[last]
+	for x in range(x0, mini(x1, r.length())):
+		var c: String = r[x]
+		if c == "#" or c == ">" or c == "<" or c == "~":
+			for k in range(1, extra_rows + 1):
+				_tile(T_FILL_A if (x * 7 + (last + k) * 3) % 5 < 3 else T_FILL_B, x, last + k)

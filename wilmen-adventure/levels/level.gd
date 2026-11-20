@@ -16,6 +16,7 @@ const CrumbleScene := preload("res://items/crumble.tscn")
 const GeyserScene := preload("res://items/geyser.tscn")
 const CrusherScene := preload("res://items/crusher.tscn")
 const ChunkScript := preload("res://levels/terrain_chunk.gd")
+const ParallaxBgScript := preload("res://levels/parallax_bg.gd")
 const HudScript := preload("res://ui/hud.gd")
 const UiTheme := preload("res://ui/ui_theme.gd")
 const CHUNK_COLS := 24
@@ -119,19 +120,25 @@ func _cell(x: int, y: int) -> String:
 
 # ---------------------------------------------------------- escenario -----
 func _build_background() -> void:
-	var bg := ParallaxBackground.new()
+	if Engine.has_meta("legacy_parallax"):  # TEMPORAL: solo para medir el comportamiento antiguo en CI
+		var old := ParallaxBackground.new()
+		add_child(old)
+		var sc := [0.04, 0.2, 0.45]
+		var nm := ["far", "mid", "near"]
+		for i in range(3):
+			var ly := ParallaxLayer.new()
+			ly.motion_scale = Vector2(sc[i], 0.0)
+			ly.motion_mirroring = Vector2(480, 0)
+			var spr := Sprite2D.new()
+			spr.texture = load("res://assets/backgrounds/bg_w%d_%s.png" % [world, nm[i]])
+			spr.centered = false
+			ly.add_child(spr)
+			old.add_child(ly)
+		return
+	# Fondo propio (ver parallax_bg.gd): cubre todo el ancho visible en cualquier relación de aspecto.
+	var bg = ParallaxBgScript.new()
+	bg.world = world
 	add_child(bg)
-	var scales := [0.04, 0.2, 0.45]
-	var names := ["far", "mid", "near"]
-	for i in range(3):
-		var layer := ParallaxLayer.new()
-		layer.motion_scale = Vector2(scales[i], 0.0)
-		layer.motion_mirroring = Vector2(480, 0)
-		var sp := Sprite2D.new()
-		sp.texture = load("res://assets/backgrounds/bg_w%d_%s.png" % [world, names[i]])
-		sp.centered = false
-		layer.add_child(sp)
-		bg.add_child(layer)
 
 
 func _build_terrain() -> void:
@@ -375,13 +382,13 @@ func _spawn_player() -> void:
 	add_child(player)
 	camera = Camera2D.new()
 	camera.limit_left = 0
-	camera.limit_right = cols * TILE
 	camera.limit_top = 0
-	camera.limit_bottom = nrows * TILE
 	camera.position = Vector2(0, -14)
 	camera.position_smoothing_enabled = true
 	camera.position_smoothing_speed = 8.0
 	player.add_child(camera)
+	_update_camera_limits()
+	get_viewport().size_changed.connect(_update_camera_limits)
 	camera.make_current()
 	camera.reset_smoothing()
 	player.camera = camera
@@ -690,3 +697,13 @@ func _apply_environment() -> void:
 	for b in _wind_area.get_overlapping_bodies():
 		if b == player:
 			player.env_wind = true
+
+
+func _update_camera_limits() -> void:
+	## La cámara nunca debe mostrar zonas fuera del nivel. Si la pantalla es más alta que el mapa
+	## (relaciones 4:3 o menores) el límite inferior sube para que la vista no se encoja ni se desplace.
+	if camera == null:
+		return
+	var vs: Vector2 = get_viewport_rect().size
+	camera.limit_right = maxi(cols * TILE, int(ceil(vs.x)))
+	camera.limit_bottom = int(ceil(maxf(float(nrows * TILE), vs.y)))
