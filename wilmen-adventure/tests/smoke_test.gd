@@ -722,10 +722,15 @@ func _bot_level_one() -> void:
 
 
 # ============================================ 13. controles táctiles ========
+func _to_window(pos: Vector2) -> Vector2:
+	## Los toques reales llegan en coordenadas de ventana; el motor los pasa a lógicas con la transformación de estiramiento.
+	return root.get_final_transform() * pos
+
+
 func _touch(idx: int, pos: Vector2, pressed: bool) -> void:
 	var ev := InputEventScreenTouch.new()
 	ev.index = idx
-	ev.position = pos
+	ev.position = _to_window(pos)
 	ev.pressed = pressed
 	Input.parse_input_event(ev)
 
@@ -733,7 +738,7 @@ func _touch(idx: int, pos: Vector2, pressed: bool) -> void:
 func _drag(idx: int, pos: Vector2) -> void:
 	var ev := InputEventScreenDrag.new()
 	ev.index = idx
-	ev.position = pos
+	ev.position = _to_window(pos)
 	Input.parse_input_event(ev)
 
 
