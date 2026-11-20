@@ -34,7 +34,7 @@ func _ready() -> void:
 	for i in range(count):
 		idx.append(i)
 	_sprite = AnimatedSprite2D.new()
-	_sprite.sprite_frames = SpriteUtil.make_frames(tex, 16, 16, {"idle": {"frames": idx, "fps": fps}})
+	_sprite.sprite_frames = SpriteUtil.cached_frames("pickup_" + kind, tex, 16, 16, {"idle": {"frames": idx, "fps": fps}})
 	add_child(_sprite)
 	_sprite.play("idle")
 	_sprite.frame = randi() % count

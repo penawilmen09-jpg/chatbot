@@ -60,6 +60,14 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|FALLO" /tmp/pw.log /tmp/pc.log; then exit 1; fi
           grep -q "TODO OK" /tmp/pc.log
 
+      - name: Flujo real (mapa, niveles anteriores, cambio de mundo, sin congelarse)
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/flow_test.gd 2>&1 | tee /tmp/flow.log
+          grep "FALLO" /tmp/flow.log || true
+          if grep -E "Infinite loop|Target object freed|SCRIPT ERROR|Parse Error|FALLO" /tmp/flow.log; then echo "Errores en el flujo"; exit 1; fi
+          grep -q "RESULTADO: TODO OK" /tmp/flow.log
+
       - name: Registros de pruebas
         if: always()
         uses: actions/upload-artifact@v4
@@ -70,6 +78,7 @@ jobs:
             /tmp/smoke.log
             /tmp/pw.log
             /tmp/pc.log
+            /tmp/flow.log
           if-no-files-found: ignore
 
   render:

@@ -26,7 +26,7 @@ const BAR_W := 120.0
 func _ready() -> void:
 	theme = UiTheme.make()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
-	_world = clampi(Game.world_of(Game.highest_unlocked()), 1, Game.WORLD_COUNT)
+	_world = clampi(Game.world_of(Game.continue_level()), 1, Game.WORLD_COUNT)
 	_bg_holder = Control.new()
 	_bg_holder.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_bg_holder.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -132,7 +132,7 @@ func _go_back() -> void:
 
 
 func _on_continue() -> void:
-	_start(Game.highest_unlocked())
+	_start(Game.continue_level())
 
 
 func _start(n: int) -> void:
@@ -260,7 +260,7 @@ func _build_grid() -> void:
 	for c in _grid.get_children():
 		c.queue_free()
 	_current_btn = null
-	var highest: int = Game.highest_unlocked()
+	var highest: int = Game.continue_level()
 	var focus_btn: Button = null
 	for i in range(1, Game.LEVELS_PER_WORLD + 1):
 		var n: int = Game.level_number(_world, i)
@@ -273,7 +273,7 @@ func _build_grid() -> void:
 
 
 func _level_button(n: int, highest: int) -> Button:
-	var unlocked: bool = n <= highest
+	var unlocked: bool = Game.is_unlocked(n)
 	var done: bool = Game.is_done(n)
 	var boss: bool = Game.is_boss_level(n)
 	var secret: bool = Game.is_secret_level(n)

@@ -190,8 +190,9 @@ func _build_terrain() -> void:
 			var c: String = _cell(x, y)
 			if c == "^":
 				_add_shape(_spike_area, Rect2(x * TILE + 2, y * TILE + 8, 12, 8))
-			elif c == "L":
-				_add_shape(_lava_area, Rect2(x * TILE, y * TILE + 4, TILE, 12))
+			# (la lava se fusiona abajo en pocos rectángulos: antes era una forma por casilla)
+	for lr in _merge_rects("L"):
+		_add_shape(_lava_area, Rect2(lr.position.x * TILE, lr.position.y * TILE + 4, lr.size.x * TILE, lr.size.y * TILE - 4))
 	_build_env_areas()
 
 

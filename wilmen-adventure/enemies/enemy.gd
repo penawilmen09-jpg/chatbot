@@ -92,7 +92,7 @@ func _ready() -> void:
 				"fire": {"frames": [2], "fps": 1.0, "row": row},
 			}
 	_sprite = AnimatedSprite2D.new()
-	_sprite.sprite_frames = SpriteUtil.make_frames(tex, 16, 16, anims)
+	_sprite.sprite_frames = SpriteUtil.cached_frames("enemy_%d_%s" % [world, kind], tex, 16, 16, anims)
 	add_child(_sprite)
 	_sprite.play("idle")
 

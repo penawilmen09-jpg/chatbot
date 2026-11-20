@@ -46,7 +46,7 @@ func _ready() -> void:
 	_menu.position = Vector2(250, 112)
 	_menu.add_theme_constant_override("separation", 5)
 	add_child(_menu)
-	var has_progress: bool = Game.highest_unlocked() > 1 or Game.levels.size() > 0
+	var has_progress: bool = Game.continue_level() > 1 or Game.levels.size() > 0
 	var first := _add_button("Continuar" if has_progress else "Jugar", _on_play)
 	_add_button("Mapa de niveles", func(): Transition.change_scene("res://ui/level_select.tscn"))
 	_add_button("Opciones", _show_options)
@@ -89,7 +89,7 @@ func _add_button(text: String, cb: Callable) -> Button:
 
 
 func _on_play() -> void:
-	if Game.start_level(Game.highest_unlocked()):
+	if Game.start_level(Game.continue_level()):
 		Transition.change_scene("res://levels/level.tscn")
 
 

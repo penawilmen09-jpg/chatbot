@@ -8,7 +8,7 @@ signal settings_changed
 const LEVEL_COUNT := 100
 const WORLD_COUNT := 10
 const LEVELS_PER_WORLD := 10
-const SAVE_VERSION := 2
+const SAVE_VERSION := 3
 const LEVEL_DIR := "res://levels/data/"
 const START_LIVES := 5
 const WORLD_REWARD_LIVES := 3
@@ -102,6 +102,9 @@ var coins: int = 0  # monedas hacia la próxima vida (0-99)
 var total_coins: int = 0
 var current_level: int = 1
 var levels: Dictionary = {}  # "n" -> {"done": bool, "gems": [bool x3], "best": int}
+var unlocked: Dictionary = {1: true}  # niveles abiertos (solo crece; repetir un nivel NUNCA lo cierra)
+var last_unlocked_level: int = 0  # nivel recién abierto por la última victoria (0 = ninguno)
+var _extra: Dictionary = {}  # claves desconocidas del guardado: se conservan al volver a guardar
 var worlds_done: Array = []  # mundos cuyo jefe ya se derrotó (recompensa entregada)
 var settings: Dictionary = {
 	"music": true, "sfx": true, "touch": "auto", "music_vol": 0.8, "sfx_vol": 1.0,
@@ -254,19 +257,26 @@ func world_progress(w: int) -> int:
 
 
 func highest_unlocked() -> int:
-	## Cadena consecutiva: el nivel n+1 solo se abre si 1..n están completados.
-	var n: int = 1
-	while n < LEVEL_COUNT and is_done(n):
-		n += 1
-	return n
+	## El nivel abierto más alto = por donde "Continuar" retoma la partida.
+	for n in range(LEVEL_COUNT, 0, -1):
+		if is_unlocked(n):
+			return n
+	return 1
+
+
+func continue_level() -> int:
+	return highest_unlocked()
 
 
 func is_unlocked(n: int) -> bool:
-	return n >= 1 and n <= LEVEL_COUNT and n <= highest_unlocked()
+	return n == 1 or (n >= 1 and n <= LEVEL_COUNT and unlocked.has(n))
 
 
 func is_world_unlocked(w: int) -> bool:
-	return is_unlocked(level_number(w, 1))
+	for i in range(1, LEVELS_PER_WORLD + 1):
+		if is_unlocked(level_number(w, i)):
+			return true
+	return false
 
 
 func start_level(n: int) -> bool:
@@ -288,6 +298,13 @@ func begin_level(n: int) -> void:
 
 func register_complete(n: int, gems: Array, level_score: int) -> Dictionary:
 	## Se llama SOLO al llegar a la meta. Devuelve la recompensa de mundo (si hay).
+	## Un nivel bloqueado no se puede completar. Repetir un nivel ya completado fusiona gemas y
+	## puntuación, pero nunca cierra ni quita nada de lo ya desbloqueado.
+	last_reward = {}
+	last_unlocked_level = 0
+	if not is_unlocked(n):
+		push_warning("register_complete: el nivel %d está bloqueado; se ignora." % n)
+		return last_reward
 	var rec: Dictionary = get_record(n).duplicate(true)
 	rec["done"] = true
 	var old: Array = rec["gems"]
@@ -297,7 +314,9 @@ func register_complete(n: int, gems: Array, level_score: int) -> Dictionary:
 	rec["gems"] = merged
 	rec["best"] = maxi(int(rec["best"]), level_score)
 	levels[str(n)] = rec
-	last_reward = {}
+	if n < LEVEL_COUNT and not unlocked.has(n + 1):
+		unlocked[n + 1] = true
+		last_unlocked_level = n + 1
 	if is_boss_level(n):
 		var w: int = world_of(n)
 		if not worlds_done.has(w):
@@ -360,47 +379,110 @@ func set_setting(key: String, value) -> void:
 
 
 # ------------------------------------------------------------- guardado ---
+const KNOWN_KEYS := ["version", "lives", "score", "coins", "total_coins", "levels", "worlds_done", "unlocked", "settings"]
+
+
+func _save_dict() -> Dictionary:
+	var data: Dictionary = _extra.duplicate(true)  # primero lo desconocido: nada se pierde
+	var ul: Array = []
+	for k in unlocked:
+		ul.append(int(k))
+	ul.sort()
+	data["version"] = SAVE_VERSION
+	data["lives"] = lives
+	data["score"] = score
+	data["coins"] = coins
+	data["total_coins"] = total_coins
+	data["levels"] = levels
+	data["worlds_done"] = worlds_done
+	data["unlocked"] = ul
+	data["settings"] = settings
+	return data
+
+
+func _read_text(path: String) -> String:
+	if not FileAccess.file_exists(path):
+		return ""
+	var f := FileAccess.open(path, FileAccess.READ)
+	if f == null:
+		return ""
+	var t: String = f.get_as_text()
+	f.close()
+	return t
+
+
+func _parse_dict(text: String) -> Dictionary:
+	if text.strip_edges() == "":
+		return {}
+	var parsed = JSON.parse_string(text)
+	if typeof(parsed) == TYPE_DICTIONARY:
+		return parsed
+	return {}
+
+
 func save_game() -> void:
-	var data := {
-		"version": SAVE_VERSION,
-		"lives": lives,
-		"score": score,
-		"coins": coins,
-		"total_coins": total_coins,
-		"levels": levels,
-		"worlds_done": worlds_done,
-		"settings": settings,
-	}
-	var f := FileAccess.open(save_path, FileAccess.WRITE)
+	## Escritura segura: se escribe un archivo temporal, se conserva una copia ".bak" del último guardado
+	## válido y solo entonces se sustituye el archivo real. Un corte a mitad de escritura no destruye la partida.
+	var text: String = JSON.stringify(_save_dict())
+	var tmp: String = save_path + ".tmp"
+	var f := FileAccess.open(tmp, FileAccess.WRITE)
 	if f == null:
 		push_warning("No se pudo guardar la partida: %s" % error_string(FileAccess.get_open_error()))
 		return
-	f.store_string(JSON.stringify(data))
+	f.store_string(text)
 	f.close()
+	if _parse_dict(_read_text(tmp)).is_empty():
+		push_warning("El guardado temporal no es válido; se conserva el anterior.")
+		return
+	if not _parse_dict(_read_text(save_path)).is_empty():
+		DirAccess.copy_absolute(save_path, save_path + ".bak")
+	var err: int = DirAccess.rename_absolute(tmp, save_path)
+	if err != OK:
+		DirAccess.remove_absolute(save_path)
+		err = DirAccess.rename_absolute(tmp, save_path)
+	if err != OK:  # último recurso
+		var g := FileAccess.open(save_path, FileAccess.WRITE)
+		if g != null:
+			g.store_string(text)
+			g.close()
 
 
 @warning_ignore("integer_division")
 func old_to_new_level(k: int) -> int:
-	## Guardado v1 (20 niveles: 5 mundos x 4) -> v2 (100 niveles). Los 3 primeros niveles
-	## de cada mundo antiguo son los niveles 1-3 del mundo nuevo y su jefe es el nivel 10.
+	## Guardado v1 (20 niveles: 5 mundos x 4) -> 100 niveles. Los 3 primeros niveles de cada mundo
+	## antiguo son los niveles 1-3 del mundo nuevo y su jefe es el nivel 10.
 	var w: int = (k - 1) / 4 + 1
 	var i: int = (k - 1) % 4 + 1
 	return (w - 1) * LEVELS_PER_WORLD + (i if i < 4 else 10)
 
 
 func load_game() -> void:
-	if not FileAccess.file_exists(save_path):
-		return
-	var f := FileAccess.open(save_path, FileAccess.READ)
-	if f == null:
-		return
-	var raw: String = f.get_as_text()
-	f.close()
-	var parsed = JSON.parse_string(raw)
-	if typeof(parsed) != TYPE_DICTIONARY:
-		return
-	var d: Dictionary = parsed
+	var text: String = _read_text(save_path)
+	var d: Dictionary = _parse_dict(text)
+	if d.is_empty():
+		# archivo ausente o dañado: se intenta la copia del último guardado válido
+		text = _read_text(save_path + ".bak")
+		d = _parse_dict(text)
+		if d.is_empty():
+			return
+		push_warning("Guardado principal ausente o dañado: se restauró la copia .bak")
+	_apply_save(d, text)
+
+
+func _apply_save(d: Dictionary, raw_text: String) -> void:
 	var version: int = int(d.get("version", 1))
+	if version < SAVE_VERSION:
+		# copia de seguridad ANTES de migrar (sin sobrescribir una anterior)
+		var bpath: String = save_path.get_basename() + "_v%d_backup.json" % version
+		if not FileAccess.file_exists(bpath):
+			var b := FileAccess.open(bpath, FileAccess.WRITE)
+			if b != null:
+				b.store_string(raw_text)
+				b.close()
+	_extra = {}
+	for k in d:
+		if not KNOWN_KEYS.has(str(k)):
+			_extra[k] = d[k]
 	lives = maxi(3, int(d.get("lives", START_LIVES)))
 	score = int(d.get("score", 0))
 	coins = int(d.get("coins", 0))
@@ -425,35 +507,85 @@ func load_game() -> void:
 				for i in range(mini(3, raw_gems.size())):
 					gems[i] = bool(raw_gems[i])
 			levels[str(idx)] = {"done": bool(rec.get("done", false)), "gems": gems, "best": int(rec.get("best", 0))}
-	worlds_done = []
-	if version < 2:
-		for n in range(10, LEVEL_COUNT + 1, 10):
-			if is_done(n):
-				worlds_done.append(world_of(n))
+	# --- niveles abiertos
+	unlocked = {1: true}
+	if version >= 3:
+		var ul = d.get("unlocked", [])
+		if typeof(ul) == TYPE_ARRAY:
+			for n in ul:
+				if int(n) >= 1 and int(n) <= LEVEL_COUNT:
+					unlocked[int(n)] = true
 	else:
-		var wd = d.get("worlds_done", [])
-		if typeof(wd) == TYPE_ARRAY:
-			for w in wd:
-				if int(w) >= 1 and int(w) <= WORLD_COUNT and not worlds_done.has(int(w)):
-					worlds_done.append(int(w))
+		var old_highest: int = 1
+		if version == 1:
+			old_highest = int(d.get("highest_unlocked", 1))
+		else:
+			# v2 no guardaba "abiertos": si existe la copia v1 se recupera de ahí lo que tenías abierto
+			var v1: Dictionary = _parse_dict(_read_text(save_path.get_basename() + "_v1_backup.json"))
+			old_highest = int(v1.get("highest_unlocked", 1))
+		for k in range(1, clampi(old_highest, 1, 20) + 1):
+			unlocked[old_to_new_level(k)] = true
+	# todo nivel completado está abierto y abre el siguiente
+	for key in levels:
+		if bool(levels[key]["done"]):
+			var n2: int = int(key)
+			unlocked[n2] = true
+			if n2 < LEVEL_COUNT:
+				unlocked[n2 + 1] = true
+	# --- mundos completados
+	worlds_done = []
+	var wd = d.get("worlds_done", [])
+	if version < 2 or typeof(wd) != TYPE_ARRAY:
+		for n3 in range(10, LEVEL_COUNT + 1, 10):
+			if is_done(n3):
+				worlds_done.append(world_of(n3))
+	else:
+		for w in wd:
+			if int(w) >= 1 and int(w) <= WORLD_COUNT and not worlds_done.has(int(w)):
+				worlds_done.append(int(w))
 	var st = d.get("settings", {})
 	if typeof(st) == TYPE_DICTIONARY:
-		for k in ["music", "sfx"]:
-			if st.has(k):
-				settings[k] = bool(st[k])
-		for k2 in ["music_vol", "sfx_vol"]:
+		for k2 in ["music", "sfx"]:
 			if st.has(k2):
-				settings[k2] = clampf(float(st[k2]), 0.0, 1.0)
+				settings[k2] = bool(st[k2])
+		for k3 in ["music_vol", "sfx_vol"]:
+			if st.has(k3):
+				settings[k3] = clampf(float(st[k3]), 0.0, 1.0)
 		if st.has("touch") and str(st["touch"]) in ["auto", "on", "off"]:
 			settings["touch"] = str(st["touch"])
-	if version < 2:
-		# copia de seguridad del guardado antiguo y guardado ya en el formato nuevo
-		migrated_from_v1 = true
-		var b := FileAccess.open(save_path.get_basename() + "_v1_backup.json", FileAccess.WRITE)
-		if b != null:
-			b.store_string(raw)
-			b.close()
+	if version < SAVE_VERSION:
+		migrated_from_v1 = version < 2
 		save_game()
+
+
+# ----------------------------------------- copia de seguridad manual ------
+const BACKUP_PREFIX := "WILMEN-SAVE:"
+
+
+func export_save_string() -> String:
+	## Texto que el jugador puede copiar (portapapeles) y guardar donde quiera.
+	return BACKUP_PREFIX + Marshalls.utf8_to_base64(JSON.stringify(_save_dict()))
+
+
+func import_save_string(text: String) -> bool:
+	var t: String = text.strip_edges()
+	if not t.begins_with(BACKUP_PREFIX):
+		return false
+	var json: String = Marshalls.base64_to_utf8(t.substr(BACKUP_PREFIX.length()))
+	var d: Dictionary = _parse_dict(json)
+	if d.is_empty() or typeof(d.get("levels", null)) != TYPE_DICTIONARY:
+		return false
+	# antes de reemplazar nada se guarda lo que hay ahora
+	var cur: String = _read_text(save_path)
+	if cur != "":
+		var b := FileAccess.open(save_path.get_basename() + "_before_restore.json", FileAccess.WRITE)
+		if b != null:
+			b.store_string(cur)
+			b.close()
+	_apply_save(d, json)
+	save_game()
+	stats_changed.emit()
+	return true
 
 
 func reset_progress() -> void:
@@ -462,6 +594,16 @@ func reset_progress() -> void:
 	coins = 0
 	total_coins = 0
 	levels = {}
+	unlocked = {1: true}
 	worlds_done = []
+	_extra = {}
+	last_unlocked_level = 0
+	# antes de borrar, copia del guardado actual
+	var cur: String = _read_text(save_path)
+	if cur != "":
+		var b := FileAccess.open(save_path.get_basename() + "_before_reset.json", FileAccess.WRITE)
+		if b != null:
+			b.store_string(cur)
+			b.close()
 	save_game()
 	stats_changed.emit()

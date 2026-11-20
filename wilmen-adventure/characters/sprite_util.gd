@@ -18,3 +18,16 @@ static func make_frames(tex: Texture2D, fw: int, fh: int, anims: Dictionary) -> 
 			at.region = Rect2(int(i) * fw, row * fh, fw, fh)
 			sf.add_frame(anim_name, at)
 	return sf
+
+
+static var _cache: Dictionary = {}
+
+
+static func cached_frames(key: String, tex: Texture2D, fw: int, fh: int, anims: Dictionary) -> SpriteFrames:
+	## Reutiliza el mismo SpriteFrames entre todas las monedas/enemigos iguales (construirlo por cada
+	## nodo era lo más caro al cargar un nivel con cientos de objetos).
+	if _cache.has(key):
+		return _cache[key]
+	var sf := make_frames(tex, fw, fh, anims)
+	_cache[key] = sf
+	return sf

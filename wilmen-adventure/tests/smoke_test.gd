@@ -32,6 +32,7 @@ func _frames(n: int) -> void:
 
 func _reset_game() -> void:
 	_game.levels = {}
+	_game.unlocked = {1: true}
 	_game.worlds_done = []
 	_game.lives = 5
 	_game.score = 0
@@ -40,7 +41,10 @@ func _reset_game() -> void:
 
 
 func _mark_done(i: int) -> void:
+	## Simula haber completado el nivel i legítimamente (queda abierto y abre el siguiente).
 	_game.levels[str(i)] = {"done": true, "gems": [false, false, false], "best": 0}
+	_game.unlocked[i] = true
+	_game.unlocked[i + 1] = true
 
 
 func _load_level(n: int, redirect: bool = false):
@@ -229,9 +233,9 @@ func _test_unlock_rules_pure() -> void:
 	_check(refused == 99, "start_level() rechaza los 99 niveles bloqueados (%d)" % refused)
 	_check(_game.start_level(1), "start_level(1) funciona")
 	_check(not _game.is_unlocked(0) and not _game.is_unlocked(101), "niveles fuera de rango no existen")
-	# saltarse niveles: completar el 5 sin 1-4 no abre nada
-	_game.register_complete(5, [false, false, false], 100)
-	_check(_game.highest_unlocked() == 1 and not _game.is_unlocked(6) and not _game.is_unlocked(5), "completar el nivel 5 sin los anteriores no lo salta")
+	# saltarse niveles: un nivel bloqueado no se puede completar ni abre el siguiente
+	var res: Dictionary = _game.register_complete(5, [false, false, false], 100)
+	_check(res.is_empty() and not _game.is_done(5) and _game.highest_unlocked() == 1 and not _game.is_unlocked(6) and not _game.is_unlocked(5), "completar el nivel 5 sin los anteriores no lo salta ni abre el 6")
 	_reset_game()
 
 
@@ -301,6 +305,7 @@ func _test_persistence_and_migration() -> void:
 	_game.lives = 7
 	_game.save_game()
 	_game.levels = {}
+	_game.unlocked = {1: true}
 	_game.worlds_done = []
 	_game.lives = 5
 	_game.settings["music_vol"] = 0.8
@@ -334,8 +339,9 @@ func _test_persistence_and_migration() -> void:
 	_check(_game.is_done(11) and _game.get_record(11)["gems"] == [false, false, true], "el nivel antiguo 5 pasa a ser el 11 con sus gemas")
 	_check(_game.is_done(20) and _game.worlds_done.has(1) and _game.worlds_done.has(2), "jefes antiguos 4 y 8 -> mundos 1 y 2 completados")
 	_check(_game.score == 9000 and _game.total_coins == 300, "puntuación y monedas se conservan")
-	_check(_game.highest_unlocked() == 4, "legítimo: el nivel 4 (nuevo) es el siguiente disponible (%d)" % _game.highest_unlocked())
-	_check(not _game.is_unlocked(5) and not _game.is_unlocked(11), "no se salta ningún nivel nuevo aunque el antiguo estuviera completado")
+	_check(_game.is_unlocked(4) and _game.is_unlocked(10) and _game.is_unlocked(11) and _game.is_unlocked(20) and _game.is_unlocked(21), "se conservan abiertos los niveles que ya tenías (1-4, 10-13, 20-21)")
+	_check(_game.highest_unlocked() == 21, "el nivel abierto más alto del guardado antiguo (9 -> 21) sigue abierto (%d)" % _game.highest_unlocked())
+	_check(not _game.is_unlocked(5) and not _game.is_unlocked(22), "los niveles nuevos que no habías alcanzado siguen bloqueados")
 	_check(not bool(_game.settings["music"]) and str(_game.settings["touch"]) == "on", "se conservan los ajustes antiguos")
 	_check(FileAccess.file_exists("user://smoke_migrate_v1_backup.json"), "se crea copia de seguridad del guardado antiguo")
 	var again := FileAccess.get_file_as_string(_game.save_path)
@@ -674,6 +680,7 @@ func _test_menus() -> void:
 			_reset_game()
 			if state == "avanzado":
 				for i in range(1, 36):
+					_mark_done(i)
 					_game.levels[str(i)] = {"done": true, "gems": [true, false, i % 2 == 0], "best": 1000 + i}
 				_game.worlds_done = [1, 2, 3]
 			var sc: PackedScene = load(path)

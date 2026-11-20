@@ -365,8 +365,8 @@ func show_result(info: Dictionary) -> void:
 	]
 	if not reward.is_empty():
 		lines.append("Recompensa: +%d vidas, +%d puntos" % [int(reward["lives"]), int(reward["score"])])
-	if n < Game.LEVEL_COUNT:
-		lines.append("¡Nivel %d desbloqueado!" % (n + 1))
+	if Game.last_unlocked_level > 0:
+		lines.append("¡Nivel %d desbloqueado!" % Game.last_unlocked_level)
 	for line in lines:
 		var l := UiTheme.label(str(line), 11, Color("#8affb0") if str(line).begins_with("¡") or str(line).begins_with("Recompensa") else Color.WHITE)
 		left.add_child(l)
