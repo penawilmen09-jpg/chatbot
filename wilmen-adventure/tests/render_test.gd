@@ -39,6 +39,7 @@ func _set_res(r: Vector2i) -> void:
 func _load_level(n: int):
 	for i in range(1, n):
 		_game.levels[str(i)] = {"done": true, "gems": [false, false, false], "best": 0}
+	_game.unlocked[n] = true  # el nivel debe estar abierto: el juego rechaza los bloqueados
 	_game.current_level = n
 	var lvl = _scene.instantiate()
 	lvl.redirect_on_block = false
