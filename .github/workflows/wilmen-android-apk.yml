@@ -1,0 +1,85 @@
+name: WILMEN ADVENTURE - APK de Android
+
+# Compila el juego (carpeta wilmen-adventure/) y publica el APK como artefacto descargable.
+# Se lanza a mano desde la pestaña Actions ("Run workflow") o al cambiar archivos del juego.
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "wilmen-adventure/**"
+      - ".github/workflows/wilmen-android-apk.yml"
+
+env:
+  GODOT_VERSION: "4.3"
+
+jobs:
+  apk:
+    runs-on: ubuntu-22.04
+    defaults:
+      run:
+        working-directory: wilmen-adventure
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - name: Componentes del SDK de Android
+        run: |
+          yes | sdkmanager --licenses > /dev/null || true
+          sdkmanager "platform-tools" "build-tools;34.0.0" "platforms;android-34"
+
+      - name: Descargar Godot y las plantillas de exportación
+        run: |
+          base="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          wget -q "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -O /tmp/godot.zip
+          wget -q "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz" -O /tmp/templates.tpz
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          mv /tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          chmod +x /usr/local/bin/godot
+          mkdir -p ~/.local/share/godot/export_templates
+          unzip -q /tmp/templates.tpz -d /tmp/templates
+          mv /tmp/templates/templates ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+
+      - name: Clave de depuración y ajustes del editor
+        run: |
+          keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android \
+            -keystore "$HOME/debug.keystore" -storepass android \
+            -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
+          mkdir -p ~/.config/godot
+          for f in editor_settings-4.3.tres editor_settings-4.tres; do
+            cat > ~/.config/godot/$f <<EOF
+          [gd_resource type="EditorSettings" format=3]
+
+          [resource]
+          export/android/android_sdk_path = "$ANDROID_HOME"
+          export/android/java_sdk_path = "$JAVA_HOME"
+          export/android/debug_keystore = "$HOME/debug.keystore"
+          export/android/debug_keystore_user = "androiddebugkey"
+          export/android/debug_keystore_pass = "android"
+          EOF
+          done
+
+      - name: Importar recursos
+        run: |
+          godot --headless --path . --import || true
+          godot --headless --path . --import
+
+      - name: Prueba de humo en el motor (no bloquea la exportación)
+        continue-on-error: true
+        run: godot --headless --path . --script res://tests/smoke_test.gd
+
+      - name: Exportar APK
+        run: |
+          mkdir -p build
+          godot --headless --path . --export-debug "Android" build/WilmenAdventure.apk
+          ls -la build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: WilmenAdventure-apk
+          path: wilmen-adventure/build/WilmenAdventure.apk
