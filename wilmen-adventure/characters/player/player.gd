@@ -244,7 +244,7 @@ func _shoot(kind: String, speed: float, grav: float, bouncy: bool) -> void:
 	p.team = "player"
 	p.kind = kind
 	p.velocity = Vector2(facing * speed, -30.0 if bouncy else 0.0)
-	p.gravity = grav
+	p.fall_accel = grav
 	p.bounce = bouncy
 	p.life = 1.8
 	p.position = position + Vector2(facing * 12.0, -2.0)

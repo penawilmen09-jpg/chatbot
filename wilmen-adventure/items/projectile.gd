@@ -7,7 +7,7 @@ const KINDS := {"spark": 0, "ice": 1, "shard": 2, "orb": 3, "snowball": 4, "acor
 var team: String = "enemy"  # "player" | "enemy"
 var kind: String = "orb"
 var velocity: Vector2 = Vector2.ZERO
-var gravity: float = 0.0
+var fall_accel: float = 0.0
 var bounce: bool = false
 var life: float = 3.0
 var damage: int = 1
@@ -42,7 +42,7 @@ func _physics_process(delta: float) -> void:
 	if life <= 0.0:
 		_pop()
 		return
-	velocity.y += gravity * delta
+	velocity.y += fall_accel * delta
 	var motion: Vector2 = velocity * delta
 	var space := get_world_2d().direct_space_state
 	var ahead: Vector2 = global_position + motion + motion.normalized() * 3.0
