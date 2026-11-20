@@ -172,9 +172,13 @@ func _run() -> void:
 		await _free_level(l3)
 	elif not live:
 		# un nivel de cada mundo: cielo/fondos, límites derecho e izquierdo de la cámara
+		var deep: bool = win.x == 1280 and win.y == 720  # en la resolución base se revisa además un segundo nivel, muy distinto, por mundo
 		for w in range(1, 11):
 			_game.levels = {}
 			await _scenario_level((w - 1) * 10 + 1, "M%d" % w)
+			if deep:
+				_game.levels = {}
+				await _scenario_level((w - 1) * 10 + (4 if w % 2 == 1 else 6), "M%d-b" % w)
 		# jefe: la cámara se bloquea en la arena
 		_game.levels = {}
 		var lvl = await _load_level(10)

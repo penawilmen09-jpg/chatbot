@@ -1,6 +1,6 @@
 # Formato de los niveles
 
-Cada nivel es un fichero de texto `levels/data/level_XX.txt` (XX = 01..20). Una letra = una celda de
+Cada nivel es un fichero de texto `levels/data/level_XX.txt` (XX = 01..100). Una letra = una celda de
 16x16 px, 20 filas de alto. Las líneas que empiezan por `;` son comentarios. Puedes editarlos a mano
 y volver a comprobarlos con `python3 tools/levelgen.py --check`.
 
@@ -26,4 +26,7 @@ y volver a comprobarlos con `python3 tools/levelgen.py --check`.
 | `w` `s` `j` `f` `t` | Enemigos: caminante, pinchudo (no se pisa), saltarín, volador, tirador |
 | `X` | Jefe |
 | `G` | Puerta de la arena del jefe (al cruzarla se cierra y empieza el combate) |
-| `d` | Decoración |
+| `d` | Decoración (árbol/cactus/cristales... del mundo) |
+| `1`..`9` | Atrezo del mundo (ver `tools/worlds_def.py`): 1 grande, 2 mediano, 3-4 pequeños, 5 luz/animado, 6 estructura, 7 colgante del techo, 8 animado, 9 ancho bajo. No es sólido |
+| `a` | Agua/líquido del mundo (decorativo: lagos, arroyos y pozas) |
+| `\|` | Cascada (decorativa) |

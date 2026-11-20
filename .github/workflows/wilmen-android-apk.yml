@@ -126,6 +126,7 @@ jobs:
           run_one --resolution 933x2000 --script res://tests/render_test.gd -- --rotate
           run_one --resolution 1280x720 --script res://tests/render_test.gd -- --live
           echo "líneas con FALLO: $(grep -c 'FALLO' /tmp/render.log)"
+          if grep -E "SCRIPT ERROR|Parse Error" /tmp/render.log; then echo "Errores de script al dibujar"; FAIL=1; fi
           exit $FAIL
 
       - name: Capturas y registro
