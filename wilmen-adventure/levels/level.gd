@@ -120,21 +120,6 @@ func _cell(x: int, y: int) -> String:
 
 # ---------------------------------------------------------- escenario -----
 func _build_background() -> void:
-	if Engine.has_meta("legacy_parallax"):  # TEMPORAL: solo para medir el comportamiento antiguo en CI
-		var old := ParallaxBackground.new()
-		add_child(old)
-		var sc := [0.04, 0.2, 0.45]
-		var nm := ["far", "mid", "near"]
-		for i in range(3):
-			var ly := ParallaxLayer.new()
-			ly.motion_scale = Vector2(sc[i], 0.0)
-			ly.motion_mirroring = Vector2(480, 0)
-			var spr := Sprite2D.new()
-			spr.texture = load("res://assets/backgrounds/bg_w%d_%s.png" % [world, nm[i]])
-			spr.centered = false
-			ly.add_child(spr)
-			old.add_child(ly)
-		return
 	# Fondo propio (ver parallax_bg.gd): cubre todo el ancho visible en cualquier relación de aspecto.
 	var bg = ParallaxBgScript.new()
 	bg.world = world

@@ -156,9 +156,6 @@ func _run() -> void:
 
 	var live: bool = OS.get_cmdline_user_args().has("--live")
 	var rotate: bool = OS.get_cmdline_user_args().has("--rotate")
-	if OS.get_cmdline_user_args().has("--legacy-parallax"):
-		Engine.set_meta("legacy_parallax", true)
-		print("(modo medición: ParallaxBackground antiguo)")
 	if rotate:
 		# Android arranca en vertical y rota a horizontal con el nivel ya creado (orientación "sensor")
 		_game.levels = {}

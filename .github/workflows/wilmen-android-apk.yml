@@ -1,6 +1,7 @@
 name: WILMEN ADVENTURE - Pruebas y APK de Android
 
 # 1) Valida los 100 niveles y ejecuta las pruebas en Godot 4.3 headless (bloqueante).
+# 1b) Prueba de render en pantalla (Xvfb + Mesa) en 11 relaciones de aspecto: sin franjas sin cubrir (bloqueante).
 # 2) Si pasan, exporta el APK RELEASE de Android y lo publica como artefacto descargable.
 # Cada ejecución genera una versión nueva (version code = 100 + número de ejecución), firmada con la
 # misma clave, así que cada APK se instala encima del anterior.
@@ -71,8 +72,64 @@ jobs:
             /tmp/pc.log
           if-no-files-found: ignore
 
+  render:
+    # Dibuja el juego de verdad (Godot + Mesa bajo Xvfb) y comprueba que ningún fondo deja zonas sin cubrir
+    # y que la cámara nunca muestra nada fuera del nivel, en 11 relaciones de aspecto, al rotar y al redimensionar.
+    runs-on: ubuntu-22.04
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: wilmen-adventure
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Dependencias gráficas (Xvfb, Mesa)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq xvfb libgl1-mesa-dri libglx-mesa0 libegl1 libxcursor1 libxinerama1 libxi6 libxrandr2 libxkbcommon0 libasound2
+          mkdir -p /tmp/shots
+
+      - name: Descargar Godot
+        run: |
+          wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -O /tmp/godot.zip
+          unzip -q /tmp/godot.zip -d /tmp/godot
+          sudo mv /tmp/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 /usr/local/bin/godot
+          sudo chmod +x /usr/local/bin/godot
+
+      - name: Importar recursos
+        run: |
+          godot --headless --path . --import || true
+          godot --headless --path . --import
+
+      - name: Render en 11 resoluciones, rotación vertical-horizontal y redimensionado en vivo
+        run: |
+          export LIBGL_ALWAYS_SOFTWARE=1
+          FAIL=0
+          run_one() {
+            echo "################ $*"
+            xvfb-run -a -s "-screen 0 3400x1700x24" godot --path . --rendering-driver opengl3 --audio-driver Dummy "$@" 2>&1 | tee -a /tmp/render.log | grep -E "==|FALLO|CAPTURAS|RESULTADO" || true
+            tail -n 12 /tmp/render.log | grep -q "RESULTADO: TODO OK" || FAIL=1
+          }
+          for RES in 1280x720 2000x933 1600x720 2400x1080 2340x1080 2560x1080 2960x1440 3200x1440 1920x1200 1600x1200 800x480; do
+            run_one --resolution $RES --script res://tests/render_test.gd
+          done
+          run_one --resolution 933x2000 --script res://tests/render_test.gd -- --rotate
+          run_one --resolution 1280x720 --script res://tests/render_test.gd -- --live
+          echo "líneas con FALLO: $(grep -c 'FALLO' /tmp/render.log)"
+          exit $FAIL
+
+      - name: Capturas y registro
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wilmen-render-logs
+          path: |
+            /tmp/shots
+            /tmp/render.log
+          if-no-files-found: ignore
+
   apk:
-    needs: test
+    needs: [test, render]
     runs-on: ubuntu-22.04
     timeout-minutes: 30
     defaults:
