@@ -20,7 +20,7 @@ La clave de Gemini se guarda solo en el servidor, en la variable `GEMINI_API_KEY
 
 Sin clave, la aplicación muestra un aviso en español en lugar de generar texto.
 
-Variable opcional: `GEMINI_MODEL` (por defecto `gemini-flash-latest`).
+Variable opcional: `GEMINI_MODEL` (por defecto `gemini-2.5-flash`; si no está disponible, la app busca otro modelo Flash automáticamente).
 
 ---
 

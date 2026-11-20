@@ -3,7 +3,10 @@ import { construirInstrucciones, TIPOS, TONOS } from "@/lib/generator-config";
 
 // La clave solo se lee aquí, en el servidor. Nunca se envía al navegador.
 const API_BASE = "https://generativelanguage.googleapis.com/v1beta/models";
-const MODELO_PREDETERMINADO = "gemini-flash-latest";
+// gemini-2.5-flash figura como modelo estable en la documentación oficial, pero
+// Google restringe su acceso en cuentas nuevas. Si responde 404, se busca
+// automáticamente otro modelo Flash compatible con generateContent.
+const MODELO_PREDETERMINADO = "gemini-2.5-flash";
 
 function error(mensaje: string, status: number) {
   return NextResponse.json({ error: mensaje }, { status });
@@ -16,12 +19,41 @@ function mensajeParaEstado(status: number): string {
     case 403:
       return "La clave de Gemini no es válida o no tiene permiso. Revisa el secreto GEMINI_API_KEY.";
     case 404:
-      return "El modelo de Gemini no está disponible. Revisa la variable GEMINI_MODEL.";
+      return "No se encontró un modelo de Gemini disponible. Elige uno en aistudio.google.com y guárdalo en la variable GEMINI_MODEL.";
     case 429:
       return "Se alcanzó el límite gratuito de Gemini. Espera un momento e inténtalo de nuevo.";
     default:
       return "Gemini no pudo responder en este momento. Inténtalo de nuevo en unos segundos.";
   }
+}
+
+function generar(modelo: string, payload: string, apiKey: string) {
+  return fetch(`${API_BASE}/${encodeURIComponent(modelo)}:generateContent`, {
+    body: payload,
+    headers: { "Content-Type": "application/json", "x-goog-api-key": apiKey },
+    method: "POST",
+    signal: AbortSignal.timeout(45_000),
+  });
+}
+
+async function buscarModeloFlash(apiKey: string, excluir: string) {
+  const res = await fetch(`${API_BASE}?pageSize=200`, {
+    headers: { "x-goog-api-key": apiKey },
+    signal: AbortSignal.timeout(15_000),
+  });
+  if (!res.ok) {
+    return null;
+  }
+  const data = (await res.json().catch(() => null)) as {
+    models?: { name?: string; supportedGenerationMethods?: string[] }[];
+  } | null;
+  const candidatos = (data?.models ?? [])
+    .filter((m) => m.supportedGenerationMethods?.includes("generateContent"))
+    .map((m) => m.name?.replace(/^models\//, "") ?? "")
+    .filter((n) => /^gemini-[\d.]+-flash$/.test(n) && n !== excluir)
+    .sort()
+    .reverse();
+  return candidatos[0] ?? null;
 }
 
 export async function POST(request: NextRequest) {
@@ -52,26 +84,23 @@ export async function POST(request: NextRequest) {
   const tono = TONOS.find((t) => t.id === body.tono)?.id ?? "profesional";
   const modelo = process.env.GEMINI_MODEL?.trim() || MODELO_PREDETERMINADO;
 
+  const payload = JSON.stringify({
+    contents: [{ parts: [{ text: prompt }], role: "user" }],
+    generationConfig: { maxOutputTokens: 4096, temperature: 0.9 },
+    systemInstruction: {
+      parts: [{ text: construirInstrucciones(tipo, tono) }],
+    },
+  });
+
   let respuesta: Response;
   try {
-    respuesta = await fetch(
-      `${API_BASE}/${encodeURIComponent(modelo)}:generateContent`,
-      {
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }], role: "user" }],
-          generationConfig: { maxOutputTokens: 4096, temperature: 0.9 },
-          systemInstruction: {
-            parts: [{ text: construirInstrucciones(tipo, tono) }],
-          },
-        }),
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": apiKey,
-        },
-        method: "POST",
-        signal: AbortSignal.timeout(45_000),
+    respuesta = await generar(modelo, payload, apiKey);
+    if (respuesta.status === 404 && !process.env.GEMINI_MODEL?.trim()) {
+      const alternativo = await buscarModeloFlash(apiKey, modelo);
+      if (alternativo) {
+        respuesta = await generar(alternativo, payload, apiKey);
       }
-    );
+    }
   } catch {
     return error(
       "No se pudo conectar con Gemini (sin conexión o tiempo agotado). Inténtalo de nuevo.",
