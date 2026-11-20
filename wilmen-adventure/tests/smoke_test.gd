@@ -345,7 +345,7 @@ func _test_persistence_and_migration() -> void:
 	_check(not bool(_game.settings["music"]) and str(_game.settings["touch"]) == "on", "se conservan los ajustes antiguos")
 	_check(FileAccess.file_exists("user://smoke_migrate_v1_backup.json"), "se crea copia de seguridad del guardado antiguo")
 	var again := FileAccess.get_file_as_string(_game.save_path)
-	_check(again.contains("\"version\":2"), "el archivo queda guardado en el formato nuevo")
+	_check(again.contains("\"version\":3") and again.contains("\"unlocked\""), "el archivo queda guardado en el formato nuevo (v3, con niveles abiertos)")
 	_game.save_path = "user://smoke_test_save.json"
 	_reset_game()
 

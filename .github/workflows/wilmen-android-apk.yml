@@ -61,6 +61,7 @@ jobs:
           grep -q "TODO OK" /tmp/pc.log
 
       - name: Flujo real (mapa, niveles anteriores, cambio de mundo, sin congelarse)
+        if: always()
         run: |
           set -o pipefail
           godot --headless --path . --script res://tests/flow_test.gd 2>&1 | tee /tmp/flow.log
