@@ -128,3 +128,16 @@ Los niveles son texto plano (ver `levels/README.md`): puedes retocarlos a mano y
 longitud; doble salto ≈ 5 y 7), que desde el inicio se llega a la meta y a las 3 gemas, y que un hueco de 7
 casillas o una pared de 8 se detectan como imposibles. Es una aproximación de la física real de Godot,
 no una simulación exacta; la comprobación definitiva es jugar cada nivel.
+
+## Guardado, desbloqueo y pruebas (v2.0 final)
+
+- **Guardado** (`user://wilmen_save.json`, formato v3): lista explícita de niveles abiertos (`unlocked`) que solo crece.
+  Rejugar un nivel solo fusiona gemas/mejor puntuación; nunca cierra niveles posteriores. Escritura atómica con `.bak`,
+  copia automática de seguridad antes de migrar (`_v1_backup`, `_v2_backup`), claves desconocidas conservadas.
+  En Opciones: **Copiar mi partida** / **Restaurar** (texto `WILMEN-SAVE:...` en el portapapeles) y **Borrar** (guarda copia antes).
+- **Desbloqueo**: solo el nivel 1 en partida nueva; completar el nivel n abre el n+1. Se valida en el mapa, en `Game.start_level()` y al cargar la escena.
+- **Congelamiento al elegir niveles anteriores**: un tween en bucle creado en el mapa apuntaba a botones liberados al cambiar de mundo/escena.
+  Ahora el tween pertenece al botón (`b.create_tween()`). `tests/flow_test.gd` recorre el flujo real (16 ciclos de repetición, 50 cambios de mundo).
+- **Franja negra**: el parallax no cubría el viewport ampliado (`expand`) y `Camera2D.offset` saltaba los límites; ver `levels/parallax_bg.gd`.
+- **Pruebas** (CI): `tests/smoke_test.gd`, `tests/persist_*.gd`, `tests/flow_test.gd`, `tests/render_test.gd` (11 resoluciones, rotación, redimensionado en vivo).
+- **Compilaciones**: APK (pruebas) y AAB (Google Play) como artefactos de GitHub Actions; la clave de firma de prueba está en `android/`.
