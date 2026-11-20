@@ -35,6 +35,7 @@ export function Generator() {
         body: JSON.stringify({ prompt, tipo, tono }),
         headers: { "Content-Type": "application/json" },
         method: "POST",
+        signal: AbortSignal.timeout(60_000),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -42,7 +43,13 @@ export function Generator() {
       }
       setResultado(data.resultado);
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Ocurrió un error inesperado.");
+      setError(
+        e instanceof DOMException && e.name === "TimeoutError"
+          ? "La respuesta tardó demasiado. Inténtalo de nuevo."
+          : e instanceof Error
+            ? e.message
+            : "Ocurrió un error inesperado."
+      );
     } finally {
       setCargando(false);
     }

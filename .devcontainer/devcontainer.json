@@ -1,7 +1,7 @@
 {
   "name": "WILMEN AI",
   "image": "mcr.microsoft.com/devcontainers/typescript-node:1-22-bookworm",
-  "postCreateCommand": "corepack enable && pnpm install --frozen-lockfile",
+  "postCreateCommand": "corepack enable && pnpm install --frozen-lockfile && node scripts/ensure-auth-secret.mjs",
   "postAttachCommand": "pnpm dev -H 0.0.0.0 -p 3000",
   "secrets": {
     "GEMINI_API_KEY": {
