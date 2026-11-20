@@ -49,7 +49,7 @@ jobs:
           grep -c "  ok   " /tmp/smoke.log | sed 's/^/comprobaciones ok: /'
           grep "FALLO" /tmp/smoke.log || true
           if grep -E "SCRIPT ERROR|Parse Error|FALLO|ERROR:" /tmp/smoke.log | grep -v "resources still in use"; then echo "Errores detectados"; exit 1; fi
-          tail -n 1 /tmp/smoke.log | grep -q "TODO OK"
+          grep -q "RESULTADO: TODO OK" /tmp/smoke.log
 
       - name: Persistencia entre dos ejecuciones reales (cerrar y abrir el juego)
         run: |
