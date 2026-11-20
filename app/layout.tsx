@@ -7,13 +7,15 @@ import "./globals.css";
 import { SessionProvider } from "next-auth/react";
 
 export const metadata: Metadata = {
-  description: "Next.js chatbot template using the AI SDK.",
+  description: "WILMEN AI: generador de textos con inteligencia artificial.",
   metadataBase: new URL("https://chat.vercel.ai"),
-  title: "Next.js Chatbot Template",
+  title: "WILMEN AI",
 };
 
 export const viewport = {
+  initialScale: 1,
   maximumScale: 1,
+  width: "device-width" as const,
 };
 
 const geist = Geist({
@@ -56,7 +58,7 @@ export default function RootLayout({
   return (
     <html
       className={`${geist.variable} ${geistMono.variable}`}
-      lang="en"
+      lang="es"
       suppressHydrationWarning
     >
       <head>
@@ -70,9 +72,8 @@ export default function RootLayout({
       <body className="antialiased">
         <ThemeProvider
           attribute="class"
-          defaultTheme="system"
+          defaultTheme="dark"
           disableTransitionOnChange
-          enableSystem
         >
           <SessionProvider
             basePath={`${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/api/auth`}

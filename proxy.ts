@@ -9,6 +9,11 @@ export async function proxy(request: NextRequest) {
     return new Response("pong", { status: 200 });
   }
 
+  // WILMEN AI: la página principal y el generador de demostración son públicos.
+  if (pathname === "/" || pathname.startsWith("/api/generate")) {
+    return NextResponse.next();
+  }
+
   if (pathname.startsWith("/api/auth")) {
     return NextResponse.next();
   }
