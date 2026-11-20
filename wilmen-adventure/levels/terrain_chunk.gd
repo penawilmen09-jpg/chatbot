@@ -10,6 +10,9 @@ const T_PLATFORM := 3
 const T_SPIKE := 7
 const T_LAVA_A := 8
 const T_LAVA_B := 9
+const T_CONV_R := 12  # 12-13
+const T_CONV_L := 14  # 14-15
+const T_MUD := 17
 
 var rows: Array = []
 var x0: int = 0
@@ -17,13 +20,14 @@ var x1: int = 0
 var tiles: Texture2D
 var decor: Texture2D
 var has_lava: bool = false
+var has_belt: bool = false
 
 var _phase: int = 0
 var _timer: float = 0.0
 
 
 func _ready() -> void:
-	set_process(has_lava)
+	set_process(has_lava or has_belt)
 
 
 func _process(delta: float) -> void:
@@ -38,7 +42,7 @@ func _is_solid(x: int, y: int) -> bool:
 	if y < 0 or y >= rows.size():
 		return false
 	var r: String = rows[y]
-	return x >= 0 and x < r.length() and r[x] == "#"
+	return x >= 0 and x < r.length() and (r[x] == "#" or r[x] == ">" or r[x] == "<" or r[x] == "~")
 
 
 func _tile(idx: int, x: int, y: int) -> void:
@@ -58,6 +62,12 @@ func _draw() -> void:
 						_tile(T_FILL_A if (x * 7 + y * 3) % 5 < 3 else T_FILL_B, x, y)
 				"=":
 					_tile(T_PLATFORM, x, y)
+				">":
+					_tile(T_CONV_R + _phase, x, y)
+				"<":
+					_tile(T_CONV_L + _phase, x, y)
+				"~":
+					_tile(T_MUD, x, y)
 				"^":
 					_tile(T_SPIKE, x, y)
 				"L":

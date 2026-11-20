@@ -1,36 +1,79 @@
 extends Node
-## Estado global: progreso, vidas, puntuación, ajustes y guardado automático.
+## Estado global: progreso (100 niveles, 10 mundos), desbloqueo, vidas, puntuación,
+## ajustes de audio/controles y guardado automático (con migración del guardado antiguo).
 
 signal stats_changed
 signal settings_changed
 
-const LEVEL_COUNT := 20
-const SAVE_PATH := "user://wilmen_save.json"
+const LEVEL_COUNT := 100
+const WORLD_COUNT := 10
+const LEVELS_PER_WORLD := 10
+const SAVE_VERSION := 2
 const LEVEL_DIR := "res://levels/data/"
 const START_LIVES := 5
+const WORLD_REWARD_LIVES := 3
+const WORLD_REWARD_SCORE := 5000
 
 const WORLD_NAMES := [
-	"Bosque Esmeralda", "Cuevas de Cristal", "Desierto Perdido",
-	"Reino de Hielo", "Castillo de las Sombras",
+	"Bosque Esmeralda", "Cuevas de Cristal", "Desierto Perdido", "Reino de Hielo",
+	"Castillo de las Sombras", "Islas Voladoras", "Reino Volcánico", "Jungla Salvaje",
+	"Mundo Mecánico", "Reino Final",
 ]
 const WORLD_COLORS := [
 	Color("#58c84a"), Color("#8a78d8"), Color("#f0b050"), Color("#8fd0f0"), Color("#d8503a"),
+	Color("#6ac8ff"), Color("#ff7a3a"), Color("#3aa84a"), Color("#a0aab8"), Color("#e8c050"),
 ]
 const LEVEL_NAMES := [
-	"Claro del Bosque", "Sendero de las Raíces", "Copas de los Árboles", "Guarida del Rey Tronco",
-	"Galería Brillante", "Lago Subterráneo", "Mina Abandonada", "Corazón de Cristal",
-	"Dunas Doradas", "Oasis Espejismo", "Ruinas de Arena", "Tumba del Escarabajo",
-	"Llanura Helada", "Cumbres Nevadas", "Cavernas de Escarcha", "Trono del Yeti",
-	"Puente Sombrío", "Salón de Antorchas", "Torre del Vacío", "El Señor de las Sombras",
+	# 1 Bosque Esmeralda
+	"Claro del Bosque", "Sendero de las Raíces", "Copas de los Árboles", "Arroyo Escondido",
+	"Puente de Troncos", "Colinas de Musgo", "Cámara Secreta del Bosque", "Tronco Hueco",
+	"Atardecer entre Pinos", "Guarida del Rey Tronco",
+	# 2 Cuevas de Cristal
+	"Galería Brillante", "Lago Subterráneo", "Mina Abandonada", "Gruta de los Ecos",
+	"Pozo Luminoso", "Veta de Amatista", "Cámara Secreta de Cristal", "Túnel de Geodas",
+	"Río de Estalactitas", "Corazón de Cristal",
+	# 3 Desierto Perdido
+	"Dunas Doradas", "Oasis Espejismo", "Ruinas de Arena", "Camino de Caravanas",
+	"Cañón Rojo", "Templo Hundido", "Cámara Secreta del Faraón", "Tormenta de Arena",
+	"Pirámide Olvidada", "Tumba del Escarabajo",
+	# 4 Reino de Hielo
+	"Llanura Helada", "Cumbres Nevadas", "Cavernas de Escarcha", "Lago Congelado",
+	"Aldea Nevada", "Ventisca Eterna", "Cámara Secreta de Hielo", "Glaciar Cortante",
+	"Pico Gélido", "Trono del Yeti",
+	# 5 Castillo de las Sombras
+	"Puente Sombrío", "Salón de Antorchas", "Torre del Vacío", "Foso Oscuro",
+	"Biblioteca Maldita", "Mazmorras Profundas", "Cámara Secreta de las Sombras", "Almenas Tormentosas",
+	"Sala del Trono Vacío", "El Señor de las Sombras",
+	# 6 Islas Voladoras
+	"Costa de Nubes", "Archipiélago Alto", "Molinos del Viento", "Puente de Cuerdas",
+	"Isla Tormenta", "Corrientes Ascendentes", "Cámara Secreta Celeste", "Jardín Colgante",
+	"Ciudadela de Nubes", "Nido del Águila Tormenta",
+	# 7 Reino Volcánico
+	"Falda del Volcán", "Ríos de Lava", "Géiseres Ardientes", "Cantera de Obsidiana",
+	"Puente de Ceniza", "Cráter Rugiente", "Cámara Secreta de Magma", "Forja Ancestral",
+	"Corazón del Volcán", "Guarida del Dragón de Magma",
+	# 8 Jungla Salvaje
+	"Selva Espesa", "Pantano Verde", "Ruinas Cubiertas", "Lianas Colgantes",
+	"Templo del Jaguar", "Cascada Oculta", "Cámara Secreta de la Selva", "Raíces Gigantes",
+	"Colmillo de Piedra", "Trono del Gorila Ancestral",
+	# 9 Mundo Mecánico
+	"Fábrica de Engranajes", "Cintas Transportadoras", "Planta de Vapor", "Sala de Prensas",
+	"Laboratorio Roto", "Línea de Montaje", "Cámara Secreta Oculta", "Torre de Antenas",
+	"Núcleo del Reactor", "El Coloso Mecánico",
+	# 10 Reino Final
+	"Umbral del Vacío", "Ruinas Estelares", "Galaxia Rota", "Puente de Estrellas",
+	"Jardín Cósmico", "Fortaleza Dorada", "Cámara Secreta Final", "Corredor del Tiempo",
+	"Antesala del Emperador", "El Emperador del Vacío",
 ]
-const BOSS_NAMES := ["Rey Tronco", "Golem de Cristal", "Rey Escarabajo", "Yeti Gélido", "Señor de las Sombras"]
-const POWERS := ["spark", "dash", "shield", "freeze", "blink"]
+const BOSS_NAMES := [
+	"Rey Tronco", "Golem de Cristal", "Rey Escarabajo", "Yeti Gélido", "Señor de las Sombras",
+	"Águila Tormenta", "Dragón de Magma", "Gorila Ancestral", "Coloso Mecánico", "Emperador del Vacío",
+]
+const POWERS := ["spark", "dash", "shield", "freeze", "blink", "gust", "flame", "leap", "pulse", "nova"]
 const POWER_NAMES := {
-	"spark": "Chispa Esmeralda",
-	"dash": "Impulso de Cristal",
-	"shield": "Escudo Solar",
-	"freeze": "Aliento Helado",
-	"blink": "Paso Sombrío",
+	"spark": "Chispa Esmeralda", "dash": "Impulso de Cristal", "shield": "Escudo Solar",
+	"freeze": "Aliento Helado", "blink": "Paso Sombrío", "gust": "Ráfaga Celeste",
+	"flame": "Llamarada", "leap": "Salto Salvaje", "pulse": "Pulso Eléctrico", "nova": "Nova Final",
 }
 const POWER_HELP := {
 	"spark": "Lanza una chispa que rebota y derrota enemigos.",
@@ -38,17 +81,35 @@ const POWER_HELP := {
 	"shield": "Escudo que te protege de todo durante unos segundos.",
 	"freeze": "Congela enemigos; tócalos para romperlos.",
 	"blink": "Te teletransportas hacia delante y esquivas daño.",
+	"gust": "Una ráfaga que atraviesa a varios enemigos.",
+	"flame": "Tres llamas en abanico.",
+	"leap": "Un gran salto extra, también en el aire.",
+	"pulse": "Descarga que daña a los enemigos cercanos.",
+	"nova": "Escudo breve y una explosión de chispas.",
 }
+## Todas las canciones que el juego puede pedir (se comprueban en las pruebas).
+const MUSIC_TRACKS := [
+	"title", "map", "victory", "victory_world", "defeat", "secret", "castle",
+	"boss", "boss_b", "boss_c", "boss_final",
+	"world1", "world2", "world3", "world4", "world5", "world6", "world7", "world8", "world9", "world10",
+	"world1_alt", "world2_alt", "world3_alt", "world4_alt", "world5_alt",
+	"world6_alt", "world7_alt", "world8_alt", "world9_alt", "world10_alt",
+]
 
 var lives: int = START_LIVES
 var score: int = 0
 var coins: int = 0  # monedas hacia la próxima vida (0-99)
 var total_coins: int = 0
 var current_level: int = 1
-var highest_unlocked: int = 1
 var levels: Dictionary = {}  # "n" -> {"done": bool, "gems": [bool x3], "best": int}
-var settings: Dictionary = {"music": true, "sfx": true, "touch": "auto"}
+var worlds_done: Array = []  # mundos cuyo jefe ya se derrotó (recompensa entregada)
+var settings: Dictionary = {
+	"music": true, "sfx": true, "touch": "auto", "music_vol": 0.8, "sfx_vol": 1.0,
+}
 var score_at_level_start: int = 0
+var save_path: String = "user://wilmen_save.json"
+var last_reward: Dictionary = {}  # recompensa de mundo de la última partida (para la pantalla de resultados)
+var migrated_from_v1: bool = false
 
 
 func _ready() -> void:
@@ -87,15 +148,31 @@ func _add_action(action: String, keys: Array, buttons: Array) -> void:
 # ------------------------------------------------------------- niveles ----
 @warning_ignore("integer_division")
 func world_of(n: int) -> int:
-	return (n - 1) / 4 + 1
+	return (n - 1) / LEVELS_PER_WORLD + 1
 
 
 func index_in_world(n: int) -> int:
-	return (n - 1) % 4 + 1
+	return (n - 1) % LEVELS_PER_WORLD + 1
+
+
+func level_number(world: int, index: int) -> int:
+	return (world - 1) * LEVELS_PER_WORLD + index
 
 
 func is_boss_level(n: int) -> bool:
-	return n % 4 == 0
+	return n % LEVELS_PER_WORLD == 0
+
+
+func is_secret_level(n: int) -> bool:
+	return index_in_world(n) == 7
+
+
+func is_castle_level(n: int) -> bool:
+	var w: int = world_of(n)
+	var i: int = index_in_world(n)
+	if is_boss_level(n) or is_secret_level(n):
+		return false
+	return (w == 5 or w == 10) and i >= 6
 
 
 func level_path(n: int) -> String:
@@ -107,7 +184,31 @@ func level_title(n: int) -> String:
 
 
 func power_of_world(w: int) -> String:
-	return POWERS[clampi(w, 1, 5) - 1]
+	return POWERS[clampi(w, 1, WORLD_COUNT) - 1]
+
+
+func music_for_level(n: int) -> String:
+	## Música de un nivel: secreta, castillo, alternativa (niveles 5-9 del mundo) o principal.
+	var w: int = world_of(n)
+	if is_boss_level(n):
+		return "world%d" % w
+	if is_secret_level(n):
+		return "secret"
+	if is_castle_level(n):
+		return "castle"
+	if index_in_world(n) >= 5:
+		return "world%d_alt" % w
+	return "world%d" % w
+
+
+func boss_music(w: int) -> String:
+	if w >= 10:
+		return "boss_final"
+	if w >= 7:
+		return "boss_c"
+	if w >= 4:
+		return "boss_b"
+	return "boss"
 
 
 func get_record(n: int) -> Dictionary:
@@ -115,6 +216,10 @@ func get_record(n: int) -> Dictionary:
 	if levels.has(key):
 		return levels[key]
 	return {"done": false, "gems": [false, false, false], "best": 0}
+
+
+func is_done(n: int) -> bool:
+	return bool(get_record(n)["done"])
 
 
 func gems_in_level(n: int) -> int:
@@ -132,8 +237,45 @@ func total_gems() -> int:
 	return c
 
 
+func completed_count() -> int:
+	var c := 0
+	for n in range(1, LEVEL_COUNT + 1):
+		if is_done(n):
+			c += 1
+	return c
+
+
+func world_progress(w: int) -> int:
+	var c := 0
+	for i in range(1, LEVELS_PER_WORLD + 1):
+		if is_done(level_number(w, i)):
+			c += 1
+	return c
+
+
+func highest_unlocked() -> int:
+	## Cadena consecutiva: el nivel n+1 solo se abre si 1..n están completados.
+	var n: int = 1
+	while n < LEVEL_COUNT and is_done(n):
+		n += 1
+	return n
+
+
 func is_unlocked(n: int) -> bool:
-	return n <= highest_unlocked
+	return n >= 1 and n <= LEVEL_COUNT and n <= highest_unlocked()
+
+
+func is_world_unlocked(w: int) -> bool:
+	return is_unlocked(level_number(w, 1))
+
+
+func start_level(n: int) -> bool:
+	## ÚNICA puerta de entrada a un nivel: valida el desbloqueo.
+	if not is_unlocked(n):
+		push_warning("Nivel %d bloqueado: no se puede jugar." % n)
+		return false
+	current_level = n
+	return true
 
 
 func begin_level(n: int) -> void:
@@ -144,7 +286,8 @@ func begin_level(n: int) -> void:
 	stats_changed.emit()
 
 
-func register_complete(n: int, gems: Array, level_score: int) -> void:
+func register_complete(n: int, gems: Array, level_score: int) -> Dictionary:
+	## Se llama SOLO al llegar a la meta. Devuelve la recompensa de mundo (si hay).
 	var rec: Dictionary = get_record(n).duplicate(true)
 	rec["done"] = true
 	var old: Array = rec["gems"]
@@ -154,10 +297,17 @@ func register_complete(n: int, gems: Array, level_score: int) -> void:
 	rec["gems"] = merged
 	rec["best"] = maxi(int(rec["best"]), level_score)
 	levels[str(n)] = rec
-	if n < LEVEL_COUNT:
-		highest_unlocked = maxi(highest_unlocked, n + 1)
+	last_reward = {}
+	if is_boss_level(n):
+		var w: int = world_of(n)
+		if not worlds_done.has(w):
+			worlds_done.append(w)
+			lives += WORLD_REWARD_LIVES
+			score += WORLD_REWARD_SCORE
+			last_reward = {"world": w, "lives": WORLD_REWARD_LIVES, "score": WORLD_REWARD_SCORE}
 	save_game()
 	stats_changed.emit()
+	return last_reward
 
 
 # ------------------------------------------------------ vidas y puntos ----
@@ -187,7 +337,7 @@ func lose_life() -> void:
 
 
 func fail_level() -> void:
-	## Se acabaron las vidas: se pierde lo ganado en este intento.
+	## Se acabaron las vidas: se pierde lo ganado en este intento (no desbloquea nada).
 	score = score_at_level_start
 	lives = 3
 	stats_changed.emit()
@@ -212,16 +362,16 @@ func set_setting(key: String, value) -> void:
 # ------------------------------------------------------------- guardado ---
 func save_game() -> void:
 	var data := {
-		"version": 1,
+		"version": SAVE_VERSION,
 		"lives": lives,
 		"score": score,
 		"coins": coins,
 		"total_coins": total_coins,
-		"highest_unlocked": highest_unlocked,
 		"levels": levels,
+		"worlds_done": worlds_done,
 		"settings": settings,
 	}
-	var f := FileAccess.open(SAVE_PATH, FileAccess.WRITE)
+	var f := FileAccess.open(save_path, FileAccess.WRITE)
 	if f == null:
 		push_warning("No se pudo guardar la partida: %s" % error_string(FileAccess.get_open_error()))
 		return
@@ -229,41 +379,81 @@ func save_game() -> void:
 	f.close()
 
 
+@warning_ignore("integer_division")
+func old_to_new_level(k: int) -> int:
+	## Guardado v1 (20 niveles: 5 mundos x 4) -> v2 (100 niveles). Los 3 primeros niveles
+	## de cada mundo antiguo son los niveles 1-3 del mundo nuevo y su jefe es el nivel 10.
+	var w: int = (k - 1) / 4 + 1
+	var i: int = (k - 1) % 4 + 1
+	return (w - 1) * LEVELS_PER_WORLD + (i if i < 4 else 10)
+
+
 func load_game() -> void:
-	if not FileAccess.file_exists(SAVE_PATH):
+	if not FileAccess.file_exists(save_path):
 		return
-	var f := FileAccess.open(SAVE_PATH, FileAccess.READ)
+	var f := FileAccess.open(save_path, FileAccess.READ)
 	if f == null:
 		return
-	var parsed = JSON.parse_string(f.get_as_text())
+	var raw: String = f.get_as_text()
 	f.close()
+	var parsed = JSON.parse_string(raw)
 	if typeof(parsed) != TYPE_DICTIONARY:
 		return
 	var d: Dictionary = parsed
+	var version: int = int(d.get("version", 1))
 	lives = maxi(3, int(d.get("lives", START_LIVES)))
 	score = int(d.get("score", 0))
 	coins = int(d.get("coins", 0))
 	total_coins = int(d.get("total_coins", 0))
-	highest_unlocked = clampi(int(d.get("highest_unlocked", 1)), 1, LEVEL_COUNT)
+	levels = {}
 	var lv = d.get("levels", {})
 	if typeof(lv) == TYPE_DICTIONARY:
-		levels = {}
 		for key in lv:
 			var rec = lv[key]
-			if typeof(rec) == TYPE_DICTIONARY:
-				var gems: Array = [false, false, false]
-				var raw = rec.get("gems", [])
-				if typeof(raw) == TYPE_ARRAY:
-					for i in range(mini(3, raw.size())):
-						gems[i] = bool(raw[i])
-				levels[str(key)] = {"done": bool(rec.get("done", false)), "gems": gems, "best": int(rec.get("best", 0))}
+			if typeof(rec) != TYPE_DICTIONARY:
+				continue
+			var idx: int = int(str(key))
+			if version < 2:
+				if idx < 1 or idx > 20:
+					continue
+				idx = old_to_new_level(idx)
+			if idx < 1 or idx > LEVEL_COUNT:
+				continue
+			var gems: Array = [false, false, false]
+			var raw_gems = rec.get("gems", [])
+			if typeof(raw_gems) == TYPE_ARRAY:
+				for i in range(mini(3, raw_gems.size())):
+					gems[i] = bool(raw_gems[i])
+			levels[str(idx)] = {"done": bool(rec.get("done", false)), "gems": gems, "best": int(rec.get("best", 0))}
+	worlds_done = []
+	if version < 2:
+		for n in range(10, LEVEL_COUNT + 1, 10):
+			if is_done(n):
+				worlds_done.append(world_of(n))
+	else:
+		var wd = d.get("worlds_done", [])
+		if typeof(wd) == TYPE_ARRAY:
+			for w in wd:
+				if int(w) >= 1 and int(w) <= WORLD_COUNT and not worlds_done.has(int(w)):
+					worlds_done.append(int(w))
 	var st = d.get("settings", {})
 	if typeof(st) == TYPE_DICTIONARY:
 		for k in ["music", "sfx"]:
 			if st.has(k):
 				settings[k] = bool(st[k])
+		for k2 in ["music_vol", "sfx_vol"]:
+			if st.has(k2):
+				settings[k2] = clampf(float(st[k2]), 0.0, 1.0)
 		if st.has("touch") and str(st["touch"]) in ["auto", "on", "off"]:
 			settings["touch"] = str(st["touch"])
+	if version < 2:
+		# copia de seguridad del guardado antiguo y guardado ya en el formato nuevo
+		migrated_from_v1 = true
+		var b := FileAccess.open(save_path.get_basename() + "_v1_backup.json", FileAccess.WRITE)
+		if b != null:
+			b.store_string(raw)
+			b.close()
+		save_game()
 
 
 func reset_progress() -> void:
@@ -271,7 +461,7 @@ func reset_progress() -> void:
 	score = 0
 	coins = 0
 	total_coins = 0
-	highest_unlocked = 1
 	levels = {}
+	worlds_done = []
 	save_game()
 	stats_changed.emit()

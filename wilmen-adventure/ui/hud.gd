@@ -4,6 +4,7 @@ extends CanvasLayer
 
 const UiTheme := preload("res://ui/ui_theme.gd")
 const TouchButton := preload("res://ui/touch_button.gd")
+const AudioPanel := preload("res://ui/audio_panel.gd")
 
 var level = null
 
@@ -281,8 +282,8 @@ func _make_overlay(title: String, title_color: Color = Color.WHITE) -> VBoxConta
 	return v
 
 
-func _menu_button(parent: Control, text: String, cb: Callable) -> Button:
-	var b := UiTheme.button(text, Vector2(220, 38))
+func _menu_button(parent: Control, text: String, cb: Callable, width: float = 220.0) -> Button:
+	var b := UiTheme.button(text, Vector2(width, 34))
 	b.pressed.connect(func():
 		Audio.play_sfx("click")
 		cb.call())
@@ -292,17 +293,28 @@ func _menu_button(parent: Control, text: String, cb: Callable) -> Button:
 
 func show_pause() -> void:
 	var v := _make_overlay("PAUSA")
-	var first := _menu_button(v, "Continuar", func(): level.toggle_pause())
-	_menu_button(v, "Reiniciar nivel", func():
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 16)
+	v.add_child(cols)
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 6)
+	cols.add_child(left)
+	var first := _menu_button(left, "Continuar", func(): level.toggle_pause(), 150.0)
+	_menu_button(left, "Reiniciar nivel", func():
 		Game.save_game()
-		level.restart_level())
-	var music := _menu_button(v, "", func(): pass)
-	var sfx := _menu_button(v, "", func(): pass)
-	var touch := _menu_button(v, "", func(): pass)
-	_wire_toggle(music, "Música", "music")
-	_wire_toggle(sfx, "Efectos", "sfx")
+		level.restart_level(), 150.0)
+	var touch := _menu_button(left, "", func(): pass, 150.0)
 	_wire_touch(touch)
-	_menu_button(v, "Salir al menú", func(): level.go_menu())
+	_menu_button(left, "Salir al mapa", func(): level.go_menu(), 150.0)
+	var right := VBoxContainer.new()
+	right.add_child(AudioPanel.build(260.0))
+	var help := UiTheme.label("Poder: %s" % Game.POWER_NAMES[Game.power_of_world(level.world)], 10, Color("#ffe97a"))
+	right.add_child(help)
+	var help2 := UiTheme.label(Game.POWER_HELP[Game.power_of_world(level.world)], 9, Color("#cfc6ff"))
+	help2.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	help2.custom_minimum_size.x = 250
+	right.add_child(help2)
+	cols.add_child(right)
 	first.grab_focus()
 
 
@@ -310,22 +322,10 @@ func hide_pause() -> void:
 	_clear_overlay()
 
 
-func _wire_toggle(btn: Button, label_text: String, key: String) -> void:
-	var upd := func():
-		btn.text = "%s: %s" % [label_text, "Sí" if bool(Game.settings.get(key, true)) else "No"]
-	upd.call()
-	for c in btn.pressed.get_connections():
-		btn.pressed.disconnect(c["callable"])
-	btn.pressed.connect(func():
-		Audio.play_sfx("click")
-		Game.set_setting(key, not bool(Game.settings.get(key, true)))
-		upd.call())
-
-
 func _wire_touch(btn: Button) -> void:
 	var names := {"auto": "Auto", "on": "Sí", "off": "No"}
 	var upd := func():
-		btn.text = "Controles táctiles: %s" % names[str(Game.settings.get("touch", "auto"))]
+		btn.text = "Táctil: %s" % names[str(Game.settings.get("touch", "auto"))]
 	upd.call()
 	for c in btn.pressed.get_connections():
 		btn.pressed.disconnect(c["callable"])
@@ -339,41 +339,55 @@ func _wire_touch(btn: Button) -> void:
 
 func show_result(info: Dictionary) -> void:
 	var n: int = level.number
-	var v := _make_overlay("¡NIVEL COMPLETADO!", Color("#ffe97a"))
+	var reward: Dictionary = info.get("reward", {})
+	var v := _make_overlay("¡MUNDO COMPLETADO!" if not reward.is_empty() else "¡NIVEL COMPLETADO!", Color("#ffe97a"))
 	var sub := UiTheme.label(Game.level_title(n), 12, Color("#cfc6ff"))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(sub)
+	var cols := HBoxContainer.new()
+	cols.add_theme_constant_override("separation", 18)
+	v.add_child(cols)
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 3)
+	cols.add_child(left)
 	var gem_row := HBoxContainer.new()
 	gem_row.alignment = BoxContainer.ALIGNMENT_CENTER
 	for i in range(3):
-		var g := _icon_rect(UiTheme.ICON_GEM, 28)
+		var g := _icon_rect(UiTheme.ICON_GEM, 26)
 		g.modulate = Color.WHITE if info["gems"][i] else Color(0.25, 0.25, 0.3, 0.8)
 		gem_row.add_child(g)
-	v.add_child(gem_row)
-	for line in [
+	left.add_child(gem_row)
+	var lines: Array = [
 		"Monedas: %d" % int(info["coins"]),
 		"Bonus: +%d" % int(info["bonus"]),
 		"Puntos del nivel: %d" % int(info["score"]),
 		"Puntos totales: %d" % Game.score,
-	]:
-		var l := UiTheme.label(line, 12)
-		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		v.add_child(l)
-	var first := _menu_button(v, "Siguiente nivel" if n < Game.LEVEL_COUNT else "¡Final!", func(): level.next_level())
-	_menu_button(v, "Repetir nivel", func(): level.restart_level())
-	_menu_button(v, "Menú de niveles", func(): level.go_menu())
+	]
+	if not reward.is_empty():
+		lines.append("Recompensa: +%d vidas, +%d puntos" % [int(reward["lives"]), int(reward["score"])])
+	if n < Game.LEVEL_COUNT:
+		lines.append("¡Nivel %d desbloqueado!" % (n + 1))
+	for line in lines:
+		var l := UiTheme.label(str(line), 11, Color("#8affb0") if str(line).begins_with("¡") or str(line).begins_with("Recompensa") else Color.WHITE)
+		left.add_child(l)
+	var right := VBoxContainer.new()
+	right.add_theme_constant_override("separation", 6)
+	cols.add_child(right)
+	var first := _menu_button(right, "Siguiente nivel" if n < Game.LEVEL_COUNT else "¡Final!", func(): level.next_level(), 150.0)
+	_menu_button(right, "Repetir nivel", func(): level.restart_level(), 150.0)
+	_menu_button(right, "Mapa de niveles", func(): level.go_menu(), 150.0)
 	first.grab_focus()
 
 
 func show_game_over() -> void:
 	var v := _make_overlay("SIN VIDAS", Color("#ff8a8a"))
-	var l := UiTheme.label("Perdiste el progreso de este intento.", 12)
+	var l := UiTheme.label("No se desbloquea el siguiente nivel hasta completar este.", 11)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(l)
 	var first := _menu_button(v, "Reintentar", func():
 		Game.fail_level()
 		level.restart_level())
-	_menu_button(v, "Menú de niveles", func():
+	_menu_button(v, "Mapa de niveles", func():
 		Game.fail_level()
 		Game.save_game()
 		level.go_menu())

@@ -11,7 +11,7 @@ const ProjectileScene := preload("res://items/projectile.tscn")
 
 const GRAVITY := 900.0
 const ROWS := {"walker": 0, "spiky": 1, "jumper": 2, "flyer": 3, "shooter": 4}
-const SHOT_KINDS := ["acorn", "shard", "sand", "snowball", "orb"]
+const SHOT_KINDS := ["acorn", "shard", "sand", "snowball", "orb", "feather", "fire", "thorn", "bolt", "void"]
 
 @export var kind: String = "walker"
 @export var world: int = 1
@@ -35,13 +35,14 @@ var _home_x: float = 0.0
 
 
 func _ready() -> void:
+	add_to_group("enemies")
 	collision_layer = 4
 	collision_mask = 1
 	_home_x = position.x
 	stompable = kind != "spiky"
-	_speed = 26.0 + 4.0 * world
+	_speed = 26.0 + 4.0 * mini(world, 5) + 1.5 * maxi(0, world - 5)
 	if kind == "spiky":
-		_speed = 34.0 + 3.0 * world
+		_speed = 34.0 + 3.0 * mini(world, 5) + 1.5 * maxi(0, world - 5)
 	dir = -1 if randf() < 0.5 else 1
 
 	var cs := CollisionShape2D.new()
@@ -178,7 +179,7 @@ func _jump(delta: float, dx: float) -> void:
 		_hop_t -= delta
 		if _hop_t <= 0.0:
 			dir = (1 if dx > 0.0 else -1) if absf(dx) < 220.0 else dir
-			velocity = Vector2(dir * 62.0, -235.0)
+			velocity = Vector2(dir * 62.0, -235.0 - (25.0 if world == 7 else 0.0))
 			_hop_t = randf_range(0.9, 1.6)
 			_sprite.play("jump")
 	move_and_slide()
@@ -213,21 +214,28 @@ func _shooter(delta: float, dx: float) -> void:
 	_shoot_t -= delta
 	var dy: float = _player.global_position.y - global_position.y
 	if _shoot_t <= 0.0 and absf(dx) < 170.0 and absf(dy) < 90.0 and not _player.dead:
-		_shoot_t = maxf(1.2, 2.4 - 0.15 * world)
+		_shoot_t = maxf(1.2, 2.4 - 0.15 * mini(world, 8))
 		_fire(dx, dy)
 
 
 func _fire(dx: float, dy: float) -> void:
 	_sprite.play("fire")
 	Audio.play_sfx("enemy_shoot")
-	var p = ProjectileScene.instantiate()
-	p.team = "enemy"
-	p.kind = SHOT_KINDS[clampi(world, 1, 5) - 1]
-	var aim := Vector2(dx, dy - 4.0).normalized()
-	p.velocity = aim * 105.0
-	p.life = 3.0
-	p.position = position + Vector2(signf(dx) * 8.0, -2.0)
-	get_parent().add_child(p)
+	# variantes por mundo: 7 y 9 disparan 2 balas, el 10 un abanico de 3
+	var shots: Array = [0.0]
+	if world == 10:
+		shots = [-0.28, 0.0, 0.28]
+	elif world == 7 or world == 9:
+		shots = [-0.14, 0.14]
+	for off in shots:
+		var p = ProjectileScene.instantiate()
+		p.team = "enemy"
+		p.kind = SHOT_KINDS[clampi(world, 1, 10) - 1]
+		var aim := Vector2(dx, dy - 4.0).normalized().rotated(off)
+		p.velocity = aim * 105.0
+		p.life = 3.0
+		p.position = position + Vector2(signf(dx) * 8.0, -2.0)
+		get_parent().add_child(p)
 	await get_tree().create_timer(0.3, false).timeout
 	if not dead and is_instance_valid(_sprite):
 		_sprite.play("idle")

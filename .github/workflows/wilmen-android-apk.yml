@@ -1,7 +1,9 @@
 name: WILMEN ADVENTURE - Pruebas y APK de Android
 
-# 1) Importa el proyecto y ejecuta las pruebas en Godot 4.3 headless (bloqueante).
-# 2) Si pasan, exporta el APK de Android y lo publica como artefacto descargable.
+# 1) Valida los 100 niveles y ejecuta las pruebas en Godot 4.3 headless (bloqueante).
+# 2) Si pasan, exporta el APK RELEASE de Android y lo publica como artefacto descargable.
+# Cada ejecución genera una versión nueva (version code = 100 + número de ejecución), firmada con la
+# misma clave, así que cada APK se instala encima del anterior.
 on:
   workflow_dispatch:
   push:
@@ -15,11 +17,15 @@ env:
 jobs:
   test:
     runs-on: ubuntu-22.04
+    timeout-minutes: 45
     defaults:
       run:
         working-directory: wilmen-adventure
     steps:
       - uses: actions/checkout@v4
+
+      - name: Validar los 100 niveles (alcanzabilidad, gemas, duplicados)
+        run: python3 tools/levelgen.py --check
 
       - name: Descargar Godot
         run: |
@@ -35,15 +41,40 @@ jobs:
           godot --headless --path . --import 2>&1 | tee /tmp/import.log
           if grep -E "SCRIPT ERROR|Parse Error|ERROR: " /tmp/import.log | grep -v "resources still in use"; then echo "Errores al importar"; exit 1; fi
 
-      - name: Prueba de humo (20 niveles + bot)
+      - name: Batería de pruebas (100 niveles, desbloqueo, música, jefes, mecánicas...)
         run: |
           set -o pipefail
           godot --headless --path . --script res://tests/smoke_test.gd 2>&1 | tee /tmp/smoke.log
+          echo "---- resumen ----"
+          grep -c "  ok   " /tmp/smoke.log | sed 's/^/comprobaciones ok: /'
+          grep "FALLO" /tmp/smoke.log || true
           if grep -E "SCRIPT ERROR|Parse Error|FALLO|ERROR:" /tmp/smoke.log | grep -v "resources still in use"; then echo "Errores detectados"; exit 1; fi
+          tail -n 1 /tmp/smoke.log | grep -q "TODO OK"
+
+      - name: Persistencia entre dos ejecuciones reales (cerrar y abrir el juego)
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/persist_write.gd 2>&1 | tee /tmp/pw.log
+          godot --headless --path . --script res://tests/persist_check.gd 2>&1 | tee /tmp/pc.log
+          if grep -E "SCRIPT ERROR|Parse Error|FALLO" /tmp/pw.log /tmp/pc.log; then exit 1; fi
+          grep -q "TODO OK" /tmp/pc.log
+
+      - name: Registros de pruebas
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: wilmen-test-logs
+          path: |
+            /tmp/import.log
+            /tmp/smoke.log
+            /tmp/pw.log
+            /tmp/pc.log
+          if-no-files-found: ignore
 
   apk:
     needs: test
     runs-on: ubuntu-22.04
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: wilmen-adventure
@@ -74,8 +105,25 @@ jobs:
           unzip -q /tmp/templates.tpz -d /tmp/templates
           mv /tmp/templates/templates ~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
 
-      - name: Clave de depuración y ajustes del editor
+      - name: Firma (clave estable) y ajustes del editor
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          KS_ALIAS: ${{ secrets.ANDROID_KEYSTORE_ALIAS }}
+          KS_PASS: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$HOME/release.keystore"
+            echo "KS_PATH=$HOME/release.keystore" >> "$GITHUB_ENV"
+            echo "KS_USER=$KS_ALIAS" >> "$GITHUB_ENV"
+            echo "KS_PASSWORD=$KS_PASS" >> "$GITHUB_ENV"
+            echo "Usando la clave de firma de los secrets"
+          else
+            echo "KS_PATH=$PWD/android/wilmen-sideload.keystore" >> "$GITHUB_ENV"
+            echo "KS_USER=wilmen" >> "$GITHUB_ENV"
+            echo "KS_PASSWORD=wilmenadventure" >> "$GITHUB_ENV"
+            echo "Usando la clave de instalación directa del repositorio (android/README.md)"
+          fi
+          # clave de depuración para el editor (requerida por el exportador aunque se exporte en release)
           keytool -keyalg RSA -genkeypair -alias androiddebugkey -keypass android \
             -keystore "$HOME/debug.keystore" -storepass android \
             -dname "CN=Android Debug,O=Android,C=US" -validity 9999 -deststoretype pkcs12
@@ -93,20 +141,43 @@ jobs:
           EOF
           done
 
+      - name: Versión de esta compilación
+        run: |
+          CODE=$((100 + ${{ github.run_number }}))
+          sed -i "s/^version\/code=.*/version\/code=${CODE}/" export_presets.cfg
+          sed -i "s/^version\/name=.*/version\/name=\"2.0.${{ github.run_number }}\"/" export_presets.cfg
+          grep -E "^version/" export_presets.cfg
+
       - name: Importar recursos
         run: |
           godot --headless --path . --import || true
           godot --headless --path . --import
 
-      - name: Exportar APK
+      - name: Exportar APK release
+        env:
+          GODOT_ANDROID_KEYSTORE_RELEASE_PATH: ${{ env.KS_PATH }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_USER: ${{ env.KS_USER }}
+          GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD: ${{ env.KS_PASSWORD }}
         run: |
           mkdir -p build
-          godot --headless --path . --export-debug "Android" build/WilmenAdventure.apk 2>&1 | tee /tmp/export.log
+          godot --headless --path . --export-release "Android" build/WilmenAdventure.apk 2>&1 | tee /tmp/export.log
           ls -la build
           test -s build/WilmenAdventure.apk
 
+      - name: Comprobar el APK (firma, permisos sin Internet, contenido)
+        run: |
+          BT=$ANDROID_HOME/build-tools/34.0.0
+          echo "== permisos =="
+          $BT/aapt dump permissions build/WilmenAdventure.apk | tee /tmp/perms.txt
+          if grep -q "android.permission.INTERNET" /tmp/perms.txt; then echo "ERROR: el APK pide permiso de Internet"; exit 1; fi
+          echo "== firma =="
+          $BT/apksigner verify --verbose build/WilmenAdventure.apk | head -n 8
+          echo "== datos =="
+          $BT/aapt dump badging build/WilmenAdventure.apk | grep -E "package:|sdkVersion|launchable-activity|application-label:" | head
+          cp build/WilmenAdventure.apk "build/WilmenAdventure-2.0.${{ github.run_number }}.apk"
+
       - uses: actions/upload-artifact@v4
         with:
-          name: WilmenAdventure-apk
-          path: wilmen-adventure/build/WilmenAdventure.apk
+          name: WilmenAdventure-APK-2.0.${{ github.run_number }}
+          path: wilmen-adventure/build/WilmenAdventure-2.0.${{ github.run_number }}.apk
           if-no-files-found: error

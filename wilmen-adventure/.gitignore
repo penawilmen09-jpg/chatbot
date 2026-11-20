@@ -5,6 +5,7 @@ build/
 *.aab
 *.keystore
 *.jks
+!android/wilmen-sideload.keystore
 export_credentials.cfg
 preview_*.png
 __pycache__/

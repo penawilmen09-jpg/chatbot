@@ -4,6 +4,7 @@ extends Control
 const UiTheme := preload("res://ui/ui_theme.gd")
 const MenuBg := preload("res://ui/menu_background.gd")
 const SpriteUtil := preload("res://characters/sprite_util.gd")
+const AudioPanel := preload("res://ui/audio_panel.gd")
 
 var _options: Control = null
 var _menu: VBoxContainer
@@ -45,17 +46,17 @@ func _ready() -> void:
 	_menu.position = Vector2(250, 112)
 	_menu.add_theme_constant_override("separation", 5)
 	add_child(_menu)
-	var has_progress: bool = Game.highest_unlocked > 1 or Game.levels.size() > 0
+	var has_progress: bool = Game.highest_unlocked() > 1 or Game.levels.size() > 0
 	var first := _add_button("Continuar" if has_progress else "Jugar", _on_play)
-	_add_button("Seleccionar nivel", func(): Transition.change_scene("res://ui/level_select.tscn"))
+	_add_button("Mapa de niveles", func(): Transition.change_scene("res://ui/level_select.tscn"))
 	_add_button("Opciones", _show_options)
 	_add_button("Salir", func(): get_tree().quit())
 	first.grab_focus()
 
-	var info := UiTheme.label("Gemas %d/60   Puntos %d" % [Game.total_gems(), Game.score], 10, Color("#ffffff"))
+	var info := UiTheme.label("Niveles %d/100   Gemas %d/300   Puntos %d" % [Game.completed_count(), Game.total_gems(), Game.score], 10, Color("#ffffff"))
 	info.position = Vector2(8, 250)
 	add_child(info)
-	var ver := UiTheme.label("v1.0 - 20 niveles - sin anuncios", 9, Color("#cfc6ff"))
+	var ver := UiTheme.label("v2.0 - 100 niveles - sin anuncios", 9, Color("#cfc6ff"))
 	ver.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	ver.offset_left = -190
 	ver.offset_top = -18
@@ -63,6 +64,10 @@ func _ready() -> void:
 	ver.offset_bottom = -4
 	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	add_child(ver)
+	if Game.migrated_from_v1:
+		var mig := UiTheme.label("Progreso de la versión anterior migrado a los 100 niveles", 9, Color("#8affb0"))
+		mig.position = Vector2(8, 236)
+		add_child(mig)
 	Audio.play_music("title")
 
 
@@ -84,8 +89,8 @@ func _add_button(text: String, cb: Callable) -> Button:
 
 
 func _on_play() -> void:
-	Game.current_level = clampi(Game.highest_unlocked, 1, Game.LEVEL_COUNT)
-	Transition.change_scene("res://levels/level.tscn")
+	if Game.start_level(Game.highest_unlocked()):
+		Transition.change_scene("res://levels/level.tscn")
 
 
 # ------------------------------------------------------------- opciones ---
@@ -109,14 +114,9 @@ func _show_options() -> void:
 	var t := UiTheme.label("OPCIONES", 20)
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(t)
-	var music := UiTheme.button("", Vector2(250, 34))
-	var sfx := UiTheme.button("", Vector2(250, 34))
-	var touch := UiTheme.button("", Vector2(250, 34))
-	v.add_child(music)
-	v.add_child(sfx)
+	v.add_child(AudioPanel.build(300.0))
+	var touch := UiTheme.button("", Vector2(300, 34))
 	v.add_child(touch)
-	_toggle(music, "Música", "music")
-	_toggle(sfx, "Efectos de sonido", "sfx")
 	var names := {"auto": "Auto", "on": "Sí", "off": "No"}
 	var upd := func():
 		touch.text = "Controles táctiles: %s" % names[str(Game.settings.get("touch", "auto"))]
@@ -127,7 +127,7 @@ func _show_options() -> void:
 		var cur: int = order.find(str(Game.settings.get("touch", "auto")))
 		Game.set_setting("touch", order[(cur + 1) % 3])
 		upd.call())
-	var reset := UiTheme.button("Borrar progreso", Vector2(250, 34))
+	var reset := UiTheme.button("Borrar progreso", Vector2(300, 34))
 	v.add_child(reset)
 	reset.pressed.connect(func():
 		if reset.text == "Borrar progreso":
@@ -137,7 +137,7 @@ func _show_options() -> void:
 			Audio.play_sfx("back")
 			_close_options()
 			get_tree().reload_current_scene())
-	var back := UiTheme.button("Volver", Vector2(250, 34))
+	var back := UiTheme.button("Volver", Vector2(300, 34))
 	back.pressed.connect(func():
 		Audio.play_sfx("back")
 		_close_options())
@@ -145,16 +145,6 @@ func _show_options() -> void:
 	add_child(o)
 	_options = o
 	back.grab_focus()
-
-
-func _toggle(btn: Button, label_text: String, key: String) -> void:
-	var upd := func():
-		btn.text = "%s: %s" % [label_text, "Sí" if bool(Game.settings.get(key, true)) else "No"]
-	upd.call()
-	btn.pressed.connect(func():
-		Audio.play_sfx("click")
-		Game.set_setting(key, not bool(Game.settings.get(key, true)))
-		upd.call())
 
 
 func _close_options() -> void:

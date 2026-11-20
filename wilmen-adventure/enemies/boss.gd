@@ -15,11 +15,16 @@ const ProjectileScene := preload("res://items/projectile.tscn")
 const GRAVITY := 900.0
 
 const CONFIG := {
-	1: {"hp": 5, "patterns": ["charge", "slam", "rain"], "rain": "acorn"},
-	2: {"hp": 6, "patterns": ["hover", "slam", "rain"], "rain": "shard"},
-	3: {"hp": 7, "patterns": ["charge", "burrow", "rain"], "rain": "sand"},
-	4: {"hp": 8, "patterns": ["slam", "snow", "charge", "rain"], "rain": "snowball"},
-	5: {"hp": 10, "patterns": ["teleport", "slam", "rain", "charge"], "rain": "orb"},
+	1: {"hp": 5, "patterns": ["charge", "slam", "rain"], "rain": "acorn", "shot": "acorn"},
+	2: {"hp": 6, "patterns": ["hover", "slam", "rain"], "rain": "shard", "shot": "shard"},
+	3: {"hp": 7, "patterns": ["charge", "burrow", "rain"], "rain": "sand", "shot": "sand"},
+	4: {"hp": 8, "patterns": ["slam", "snow", "charge", "rain"], "rain": "snowball", "shot": "snowball"},
+	5: {"hp": 10, "patterns": ["teleport", "slam", "rain", "charge"], "rain": "orb", "shot": "orb"},
+	6: {"hp": 11, "patterns": ["hover", "barrage", "slam", "rain"], "rain": "feather", "shot": "feather"},
+	7: {"hp": 12, "patterns": ["slam", "fan", "charge", "rain"], "rain": "fire", "shot": "fire"},
+	8: {"hp": 13, "patterns": ["charge", "slam", "snow", "fan"], "rain": "thorn", "shot": "thorn"},
+	9: {"hp": 14, "patterns": ["barrage", "hover", "charge", "rain"], "rain": "bolt", "shot": "gear"},
+	10: {"hp": 16, "patterns": ["teleport", "fan", "slam", "barrage", "rain", "charge"], "rain": "void", "shot": "void"},
 }
 
 @export var world: int = 1
@@ -47,6 +52,7 @@ var _gen: int = 0
 
 
 func _ready() -> void:
+	add_to_group("enemies")
 	collision_layer = 4
 	collision_mask = 1
 	_home = position
@@ -73,6 +79,10 @@ func _ready() -> void:
 	_sprite.sprite_frames = SpriteUtil.make_frames(tex, 64, 64, {"idle": {"frames": [0, 1], "fps": 3.0}})
 	add_child(_sprite)
 	_sprite.play("idle")
+	# animación de respiración / flotación del jefe
+	var bob := create_tween().set_loops()
+	bob.tween_property(_sprite, "position:y", -2.0, 0.7).set_trans(Tween.TRANS_SINE)
+	bob.tween_property(_sprite, "position:y", 1.0, 0.7).set_trans(Tween.TRANS_SINE)
 
 
 # ------------------------------------------------------------- control ----
@@ -247,6 +257,10 @@ func _run_ai(g: int) -> void:
 				await _p_snow(g)
 			"teleport":
 				await _p_teleport(g)
+			"fan":
+				await _p_fan(g)
+			"barrage":
+				await _p_barrage(g)
 		if not _alive(g):
 			return
 		mode = "idle"
@@ -361,7 +375,7 @@ func _p_hover(g: int) -> void:
 		if p != null:
 			var aim: Vector2 = (p.global_position - global_position).normalized()
 			for a in [-0.35, 0.0, 0.35]:
-				_shoot("shard", global_position + Vector2(0, 8), aim.rotated(a) * 110.0, 0.0, 1.3)
+				_shoot(str(CONFIG[world]["shot"]), global_position + Vector2(0, 8), aim.rotated(a) * 110.0, 0.0, 1.3)
 			Audio.play_sfx("enemy_shoot")
 		await _wait(0.4, g)
 	shielded = false
@@ -431,7 +445,7 @@ func _p_snow(g: int) -> void:
 		if p != null:
 			tx = p.global_position.x
 		var vx: float = clampf((tx - position.x) / 0.9, -170.0, 170.0)
-		_shoot("snowball", position + Vector2(0, -16), Vector2(vx, -240.0), 420.0, 1.6)
+		_shoot(str(CONFIG[world]["shot"]), position + Vector2(0, -16), Vector2(vx, -240.0), 420.0, 1.6)
 		Audio.play_sfx("enemy_shoot")
 		await _wait(0.55, g)
 	await _wait(0.6, g)
@@ -461,7 +475,7 @@ func _p_teleport(g: int) -> void:
 	Audio.play_sfx("enemy_shoot")
 	for k in range(8):
 		var ang: float = TAU * k / 8.0
-		_shoot("orb", global_position, Vector2(cos(ang), sin(ang)) * 95.0, 0.0, 1.3)
+		_shoot(str(CONFIG[world]["shot"]), global_position, Vector2(cos(ang), sin(ang)) * 95.0, 0.0, 1.3)
 	await _wait(0.7, g)
 	if not _alive(g):
 		return
@@ -469,7 +483,7 @@ func _p_teleport(g: int) -> void:
 	if p != null:
 		var aim: Vector2 = (p.global_position - global_position).normalized()
 		for a in [-0.25, 0.0, 0.25]:
-			_shoot("orb", global_position, aim.rotated(a) * 120.0, 0.0, 1.3)
+			_shoot(str(CONFIG[world]["shot"]), global_position, aim.rotated(a) * 120.0, 0.0, 1.3)
 	await _wait(0.6, g)
 	if not _alive(g):
 		return
@@ -486,3 +500,38 @@ func _unvanish() -> void:
 	_hit.monitoring = true
 	collision_layer = 4
 	_sprite.modulate.a = 1.0
+
+
+func _p_fan(g: int) -> void:
+	## Abanico de proyectiles hacia abajo y a los lados (se esquiva saltando o entre huecos).
+	mode = "telegraph"
+	Audio.play_sfx("boss_roar")
+	await _wait(0.6, g)
+	for volley in range(2 if speed_mult == 1.0 else 3):
+		if not _alive(g):
+			return
+		Audio.play_sfx("enemy_shoot")
+		var n: int = 7
+		for k in range(n):
+			var ang: float = deg_to_rad(20.0 + 140.0 * k / float(n - 1)) + (0.12 if volley % 2 == 1 else 0.0)
+			_shoot(str(CONFIG[world]["shot"]), global_position + Vector2(0, 6), Vector2(cos(ang), sin(ang)) * 105.0, 0.0, 1.4)
+		await _wait(0.8, g)
+	mode = "idle"
+	await _wait(0.5, g)
+
+
+func _p_barrage(g: int) -> void:
+	## Ráfaga de disparos dirigidos al jugador.
+	mode = "telegraph"
+	await _wait(0.5, g)
+	for i in range(5):
+		if not _alive(g):
+			return
+		var p = _get_player()
+		if p != null:
+			var aim: Vector2 = (p.global_position - global_position).normalized()
+			_shoot(str(CONFIG[world]["shot"]), global_position + Vector2(0, 4), aim * 135.0, 0.0, 1.3)
+			Audio.play_sfx("enemy_shoot")
+		await _wait(0.26, g)
+	mode = "idle"
+	await _wait(0.6, g)

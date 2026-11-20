@@ -9,7 +9,7 @@ func _ready() -> void:
 	theme = UiTheme.make()
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 	var bg = MenuBg.new()
-	bg.world = 5
+	bg.world = 10
 	add_child(bg)
 	var center := CenterContainer.new()
 	center.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -21,10 +21,11 @@ func _ready() -> void:
 	t.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(t)
 	for line in [
-		"Wilmen derrotó al Señor de las Sombras",
-		"y devolvió la luz a los cinco mundos.",
+		"Wilmen derrotó al Emperador del Vacío",
+		"y devolvió la luz a los diez mundos.",
 		"",
-		"Gemas: %d / 60" % Game.total_gems(),
+		"Niveles: %d / 100" % Game.completed_count(),
+		"Gemas: %d / 300" % Game.total_gems(),
 		"Monedas: %d" % Game.total_coins,
 		"Puntos: %d" % Game.score,
 	]:
@@ -37,7 +38,7 @@ func _ready() -> void:
 		Transition.change_scene("res://ui/title.tscn"))
 	v.add_child(b)
 	b.grab_focus()
-	Audio.play_music("victory", false)
+	Audio.play_music("victory_world", false)
 
 
 func _notification(what: int) -> void:

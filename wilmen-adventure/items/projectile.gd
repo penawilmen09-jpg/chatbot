@@ -2,7 +2,9 @@ extends Area2D
 ## Proyectil genérico: chispas y hielo del jugador; frutos, cristales, bolas y olas de enemigos y jefes.
 
 const SHEET := preload("res://assets/items/projectiles.png")
-const KINDS := {"spark": 0, "ice": 1, "shard": 2, "orb": 3, "snowball": 4, "acorn": 5, "wave": 6, "sand": 7}
+const KINDS := {"spark": 0, "ice": 1, "shard": 2, "orb": 3, "snowball": 4, "acorn": 5, "wave": 6, "sand": 7,
+	"fire": 8, "bolt": 9, "thorn": 10, "gear": 11, "void": 12, "feather": 13}
+const SPINNERS := ["shard", "acorn", "sand", "thorn", "gear", "bolt"]
 
 var team: String = "enemy"  # "player" | "enemy"
 var kind: String = "orb"
@@ -12,6 +14,7 @@ var bounce: bool = false
 var life: float = 3.0
 var damage: int = 1
 var sprite_scale: float = 1.0
+var pierce: bool = false  # atraviesa enemigos (ráfaga)
 
 var _bounces: int = 0
 var _sprite: Sprite2D
@@ -60,9 +63,9 @@ func _physics_process(delta: float) -> void:
 	else:
 		_pop()
 		return
-	if kind == "wave" or kind == "spark" or kind == "ice":
+	if kind == "wave" or kind == "spark" or kind == "ice" or kind == "feather" or kind == "fire":
 		_sprite.flip_h = velocity.x < 0.0
-	elif kind == "shard" or kind == "acorn" or kind == "sand":
+	elif SPINNERS.has(kind):
 		_sprite.rotation += 8.0 * delta
 
 
@@ -70,7 +73,8 @@ func _on_body_entered(b: Node) -> void:
 	if team == "player":
 		if b.has_method("take_hit"):
 			b.take_hit(kind)
-			_pop()
+			if not pierce:
+				_pop()
 	elif b.has_method("hurt"):
 		b.hurt(damage, global_position.x)
 		_pop()

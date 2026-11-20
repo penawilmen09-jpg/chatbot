@@ -73,6 +73,8 @@ func _refresh() -> void:
 		return
 	pressed = now
 	if pressed:
+		if OS.has_feature("mobile"):
+			Input.vibrate_handheld(10)
 		Input.action_press(action)
 	else:
 		Input.action_release(action)
@@ -82,6 +84,8 @@ func _refresh() -> void:
 func _draw() -> void:
 	var c: Vector2 = size * 0.5
 	var r: float = minf(size.x, size.y) * 0.5 - 2.0
+	if pressed:
+		r *= 0.93
 	var fill := Color(0.08, 0.05, 0.16, 0.50)
 	if pressed:
 		fill = Color(1, 1, 1, 0.45)

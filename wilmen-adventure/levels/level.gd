@@ -12,6 +12,9 @@ const SpringScene := preload("res://items/spring.tscn")
 const GoalScene := preload("res://items/goal.tscn")
 const CheckpointScene := preload("res://items/checkpoint.tscn")
 const MoverScene := preload("res://items/mover.tscn")
+const CrumbleScene := preload("res://items/crumble.tscn")
+const GeyserScene := preload("res://items/geyser.tscn")
+const CrusherScene := preload("res://items/crusher.tscn")
 const ChunkScript := preload("res://levels/terrain_chunk.gd")
 const HudScript := preload("res://ui/hud.gd")
 const UiTheme := preload("res://ui/ui_theme.gd")
@@ -46,10 +49,25 @@ var _lava_area: Area2D
 var _gate_wall: StaticBody2D = null
 var _gem_counter: int = 0
 var _dying: bool = false
+var blocked: bool = false  # el nivel está bloqueado: no se construye nada
+var redirect_on_block: bool = true  # (las pruebas lo desactivan)
+var _belt_r: Area2D = null
+var _belt_l: Area2D = null
+var _mud_area: Area2D = null
+var _wind_area: Area2D = null
+var _coin_combo: int = 0
+var _coin_combo_t: float = 0.0
 
 
 func _ready() -> void:
 	number = Game.current_level
+	# Validación de desbloqueo también al cargar la escena directamente (no solo en el menú).
+	if not Game.is_unlocked(number):
+		blocked = true
+		push_warning("Intento de cargar el nivel %d bloqueado: se vuelve al mapa." % number)
+		if redirect_on_block:
+			Transition.change_scene("res://ui/level_select.tscn")
+		return
 	world = Game.world_of(number)
 	is_boss = Game.is_boss_level(number)
 	slippery = world == 4
@@ -61,7 +79,7 @@ func _ready() -> void:
 	_spawn_entities()
 	_spawn_player()
 	_build_hud()
-	Audio.play_music("world%d" % world)
+	Audio.play_music(Game.music_for_level(number))
 	hud.show_intro(Game.level_title(number), Game.WORLD_NAMES[world - 1])
 
 
@@ -121,6 +139,7 @@ func _build_terrain() -> void:
 	# --- dibujo por trozos
 	for cx in range(0, cols, CHUNK_COLS):
 		var chunk = ChunkScript.new()
+		chunk.has_belt = false
 		chunk.rows = rows
 		chunk.x0 = cx
 		chunk.x1 = cx + CHUNK_COLS
@@ -131,6 +150,8 @@ func _build_terrain() -> void:
 			for x in range(cx, mini(cx + CHUNK_COLS, cols)):
 				if r[x] == "L":
 					chunk.has_lava = true
+				elif r[x] == ">" or r[x] == "<":
+					chunk.has_belt = true
 		add_child(chunk)
 
 	# --- colisiones sólidas (rectángulos fusionados)
@@ -139,7 +160,7 @@ func _build_terrain() -> void:
 	body.collision_layer = 1
 	body.collision_mask = 0
 	add_child(body)
-	for rc in _merge_rects("#"):
+	for rc in _merge_rects("#><~"):
 		_add_shape(body, Rect2(rc.position.x * TILE, rc.position.y * TILE, rc.size.x * TILE, rc.size.y * TILE))
 	_add_shape(body, Rect2(-32, -400, 32, 1200))
 	_add_shape(body, Rect2(cols * TILE, -400, 32, 1200))
@@ -179,6 +200,7 @@ func _build_terrain() -> void:
 				_add_shape(_spike_area, Rect2(x * TILE + 2, y * TILE + 8, 12, 8))
 			elif c == "L":
 				_add_shape(_lava_area, Rect2(x * TILE, y * TILE + 4, TILE, 12))
+	_build_env_areas()
 
 
 func _make_hazard_area() -> Area2D:
@@ -208,9 +230,9 @@ func _merge_rects(ch: String) -> Array:
 			var r: String = rows[y]
 			var x: int = 0
 			while x < cols:
-				if r[x] == ch:
+				if ch.contains(r[x]):
 					var xs: int = x
-					while x < cols and r[x] == ch:
+					while x < cols and ch.contains(r[x]):
 						x += 1
 					runs.append(Vector2i(xs, x))
 				else:
@@ -289,6 +311,19 @@ func _spawn_entities() -> void:
 					mv.world = world
 					mv.position = Vector2(x * TILE + 16, y * TILE + 4)
 					add_child(mv)
+				"c":
+					var cr = CrumbleScene.instantiate()
+					cr.tileset = _tileset
+					cr.position = pos
+					add_child(cr)
+				"g":
+					var gy = GeyserScene.instantiate()
+					gy.position = pos
+					add_child(gy)
+				"p":
+					var cru = CrusherScene.instantiate()
+					cru.position = pos
+					add_child(cru)
 				"X":
 					boss = BossScene.instantiate()
 					boss.world = world
@@ -363,9 +398,13 @@ func _build_hud() -> void:
 
 
 # ------------------------------------------------------------ bucle -------
-func _physics_process(_delta: float) -> void:
-	if player == null or player.dead or finished:
+func _physics_process(delta: float) -> void:
+	if blocked or player == null or player.dead or finished:
 		return
+	_coin_combo_t = maxf(0.0, _coin_combo_t - delta)
+	if _coin_combo_t <= 0.0:
+		_coin_combo = 0
+	_apply_environment()
 	if player.position.y > nrows * TILE + 48:
 		player.die()
 		return
@@ -388,7 +427,7 @@ func _on_player_died() -> void:
 		return
 	if Game.lives <= 0:
 		finished = true
-		Audio.play_music("title", false)
+		Audio.play_music("defeat", false, 0.3)
 		Audio.play_sfx("gameover")
 		hud.show_game_over()
 		return
@@ -412,7 +451,10 @@ func on_pickup(kind: String, gem_id: int, pos: Vector2) -> void:
 		"coin":
 			Game.add_coin()
 			coins_level += 1
-			Audio.play_sfx("coin")
+			_coin_combo += 1
+			_coin_combo_t = 0.9
+			Audio.play_sfx("coin", 1.0 + minf(_coin_combo, 12) * 0.05)
+			spawn_burst(pos, Color("#ffe97a"), 4)
 		"gem":
 			if gem_id >= 0 and gem_id < 3:
 				gems[gem_id] = true
@@ -443,7 +485,7 @@ func _start_fight() -> void:
 	_close_gate()
 	camera.limit_left = int(gate_x)
 	boss.activate(gate_x + TILE, (cols - 2) * TILE, boss_home_y - 170.0)
-	Audio.play_music("boss")
+	Audio.play_music(Game.boss_music(world))
 	hud.show_boss(Game.BOSS_NAMES[world - 1])
 	shake(4.0)
 
@@ -466,7 +508,7 @@ func _reset_boss_fight() -> void:
 	camera.limit_left = 0
 	boss.reset_fight()
 	hud.hide_boss()
-	Audio.play_music("world%d" % world)
+	Audio.play_music(Game.music_for_level(number))
 
 
 func _on_boss_hp(hp: int, max_hp: int) -> void:
@@ -477,7 +519,7 @@ func _on_boss_hp(hp: int, max_hp: int) -> void:
 func _on_boss_defeated() -> void:
 	Game.add_score(2000)
 	popup("¡JEFE DERROTADO! +2000", boss.global_position + Vector2(0, -40))
-	Audio.play_music("victory", false)
+	Audio.play_music("victory_world", false, 0.4)
 	hud.hide_boss()
 	if goal != null:
 		goal.set_active(true)
@@ -498,12 +540,21 @@ func complete_level() -> void:
 	finished = true
 	player.celebrate()
 	Audio.play_sfx("goal")
-	Audio.play_music("victory", false)
 	var bonus: int = 1000 + player.hp * 100
 	Game.add_score(bonus)
 	var level_score: int = Game.score - Game.score_at_level_start
-	Game.register_complete(number, gems, level_score)
-	popup("¡Nivel completado!", player.global_position + Vector2(0, -34))
+	# Solo aquí (al llegar a la meta) se marca el nivel como completado y se desbloquea el siguiente.
+	var reward: Dictionary = Game.register_complete(number, gems, level_score)
+	if reward.is_empty():
+		Audio.play_music("victory", false, 0.3)
+		popup("¡Nivel completado!", player.global_position + Vector2(0, -34))
+	else:
+		Audio.play_music("victory_world", false, 0.3)
+		popup("¡MUNDO %d COMPLETADO!" % world, player.global_position + Vector2(0, -34))
+	for i in range(8):
+		get_tree().create_timer(0.16 * i, false).timeout.connect(func():
+			if player != null and is_instance_valid(player):
+				spawn_burst(player.global_position + Vector2(randf_range(-50, 50), randf_range(-80, -20)), Color.from_hsv(randf(), 0.6, 1.0), 10))
 	await get_tree().create_timer(1.8, false).timeout
 	hud.show_result({
 		"gems": gems.duplicate(),
@@ -511,6 +562,7 @@ func complete_level() -> void:
 		"score": level_score,
 		"bonus": bonus,
 		"hp": player.hp,
+		"reward": reward,
 	})
 
 
@@ -580,5 +632,61 @@ func next_level() -> void:
 	if number >= Game.LEVEL_COUNT:
 		Transition.change_scene("res://ui/ending.tscn")
 	else:
-		Game.current_level = number + 1
-		Transition.change_scene("res://levels/level.tscn")
+		if Game.start_level(number + 1):
+			Transition.change_scene("res://levels/level.tscn")
+		else:
+			Transition.change_scene("res://ui/level_select.tscn")
+
+
+# ------------------------------------------------ entorno (mundos 6-10) ----
+func _build_env_areas() -> void:
+	_belt_r = _make_hazard_area()
+	_belt_l = _make_hazard_area()
+	_mud_area = _make_hazard_area()
+	_wind_area = _make_hazard_area()
+	for rc in _merge_rects(">"):
+		_add_shape(_belt_r, Rect2(rc.position.x * TILE, rc.position.y * TILE - 6, rc.size.x * TILE, 8))
+	for rc in _merge_rects("<"):
+		_add_shape(_belt_l, Rect2(rc.position.x * TILE, rc.position.y * TILE - 6, rc.size.x * TILE, 8))
+	for rc in _merge_rects("~"):
+		_add_shape(_mud_area, Rect2(rc.position.x * TILE, rc.position.y * TILE - 6, rc.size.x * TILE, 8))
+	for rc in _merge_rects("W"):
+		var r := Rect2(rc.position.x * TILE, rc.position.y * TILE, rc.size.x * TILE, rc.size.y * TILE)
+		_add_shape(_wind_area, r)
+		_add_wind_fx(r)
+
+
+func _add_wind_fx(r: Rect2) -> void:
+	var p := CPUParticles2D.new()
+	p.position = Vector2(r.position.x + r.size.x * 0.5, r.position.y + r.size.y)
+	p.amount = maxi(6, int(r.size.x * r.size.y / 220.0))
+	p.lifetime = 1.3
+	p.preprocess = 1.3
+	p.emission_shape = CPUParticles2D.EMISSION_SHAPE_RECTANGLE
+	p.emission_rect_extents = Vector2(r.size.x * 0.5, 2.0)
+	p.direction = Vector2(0, -1)
+	p.spread = 6.0
+	p.initial_velocity_min = r.size.y * 0.55
+	p.initial_velocity_max = r.size.y * 0.8
+	p.gravity = Vector2.ZERO
+	p.scale_amount_min = 1.0
+	p.scale_amount_max = 2.0
+	p.color = Color(1, 1, 1, 0.45)
+	p.z_index = -1
+	add_child(p)
+
+
+func _apply_environment() -> void:
+	## Cintas, barro y viento: el nivel informa al jugador en cada paso de física.
+	for b in _belt_r.get_overlapping_bodies():
+		if b == player:
+			player.env_conveyor += 62.0
+	for b in _belt_l.get_overlapping_bodies():
+		if b == player:
+			player.env_conveyor -= 62.0
+	for b in _mud_area.get_overlapping_bodies():
+		if b == player:
+			player.env_slow = true
+	for b in _wind_area.get_overlapping_bodies():
+		if b == player:
+			player.env_wind = true

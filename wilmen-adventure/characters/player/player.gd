@@ -21,7 +21,8 @@ const COYOTE := 0.10
 const JUMP_BUFFER := 0.12
 const DASH_SPEED := 300.0
 const MAX_HP := 3
-const POWER_COOLDOWN := {"spark": 0.45, "dash": 1.0, "shield": 8.0, "freeze": 0.8, "blink": 1.0}
+const POWER_COOLDOWN := {"spark": 0.45, "dash": 1.0, "shield": 8.0, "freeze": 0.8, "blink": 1.0,
+	"gust": 0.6, "flame": 0.8, "leap": 1.0, "pulse": 1.3, "nova": 9.0}
 
 var level = null  # el nivel que contiene al jugador (duck typing)
 var camera: Camera2D = null
@@ -38,6 +39,11 @@ var skill_cd_max: float = 0.5
 var shield_t: float = 0.0
 var dash_t: float = 0.0
 
+# efectos del entorno: los fija el nivel en cada paso de física
+var env_conveyor: float = 0.0
+var env_slow: bool = false
+var env_wind: bool = false
+
 var _coyote_t: float = 0.0
 var _buffer_t: float = 0.0
 var _air_jumps: int = 1
@@ -47,6 +53,9 @@ var _hurt_t: float = 0.0
 var _cast_t: float = 0.0
 var _shake: float = 0.0
 var _sprite: AnimatedSprite2D
+var _was_on_floor: bool = true
+var _dust_t: float = 0.0
+var _squash_tw: Tween = null
 
 
 func _ready() -> void:
@@ -131,21 +140,32 @@ func _physics_process(delta: float) -> void:
 			_coyote_t = 0.0
 			_in_jump = true
 			Audio.play_sfx("jump")
+			_squash(Vector2(0.82, 1.22))
 		elif jump_pressed and not on_floor and _air_jumps > 0:
 			velocity.y = DOUBLE_JUMP_V
 			_air_jumps -= 1
 			_in_jump = true
 			Audio.play_sfx("double_jump")
+			_squash(Vector2(0.85, 1.18))
 			if level != null:
 				level.spawn_burst(global_position + Vector2(0, 10), Color("#ffffff"), 5)
 		# altura de salto variable: soltar el botón corta el salto
 		if _in_jump and not jump_held and velocity.y < -140.0:
 			velocity.y = -140.0
 
+	if env_wind:
+		_in_jump = false
+		velocity.y = maxf(velocity.y - 1500.0 * delta, -170.0)
+	if on_floor and env_conveyor != 0.0:
+		move_and_collide(Vector2(env_conveyor * delta, 0.0))
 	last_vy = velocity.y
 	move_and_slide()
 	_handle_collisions()
 	_update_visuals(dir, on_floor, delta)
+	_juice(on_floor, delta)
+	env_conveyor = 0.0
+	env_slow = false
+	env_wind = false
 
 
 func _move_horizontal(dir: float, on_floor: bool, delta: float) -> void:
@@ -157,7 +177,7 @@ func _move_horizontal(dir: float, on_floor: bool, delta: float) -> void:
 	if _hurt_t > 0.0:
 		return
 	if dir != 0.0:
-		velocity.x = move_toward(velocity.x, dir * RUN_SPEED, accel * delta)
+		velocity.x = move_toward(velocity.x, dir * RUN_SPEED * (0.55 if env_slow else 1.0), accel * delta)
 		facing = 1 if dir > 0.0 else -1
 	else:
 		velocity.x = move_toward(velocity.x, 0.0, fric * delta)
@@ -222,33 +242,105 @@ func _use_skill() -> void:
 	_cast_t = 0.16
 	match power:
 		"spark":
-			_shoot("spark", 230.0, 380.0, true)
+			_shoot("spark", Vector2(facing * 230.0, -30.0), 380.0, true)
 			Audio.play_sfx("spark")
+			_fx(Color("#ffd23a"), 5)
 		"dash":
 			dash_t = 0.22
 			_invuln_t = maxf(_invuln_t, 0.3)
 			Audio.play_sfx("dash")
+			_fx(Color("#59e0f0"), 8)
 		"shield":
 			shield_t = 4.0
 			Audio.play_sfx("shield")
+			_fx(Color("#ffb030"), 8)
 		"freeze":
-			_shoot("ice", 200.0, 0.0, false)
+			_shoot("ice", Vector2(facing * 200.0, 0.0), 0.0, false)
 			Audio.play_sfx("freeze")
+			_fx(Color("#8fe0ff"), 6)
 		"blink":
 			_blink()
 			Audio.play_sfx("blink")
+		"gust":
+			_shoot("feather", Vector2(facing * 290.0, 0.0), 0.0, false, true)
+			Audio.play_sfx("dash", 1.3)
+			_fx(Color("#e8f4ff"), 7)
+		"flame":
+			for a in [-0.2, 0.0, 0.2]:
+				_shoot("fire", Vector2(facing * 215.0, 0.0).rotated(a), 120.0, false)
+			Audio.play_sfx("spark", 0.8)
+			_fx(Color("#ff7a1a"), 7)
+		"leap":
+			velocity.y = -400.0
+			_air_jumps = 1
+			_in_jump = false
+			Audio.play_sfx("spring")
+			_squash(Vector2(0.8, 1.3))
+			_fx(Color("#5adf7a"), 10)
+		"pulse":
+			_pulse()
+		"nova":
+			shield_t = 3.0
+			Audio.play_sfx("shield", 0.8)
+			for k in range(8):
+				var ang: float = TAU * k / 8.0
+				_shoot("spark", Vector2(cos(ang), sin(ang)) * 175.0, 0.0, false)
+			_fx(Color("#c05aff"), 12)
 
 
-func _shoot(kind: String, speed: float, grav: float, bouncy: bool) -> void:
+func _shoot(kind: String, vel: Vector2, grav: float, bouncy: bool, pierce: bool = false) -> void:
 	var p = ProjectileScene.instantiate()
 	p.team = "player"
 	p.kind = kind
-	p.velocity = Vector2(facing * speed, -30.0 if bouncy else 0.0)
+	p.velocity = vel
 	p.fall_accel = grav
 	p.bounce = bouncy
-	p.life = 1.8
+	p.pierce = pierce
+	p.life = 1.8 if not pierce else 1.2
 	p.position = position + Vector2(facing * 12.0, -2.0)
 	get_parent().add_child(p)
+
+
+func _pulse() -> void:
+	## Descarga eléctrica: daña a los enemigos (y al jefe) en un radio.
+	Audio.play_sfx("boss_hit", 1.5)
+	for k in range(10):
+		var ang: float = TAU * k / 10.0
+		if level != null:
+			level.spawn_burst(global_position + Vector2(cos(ang), sin(ang)) * 30.0, Color("#fff06a"), 3)
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e) and e.global_position.distance_to(global_position) < 64.0:
+			e.take_hit("spark")
+
+
+func _fx(color: Color, n: int) -> void:
+	if level != null:
+		level.spawn_burst(global_position + Vector2(facing * 8.0, -2.0), color, n)
+
+
+func _squash(scl: Vector2) -> void:
+	## Efecto visual de estirar/aplastar el sprite; no afecta a la física.
+	if _sprite == null:
+		return
+	if _squash_tw != null and _squash_tw.is_valid():
+		_squash_tw.kill()
+	_sprite.scale = scl
+	_squash_tw = create_tween()
+	_squash_tw.tween_property(_sprite, "scale", Vector2.ONE, 0.14)
+
+
+func _juice(on_floor: bool, delta: float) -> void:
+	if on_floor and not _was_on_floor and last_vy > 120.0:
+		_squash(Vector2(1.2, 0.82))
+		if level != null:
+			level.spawn_burst(global_position + Vector2(0, 10), Color(1, 1, 1, 0.8), 3)
+	_was_on_floor = on_floor
+	if on_floor and absf(velocity.x) > 60.0:
+		_dust_t -= delta
+		if _dust_t <= 0.0:
+			_dust_t = 0.16
+			if level != null:
+				level.spawn_burst(global_position + Vector2(-facing * 4.0, 10), Color(1, 1, 1, 0.6), 1)
 
 
 func _blink() -> void:

@@ -139,6 +139,9 @@ MAJ = [0, 2, 4, 5, 7, 9, 11]
 MIN = [0, 2, 3, 5, 7, 8, 10]
 HMIN = [0, 2, 3, 5, 7, 8, 11]
 PHR = [0, 1, 4, 5, 7, 8, 10]
+LYD = [0, 2, 4, 6, 7, 9, 11]
+MIX = [0, 2, 4, 5, 7, 9, 10]
+WHOLE = [0, 2, 4, 6, 8, 10]
 PENT_MAJ = [0, 2, 4, 7, 9]
 PENT_MIN = [0, 3, 5, 7, 10]
 
@@ -151,6 +154,30 @@ TRACKS = {
     "world5": dict(root=52, scale=HMIN, pent=PENT_MIN, prog=[(0, "m"), (8, "M"), (7, "M"), (7, "M")], bpm=116, seed=55, lead_duty=0.5, swing=False, drums="march"),
     "boss": dict(root=55, scale=HMIN, pent=PENT_MIN, prog=[(0, "m"), (1, "M"), (0, "m"), (7, "M")], bpm=156, seed=66, lead_duty=0.5, swing=False, drums="drive"),
     "title": dict(root=67, scale=MAJ, pent=PENT_MAJ, prog=[(0, "M"), (5, "M"), (9, "m"), (7, "M")], bpm=108, seed=77, lead_duty=0.25, swing=False, drums="light"),
+    # --- mundos 6-10 (canción principal de cada mundo)
+    "world6": dict(root=67, scale=LYD, pent=PENT_MAJ, prog=[(0, "M"), (2, "M"), (9, "m"), (7, "M")], bpm=132, seed=61, lead_duty=0.25, drums="light", arp="wide", echo=True),
+    "world7": dict(root=50, scale=PHR, pent=PENT_MIN, prog=[(0, "m"), (5, "M"), (1, "M"), (0, "m")], bpm=140, seed=71, lead_duty=0.5, drums="drive", bass="walk"),
+    "world8": dict(root=62, scale=MIX, pent=PENT_MAJ, prog=[(0, "M"), (10, "M"), (5, "M"), (0, "M")], bpm=126, seed=81, lead_duty=0.125, drums="march", bass="walk", arp="up"),
+    "world9": dict(root=57, scale=MIN, pent=PENT_MIN, prog=[(0, "m"), (0, "m"), (8, "M"), (7, "M")], bpm=136, seed=91, lead_duty=0.125, drums="heavy", bass="pulse", arp="up"),
+    "world10": dict(root=53, scale=HMIN, pent=PENT_MIN, prog=[(0, "m"), (8, "M"), (5, "m"), (7, "M")], bpm=144, seed=101, lead_duty=0.5, drums="heavy", bass="walk", double=True),
+    # --- canciones alternativas (niveles 5-9 de cada mundo)
+    "world1_alt": dict(root=65, scale=MAJ, pent=PENT_MAJ, prog=[(0, "M"), (9, "m"), (5, "M"), (7, "M")], bpm=116, seed=12, lead_duty=0.125, drums="march", arp="up"),
+    "world2_alt": dict(root=52, scale=MIN, pent=PENT_MIN, prog=[(0, "m"), (3, "M"), (8, "M"), (7, "M")], bpm=96, seed=23, lead_duty=0.25, drums="soft", arp="sparse", echo=True),
+    "world3_alt": dict(root=57, scale=PHR, pent=PENT_MIN, prog=[(0, "m"), (10, "M"), (8, "M"), (0, "m")], bpm=120, seed=34, lead_duty=0.5, drums="march", bass="walk"),
+    "world4_alt": dict(root=60, scale=MAJ, pent=PENT_MAJ, prog=[(0, "M"), (9, "m"), (2, "m"), (7, "M")], bpm=112, seed=45, lead_duty=0.25, drums="soft", lead_wave="tri", arp="wide"),
+    "world5_alt": dict(root=50, scale=HMIN, pent=PENT_MIN, prog=[(0, "m"), (7, "M"), (8, "M"), (7, "M")], bpm=108, seed=56, lead_duty=0.5, drums="march", bass="pulse"),
+    "world6_alt": dict(root=64, scale=LYD, pent=PENT_MAJ, prog=[(0, "M"), (7, "M"), (5, "M"), (7, "M")], bpm=124, seed=62, lead_duty=0.125, drums="light", arp="up", double=True),
+    "world7_alt": dict(root=45, scale=PHR, pent=PENT_MIN, prog=[(0, "m"), (1, "M"), (10, "M"), (0, "m")], bpm=132, seed=72, lead_duty=0.25, drums="drive", bass="pulse"),
+    "world8_alt": dict(root=57, scale=MIX, pent=PENT_MAJ, prog=[(0, "M"), (5, "M"), (10, "M"), (7, "M")], bpm=118, seed=82, lead_duty=0.5, drums="light", bass="walk", lead_wave="tri"),
+    "world9_alt": dict(root=52, scale=MIN, pent=PENT_MIN, prog=[(0, "m"), (5, "m"), (8, "M"), (7, "M")], bpm=128, seed=92, lead_duty=0.25, drums="heavy", arp="sparse", bass="pulse"),
+    "world10_alt": dict(root=57, scale=HMIN, pent=PENT_MIN, prog=[(0, "m"), (5, "m"), (7, "M"), (0, "m")], bpm=136, seed=102, lead_duty=0.5, drums="drive", double=True, echo=True),
+    # --- especiales
+    "map": dict(root=60, scale=MAJ, pent=PENT_MAJ, prog=[(0, "M"), (7, "M"), (5, "M"), (7, "M")], bpm=100, seed=5, lead_duty=0.25, drums="soft", lead_wave="tri", arp="sparse", lead_vol=0.45),
+    "secret": dict(root=64, scale=WHOLE, pent=[0, 2, 4, 6, 8], prog=[(0, "M"), (2, "M"), (4, "M"), (2, "M")], bpm=92, seed=8, lead_duty=0.125, drums="none", arp="wide", lead_wave="tri", echo=True),
+    "castle": dict(root=45, scale=HMIN, pent=PENT_MIN, prog=[(0, "m"), (5, "m"), (7, "M"), (0, "m")], bpm=88, seed=9, lead_duty=0.5, drums="soft", bass="pulse", double=True, echo=True),
+    "boss_b": dict(root=52, scale=PHR, pent=PENT_MIN, prog=[(0, "m"), (1, "M"), (0, "m"), (10, "M")], bpm=164, seed=67, lead_duty=0.5, drums="drive", bass="pulse"),
+    "boss_c": dict(root=48, scale=HMIN, pent=PENT_MIN, prog=[(0, "m"), (8, "M"), (7, "M"), (0, "m")], bpm=170, seed=68, lead_duty=0.25, drums="heavy", bass="walk", double=True),
+    "boss_final": dict(root=50, scale=HMIN, pent=PENT_MIN, prog=[(0, "m"), (1, "M"), (8, "M"), (7, "M")], bpm=176, seed=69, lead_duty=0.5, drums="heavy", bass="pulse", double=True, echo=True),
 }
 
 
@@ -203,14 +230,17 @@ def render_track(name, cfg):
     arp = np.zeros(n_total)
     bass = np.zeros(n_total)
     drum = np.zeros(n_total)
-    # progresión de 16 compases: 4 repeticiones del ciclo de 4 acordes
-    chords = [(cfg["root"] + prog[i % 4][0] - 12 + 12, prog[i % 4][1]) for i in range(bars)]
-    chords = [(c[0], c[1]) for c in chords]
-    # frases melódicas (4 compases) A, B, A', C
+    chords = [(cfg["root"] + prog[i % 4][0], prog[i % 4][1]) for i in range(bars)]
     phr_a = build_phrase(rnd, cfg, chords[0:4])
     phr_b = build_phrase(rnd, cfg, chords[4:8])
     phr_c = build_phrase(rnd, cfg, chords[8:12])
     phrases = [phr_a, phr_b, phr_a, phr_c]
+    drums = cfg.get("drums", "light")
+    arp_kind = cfg.get("arp", "ud")
+    bass_kind = cfg.get("bass", "eighth")
+    lead_wave = cfg.get("lead_wave", "square")
+    lead_vol = cfg.get("lead_vol", 0.5)
+    arp_vol = cfg.get("arp_vol", 0.16)
 
     def put(buf, start_s, wave_, vol=1.0):
         i0 = int(start_s * SR)
@@ -223,44 +253,64 @@ def render_track(name, cfg):
         for (bi, st, ln, m) in phrases[p]:
             t0 = (p * 4 + bi) * bar + st * eighth
             n = int(ln * eighth * SR * 0.95)
-            w = square(freq(m), n, cfg["lead_duty"]) * env(n, 0.004, 0.08, 0.7, 0.04)
-            put(lead, t0, w, 0.5)
-            if p == 3:  # eco en la última frase
-                put(lead, t0 + eighth, w, 0.15)
+            if lead_wave == "tri":
+                w = tri(freq(m), n) * env(n, 0.01, 0.1, 0.8, 0.06)
+            else:
+                w = square(freq(m), n, cfg["lead_duty"]) * env(n, 0.004, 0.08, 0.7, 0.04)
+            put(lead, t0, w, lead_vol)
+            if p == 3 or cfg.get("echo"):
+                put(lead, t0 + eighth, w, lead_vol * 0.3)
+            if cfg.get("double"):
+                w2 = square(freq(m - 12), n, 0.5) * env(n, 0.004, 0.08, 0.7, 0.04)
+                put(lead, t0, w2, lead_vol * 0.35)
     for b in range(bars):
         croot, q = chords[b]
         ct = chord_tones(croot, q)
-        # bajo: raíz y quinta en corcheas
         for e in range(8):
-            m = (croot - 12) if e % 4 != 3 else (croot - 12 + 7)
-            if e % 2 == 1 and cfg["drums"] == "soft":
+            if bass_kind == "walk":
+                m = (croot - 12) + [0, 0, 7, 0, 12, 7, 0, 7][e]
+            elif bass_kind == "pulse":
+                m = croot - 12
+            else:
+                m = (croot - 12) if e % 4 != 3 else (croot - 12 + 7)
+            if e % 2 == 1 and drums == "soft":
                 continue
-            n = int(eighth * SR * 0.9)
+            n = int(eighth * SR * (0.55 if bass_kind == "pulse" else 0.9))
             put(bass, b * bar + e * eighth, tri(freq(m), n) * env(n, 0.003, 0.06, 0.8, 0.03), 0.8)
-        # arpegio en semicorcheas
+            if bass_kind == "pulse":
+                put(bass, b * bar + e * eighth + eighth / 2, tri(freq(m), n) * env(n, 0.003, 0.05, 0.7, 0.03), 0.6)
         s16 = eighth / 2
-        pat = [0, 1, 2, 1, 0, 1, 2, 1, 0, 1, 2, 1, 0, 2, 1, 2]
+        pats = {
+            "ud": [0, 1, 2, 1] * 4,
+            "up": [0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2, 1],
+            "sparse": [0, -1, 2, -1, 1, -1, 2, -1, 0, -1, 2, -1, 1, -1, 2, -1],
+            "wide": [0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2, 0, 2, 1, 2],
+        }
+        pat = pats.get(arp_kind, pats["ud"])
         for k in range(16):
-            m = ct[pat[k] % 3] + 12
+            if pat[k] < 0:
+                continue
+            m = ct[pat[k] % 3] + (12 if arp_kind != "wide" else 24)
             n = int(s16 * SR * 0.8)
-            put(arp, b * bar + k * s16, square(freq(m), n, 0.125) * env(n, 0.002, 0.05, 0.4, 0.02), 0.16)
-        # batería
+            put(arp, b * bar + k * s16, square(freq(m), n, 0.125) * env(n, 0.002, 0.05, 0.4, 0.02), arp_vol)
         for beat in range(4):
             t0 = b * bar + beat * spb
-            if beat in (0, 2) or cfg["drums"] == "drive":
+            if drums == "none":
+                continue
+            if beat in (0, 2) or drums in ("drive", "heavy"):
                 n = int(0.13 * SR)
                 kick = np.sin(2 * np.pi * np.cumsum(np.linspace(150, 45, n)) / SR) * np.linspace(1, 0, n)
                 put(drum, t0, kick, 0.9)
             if beat in (1, 3):
                 n = int(0.1 * SR)
                 put(drum, t0, noise(n, b * 4 + beat) * np.linspace(1, 0, n) ** 2, 0.5)
-            for h in (0, 1):
+            hats = 3 if drums == "heavy" else 2
+            for h in range(hats):
                 n = int(0.03 * SR)
-                if cfg["drums"] == "soft" and h == 1:
+                if drums == "soft" and h == 1:
                     continue
-                put(drum, t0 + h * eighth, noise(n, beat + h * 9 + b) * np.linspace(1, 0, n), 0.18)
+                put(drum, t0 + h * spb / hats, noise(n, beat + h * 9 + b) * np.linspace(1, 0, n), 0.18)
     mix = lead + arp + bass + drum * 0.6
-    # fundido mínimo en el empalme para evitar clics
     f = int(0.004 * SR)
     mix[:f] *= np.linspace(0, 1, f)
     mix[-f:] *= np.linspace(1, 0, f)
@@ -278,7 +328,9 @@ def main():
     for name, cfg in TRACKS.items():
         render_track(name, cfg)
     jingle("victory", [72, 72, 72, 76, 79, 84, 79, 84, 88, 91, 96], 0.16)
-    print("sfx:", len(names), "música:", len(TRACKS) + 1)
+    jingle("victory_world", [67, 72, 76, 79, 84, 79, 84, 88, 84, 88, 91, 96, 91, 96, 100, 103, 108], 0.2, "square", 0.25)
+    jingle("defeat", [67, 66, 65, 63, 62, 60, 58, 55, 50], 0.28, "tri")
+    print("sfx:", len(names), "pistas:", len(TRACKS) + 3)
 
 
 if __name__ == "__main__":
