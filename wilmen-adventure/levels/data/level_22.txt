@@ -1,5 +1,6 @@
 ; WILMEN ADVENTURE - nivel 22 (3-2): Oasis Espejismo
 ; semilla de generacion: 7882 (edita este fichero a mano si quieres retocar el nivel)
+; tesoros: 1 cofre visible, 0 habitaciones secretas []
                                                                                                                                    ##############
                                                                                                                                    ##############
                                                                                                                                    ##############
@@ -11,7 +12,7 @@
                                                                                                                                    ######BBB#####      B?B?B                            ====
                                               oo          H
                        oo                         9 3    oo             ooo oo  oo  ooo                   oo  ooo  oo oo ooo             ooo
-                     t                      s #########       4                            4      C                            3  2 3w  s 4 9            s   t       C     3oo                                                oooooo
+                     t                      s #########       4      N                     4      C                            3  2 3w  s 4 9            s   t       C     3oo                                                oooooo
                  oo######                oo#############################=== ==  ==  ===   ################==  ===  == == ===################################################  oo                      oo  oo  ooo oo
                    #########ooo            ###############################aaaaaaaaaaaaaa####################aaaaaaaaaaaaaa####################################################           S   9     4                     9 3   d  d  F
    P             ########### 9           ###################################aaaaaaaaaa########################aaaaaaaaaa##############################################################################==  ==  === ==   #####################

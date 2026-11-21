@@ -1,5 +1,6 @@
 ; WILMEN ADVENTURE - nivel 81 (9-1): Fábrica de Engranajes
 ; semilla de generacion: 15611 (edita este fichero a mano si quieres retocar el nivel)
+; tesoros: 0 cofre visible, 0 habitaciones secretas []
                                                                            ############                                                                                                                                                                     ############
                                                                            ############                                                                                                                                                                     ############
                                                                            ############                                                                                                                                                                     ############

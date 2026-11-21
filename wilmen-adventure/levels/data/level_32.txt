@@ -1,5 +1,6 @@
 ; WILMEN ADVENTURE - nivel 32 (4-2): Cumbres Nevadas
 ; semilla de generacion: 9192 (edita este fichero a mano si quieres retocar el nivel)
+; tesoros: 0 cofre visible, 0 habitaciones secretas []
                                                                                                                                                        #############
                                                                                                                                                        #############
                                                                                                                                                        #############

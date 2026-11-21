@@ -16,6 +16,7 @@ config/quit_on_go_back=false
 
 [autoload]
 
+Progress="*res://autoload/progress.gd"
 Game="*res://autoload/game.gd"
 Audio="*res://autoload/audio.gd"
 Transition="*res://autoload/transition.gd"

@@ -18,6 +18,10 @@ const CrusherScene := preload("res://items/crusher.tscn")
 const ChunkScript := preload("res://levels/terrain_chunk.gd")
 const ParallaxBgScript := preload("res://levels/parallax_bg.gd")
 const PropsData := preload("res://levels/props_data.gd")
+const ChestScript := preload("res://items/chest.gd")
+const OrbScript := preload("res://items/orb.gd")
+const SpecialGemScript := preload("res://items/special_gem.gd")
+const SecretWallScript := preload("res://items/secret_wall.gd")
 const HudScript := preload("res://ui/hud.gd")
 const UiTheme := preload("res://ui/ui_theme.gd")
 const CHUNK_COLS := 24
@@ -58,6 +62,10 @@ var _belt_l: Area2D = null
 var _mud_area: Area2D = null
 var _wind_area: Area2D = null
 var _coin_combo: int = 0
+var hit_taken: bool = false  # el jugador ha perdido corazones en este nivel (misión «sin daño»)
+var _chest_counter: int = 0
+var _sgem_counter: int = 0
+var _secret_counter: int = 0
 var _coin_combo_t: float = 0.0
 
 
@@ -360,7 +368,95 @@ func _spawn_entities() -> void:
 				"G":
 					gate_x = x * TILE
 					_make_gate_trigger(x)
+				"N", "R", "E", "Z":
+					var ch = ChestScript.new()
+					ch.kind = {"N": "normal", "R": "rare", "E": "special", "Z": "secret"}[c]
+					ch.idx = _chest_counter
+					_chest_counter += 1
+					ch.level = self
+					ch.position = Vector2(x * TILE + 8, y * TILE + 8)
+					add_child(ch)
+				"J":
+					var idx_j: int = _sgem_counter
+					_sgem_counter += 1
+					if not Progress.special_gem_taken(number, idx_j):
+						var sg = SpecialGemScript.new()
+						sg.idx = idx_j
+						sg.level = self
+						sg.position = pos
+						add_child(sg)
+				"e", "i", "k", "l", "q":
+					var orb = OrbScript.new()
+					orb.kind = Progress.POWERUP_ORB_CHARS[c]
+					orb.level = self
+					orb.position = pos
+					add_child(orb)
+				"x":
+					_make_secret_marker(x, y)
 	respawn_pos = spawn_pos
+	_build_secret_walls()
+
+
+func _make_secret_marker(x: int, y: int) -> void:
+	## Marcador invisible dentro de una habitación sellada (p. ej. con ladrillos): al entrar se descubre el secreto.
+	var idx_m: int = _secret_counter
+	_secret_counter += 1
+	var a := Area2D.new()
+	a.collision_layer = 0
+	a.collision_mask = 2
+	a.position = Vector2(x * TILE + 8, y * TILE + 8)
+	var cs := CollisionShape2D.new()
+	var rs := RectangleShape2D.new()
+	rs.size = Vector2(14, 14)
+	cs.shape = rs
+	a.add_child(cs)
+	add_child(a)
+	a.body_entered.connect(func(b):
+		if b.is_in_group("player") and Progress.secret_found(number, idx_m):
+			popup("¡Habitación secreta!", a.position + Vector2(0, -20))
+			spawn_burst(a.position, Color("#ffe97a"), 12)
+			Audio.play_sfx("secret_found"))
+
+
+func _build_secret_walls() -> void:
+	## Paredes falsas (Y) y puertas secretas (D): se ven como terreno/puerta pero se atraviesan.
+	for kind in ["Y", "D"]:
+		for rc in _merge_rects(kind):
+			var cells: Array = []
+			for yy in range(rc.position.y, rc.position.y + rc.size.y):
+				for xx in range(rc.position.x, rc.position.x + rc.size.x):
+					cells.append(Vector2i(xx, yy))
+			var w = SecretWallScript.new()
+			w.cells = cells
+			w.style = "wall" if kind == "Y" else "door"
+			w.tileset = _tileset
+			w.secret_idx = _secret_counter
+			_secret_counter += 1
+			w.level = self
+			add_child(w)
+
+
+func show_reward(info: Dictionary, pos: Vector2) -> void:
+	## Presentación del botín de un cofre: textos que suben y banner de la interfaz.
+	var lines: Array = []
+	if int(info.get("coins", 0)) > 0:
+		lines.append("+%d monedas" % int(info["coins"]))
+	if int(info.get("gems", 0)) > 0:
+		lines.append("+%d gema%s especial%s" % [int(info["gems"]), "" if int(info["gems"]) == 1 else "s", "" if int(info["gems"]) == 1 else "es"])
+	if info.has("cosmetic"):
+		var c: Dictionary = info["cosmetic"]
+		if bool(c.get("new", false)):
+			lines.append("¡Nuevo: %s!" % Progress.cosmetic_name(str(c["cat"]), str(c["id"])))
+		else:
+			lines.append("Ya lo tenías: +25 monedas")
+	if info.has("power"):
+		lines.append("Poder: %s" % str(Progress.POWERUPS.get(str(info["power"]), info["power"])))
+	for i in range(lines.size()):
+		var text: String = str(lines[i])
+		get_tree().create_timer(0.3 * float(i), false).timeout.connect(func():
+			popup(text, pos + Vector2(0, -22 - 9 * i)))
+	if hud != null and hud.has_method("show_reward"):
+		hud.show_reward(info)
 
 
 func _spawn_pickup(kind: String, pos: Vector2, id: int = -1) -> void:

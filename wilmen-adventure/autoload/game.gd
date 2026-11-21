@@ -324,6 +324,9 @@ func register_complete(n: int, gems: Array, level_score: int) -> Dictionary:
 			lives += WORLD_REWARD_LIVES
 			score += WORLD_REWARD_SCORE
 			last_reward = {"world": w, "lives": WORLD_REWARD_LIVES, "score": WORLD_REWARD_SCORE}
+			last_reward["cosmetic"] = Progress.world_completed(w)
+			Progress.boss_defeated(n)
+	Progress.check_achievements()
 	save_game()
 	stats_changed.emit()
 	return last_reward
@@ -379,7 +382,7 @@ func set_setting(key: String, value) -> void:
 
 
 # ------------------------------------------------------------- guardado ---
-const KNOWN_KEYS := ["version", "lives", "score", "coins", "total_coins", "levels", "worlds_done", "unlocked", "settings"]
+const KNOWN_KEYS := ["version", "lives", "score", "coins", "total_coins", "levels", "worlds_done", "unlocked", "settings", "ext"]
 
 
 func _save_dict() -> Dictionary:
@@ -397,6 +400,7 @@ func _save_dict() -> Dictionary:
 	data["worlds_done"] = worlds_done
 	data["unlocked"] = ul
 	data["settings"] = settings
+	data["ext"] = Progress.to_dict()  # expansión: tesoros, secretos, personalización, logros (ver progress.gd)
 	return data
 
 
@@ -543,6 +547,8 @@ func _apply_save(d: Dictionary, raw_text: String) -> void:
 		for w in wd:
 			if int(w) >= 1 and int(w) <= WORLD_COUNT and not worlds_done.has(int(w)):
 				worlds_done.append(int(w))
+	var ext = d.get("ext", {})
+	Progress.from_dict(ext if typeof(ext) == TYPE_DICTIONARY else {})
 	var st = d.get("settings", {})
 	if typeof(st) == TYPE_DICTIONARY:
 		for k2 in ["music", "sfx"]:
@@ -597,6 +603,7 @@ func reset_progress() -> void:
 	unlocked = {1: true}
 	worlds_done = []
 	_extra = {}
+	Progress.reset_all()
 	last_unlocked_level = 0
 	# antes de borrar, copia del guardado actual
 	var cur: String = _read_text(save_path)

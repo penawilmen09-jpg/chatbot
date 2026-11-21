@@ -187,7 +187,12 @@ func _check_player() -> void:
 		if b != p:
 			continue
 		var above: bool = p.global_position.y + 8.0 < global_position.y + 6.0
-		if p.is_attacking():
+		if p.has_method("is_giant") and p.is_giant() and p.shield_t <= 0.0 and p.dash_t <= 0.0:
+			# Transformación gigante: daña al jefe UNA vez por transformación y no recibe daño por contacto.
+			if not p.giant_hit_used:
+				p.giant_hit_used = true
+				hit_boss(1)
+		elif p.is_attacking():
 			hit_boss(1)
 		elif not shielded and p.velocity.y > 20.0 and above:
 			# Pisotón desde arriba: cuenta como UN golpe al jefe, el jugador rebota y no recibe daño por este impacto.

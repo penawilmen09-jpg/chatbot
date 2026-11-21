@@ -1,5 +1,6 @@
 ; WILMEN ADVENTURE - nivel 20 (2-10): Corazón de Cristal
 ; semilla de generacion: 7620 (edita este fichero a mano si quieres retocar el nivel)
+; tesoros: 1 cofre visible, 0 habitaciones secretas []
                                                                                                             ###########                                                              ##
                                                                                                             ###########                                                              ##
                                                                                                             ###########                                                              ##
@@ -13,7 +14,7 @@
                                                                                                  *          ####   ####                                                              ##
                                           oooooo               o   o              K            ====         #### o ####                                                              ##
                    ooo  ooo oo                             w aaaa                                           ####o*o####                            ====    ====        ==X=          ##
-                3                    3 w 6      6    2  #########|                                          ####BBB####                  G                                           ##
+                3                    3 w 6      6  N 2  #########|                                          ####BBB####                  G                                           ##
    P     5      ###===  === ==   ########========################|               H                                               C          5  h   2   4   8   9    6   3    2 h  F  ##
 #####################aaaaaaaaaa##########        ################|              oo                              ooo          5 ########################################################
 #######################aaaaaa############        ################aaaa3  w        5         2    S    4 2          j 2   8  2 ##########################################################

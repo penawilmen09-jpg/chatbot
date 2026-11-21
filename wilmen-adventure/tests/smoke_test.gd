@@ -13,6 +13,7 @@ const AmbientData := preload("res://levels/ambient_data.gd")
 var _failed: int = 0
 var _scene: PackedScene
 var _game
+var _prog
 var _audio
 
 
@@ -72,10 +73,18 @@ func _free_level(lvl) -> void:
 func _run() -> void:
 	_game = root.get_node("Game")
 	_audio = root.get_node("Audio")
+	_prog = root.get_node("Progress")
 	_game.save_path = "user://smoke_test_save.json"
 	_reset_game()
 	_scene = load("res://levels/level.tscn")
 	_check(_scene != null, "level.tscn carga")
+
+	if OS.get_cmdline_user_args().has("--exp"):
+		# ejecución rápida solo de la expansión: godot --headless --script res://tests/smoke_test.gd -- --exp
+		await _test_expansion()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
 
 	if OS.get_cmdline_user_args().has("--golem"):
 		# ejecución rápida solo del combate contra el Golem: godot --headless --script res://tests/smoke_test.gd -- --golem
@@ -98,6 +107,7 @@ func _run() -> void:
 	await _test_powers()
 	await _test_bosses()
 	await _test_golem_combat()
+	await _test_expansion()
 	await _test_flow()
 	await _test_touch_controls()
 	await _test_menus()
@@ -824,6 +834,154 @@ func _test_golem_combat() -> void:
 	_check(lvl.finished and _game.is_done(20), "nivel 20 completado y guardado")
 	_check(_game.is_unlocked(21), "el nivel siguiente (21) queda desbloqueado")
 	await _free_level(lvl)
+	_reset_game()
+
+
+# ===================== EXPANSIÓN: guardado, cofres, secretos, poderes temporales, personalización ======
+func _cell_nth(lvl, ch: String, nth: int = 0) -> Vector2i:
+	var k: int = 0
+	for y in range(lvl.nrows):
+		for x in range(lvl.cols):
+			if lvl._cell(x, y) == ch:
+				if k == nth:
+					return Vector2i(x, y)
+				k += 1
+	return Vector2i(-1, -1)
+
+
+func _test_expansion() -> void:
+	print("Expansión: guardado, cofres, habitaciones secretas, poderes temporales y personalización")
+	_reset_game()
+	_prog.reset_all()
+	# --- guardado: la clave "ext" se escribe y se recupera; una partida anterior sin "ext" sigue intacta
+	_mark_done(1)
+	_mark_done(2)
+	_game.total_coins = 77
+	_prog.special_gems = 3
+	_prog.unlock_cosmetic("hat", "corona")
+	_prog.equip("hat", "corona")
+	_prog.secrets["5:0"] = true
+	_prog.stats["deaths"] = 4
+	_game.save_game()
+	var text: String = FileAccess.get_file_as_string(_game.save_path)
+	var d: Dictionary = JSON.parse_string(text)
+	_check(d.has("ext") and d.has("levels") and d.has("unlocked") and int(d["version"]) == 3, "el guardado añade «ext» sin cambiar la versión ni los datos anteriores")
+	_prog.reset_all()
+	_game.load_game()
+	_check(_prog.special_gems == 3 and _prog.has_cosmetic("hat", "corona") and _prog.equipped["hat"] == "corona" and _prog.secrets.has("5:0") and int(_prog.stats["deaths"]) == 4, "tras cerrar y abrir se conservan cosméticos, secretos, gemas y estadísticas")
+	_check(_game.is_done(1) and _game.is_done(2) and _game.total_coins == 77, "y lo de antes (niveles, monedas) sigue igual")
+	# partida de la versión anterior (sin «ext»)
+	var old: Dictionary = d.duplicate(true)
+	old.erase("ext")
+	var f := FileAccess.open(_game.save_path, FileAccess.WRITE)
+	f.store_string(JSON.stringify(old))
+	f.close()
+	_game.load_game()
+	_check(_game.is_done(1) and _game.is_done(2) and _prog.special_gems == 0 and _prog.has_cosmetic("suit", "classic"), "una partida sin «ext» carga con todo lo anterior y la expansión vacía")
+	_reset_game()
+	_prog.reset_all()
+
+	# --- cofres y habitaciones secretas en el nivel 1
+	var lvl = await _load_level(1)
+	var p = lvl.player
+	var c: Vector2i = _cell_nth(lvl, "N")
+	var kind_char: String = "N"
+	if c.x < 0:
+		c = _cell_nth(lvl, "R")
+		kind_char = "R"
+	_check(c.x >= 0, "el nivel 1 tiene un cofre visible")
+	var coins0: int = _game.total_coins
+	p.global_position = Vector2(c.x * 16 + 8, c.y * 16 + 4)
+	p.velocity = Vector2.ZERO
+	await _frames(8)
+	_check(_prog.chest_opened(1, 0), "el jugador abre el cofre al tocarlo")
+	_check(_game.total_coins > coins0, "el cofre da monedas (%d -> %d)" % [coins0, _game.total_coins])
+	var coins1: int = _game.total_coins
+	p.global_position = Vector2(c.x * 16 + 8, c.y * 16 + 4)
+	await _frames(10)
+	_check(_game.total_coins == coins1 and int(_prog.stats["chests"]) == 1, "un cofre abierto no vuelve a dar botín")
+	_game.save_game()
+	_check(_prog.treasures.has("1:0"), "el tesoro se guarda por nivel y número")
+	# pared falsa / trampilla: se atraviesa y queda descubierta
+	var y_cell: Vector2i = _cell_nth(lvl, "Y")
+	_check(y_cell.x >= 0, "el nivel 1 tiene una habitación secreta (pared falsa o trampilla)")
+	var before: int = int(_prog.stats["secrets"])
+	p.global_position = Vector2(y_cell.x * 16 + 8, y_cell.y * 16 + 6)
+	p.velocity = Vector2.ZERO
+	await _frames(6)
+	_check(int(_prog.stats["secrets"]) == before + 1, "al atravesar la pared falsa se descubre el secreto")
+	await _frames(40)
+	var kinds_ok: bool = true
+	for ch in ["N", "R", "E", "Z"]:
+		var cc: Vector2i = _cell_nth(lvl, ch)
+		if cc.x >= 0 and (lvl.get_children().filter(func(n): return n.get_script() != null and str(n.get_script().resource_path).ends_with("chest.gd")).size() == 0):
+			kinds_ok = false
+	_check(kinds_ok, "los cofres del nivel se han creado")
+	await _free_level(lvl)
+	# recargar: el cofre sigue abierto
+	lvl = await _load_level(1)
+	var chests: Array = lvl.get_children().filter(func(n): return n.get_script() != null and str(n.get_script().resource_path).ends_with("chest.gd"))
+	var open_count: int = 0
+	for ch2 in chests:
+		if ch2.opened:
+			open_count += 1
+	_check(open_count >= 1, "al volver a entrar el cofre ya aparece abierto")
+	p = lvl.player
+
+	# --- poderes temporales
+	p.hp = p.max_hp
+	p._invuln_t = 0.0
+	p.grant_power("barrier")
+	_check(p.barrier, "escudo protector activo")
+	var hp_a: int = p.hp
+	p.hurt(1, p.global_position.x + 10.0)
+	_check(p.hp == hp_a and not p.barrier, "el escudo protector resiste un golpe")
+	await _frames(70)
+	p._invuln_t = 0.0
+	p.hurt(1, p.global_position.x + 10.0)
+	_check(p.hp == hp_a - 1, "tras romperse, el siguiente golpe sí quita vida")
+	await _frames(110)
+	p.grant_power("giant")
+	_check(p.is_giant() and p.scale_mul > 1.4 and p._sprite.scale.x > 1.4, "la transformación gigante aumenta el tamaño")
+	var cap := p._shape.shape as CapsuleShape2D
+	_check(cap.height > 28.0, "y también su colisión (%.0f)" % cap.height)
+	p.giant_t = 0.05
+	await _frames(10)
+	_check(not p.is_giant() and p.scale_mul == 1.0, "el gigante termina y vuelve al tamaño normal")
+	p.grant_power("flame")
+	_check(p.power == "flame" and p.temp_power_t > 20.0, "el poder de fuego sustituye al del botón")
+	p.skill_cd = 0.0
+	var n_proj: int = lvl.get_children().filter(func(n): return n is Area2D and n.get("team") == "player").size()
+	Input.action_press("skill")
+	await _frames(3)
+	Input.action_release("skill")
+	var n_proj2: int = lvl.get_children().filter(func(n): return n is Area2D and n.get("team") == "player").size()
+	_check(n_proj2 > n_proj, "lanza bolas de fuego")
+	p.temp_power_t = 0.05
+	await _frames(8)
+	_check(p.power == p.base_power, "el poder temporal termina y se recupera el original")
+	p.grant_power("freeze")
+	_check(p.power == "freeze", "poder de hielo")
+	p.grant_power("pulse")
+	_check(p.power == "pulse", "poder eléctrico")
+	await _free_level(lvl)
+
+	# --- personalización
+	_prog.unlock_cosmetic("suit", "fuego")
+	_prog.unlock_cosmetic("hat", "mago")
+	_prog.unlock_cosmetic("armor", "oro")
+	_prog.unlock_cosmetic("trail", "chispas")
+	_prog.equip("suit", "fuego")
+	_prog.equip("hat", "mago")
+	_prog.equip("armor", "oro")
+	_prog.equip("trail", "chispas")
+	lvl = await _load_level(1)
+	p = lvl.player
+	_check(p._sprite.material != null and p._hat != null and p._armor != null and p._trail != null, "traje, sombrero, armadura y efecto se aplican a Wilmen")
+	await _frames(10)
+	_check(not _prog.equip("hat", "corona"), "no se puede equipar lo que no se ha desbloqueado")
+	await _free_level(lvl)
+	_prog.reset_all()
 	_reset_game()
 
 

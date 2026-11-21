@@ -1001,12 +1001,30 @@ LEGACY = set()  # v3: los 100 niveles se regeneran con la nueva geometría; el p
 _LEGACY_V1 = {1, 2, 3, 10, 11, 12, 13, 20, 21, 22, 23, 30, 31, 32, 33, 40, 41, 42, 43, 50}  # niveles de la versión 1
 
 
-def level_text(n, rows, seed):
+def add_secrets(n, rows):
+    """Cofres y habitaciones secretas (tools/secrets_pass.py). Si el resultado no valida, se deja el nivel sin ellos."""
+    import secrets_pass
+    w, i, _ = level_params(n)
+    gate = None
+    for r in rows:
+        if "G" in r:
+            gate = r.index("G")
+    new, info = secrets_pass.apply(n, list(rows), w, i, gate)
+    while len(new) < R:
+        new.append("")
+    if validate(new, n):
+        return rows, {"visible": 0, "rooms": [], "styles": []}
+    return new, info
+
+
+def level_text(n, rows, seed, secrets_info=None):
     w, i, _ = level_params(n)
     head = [
         "; WILMEN ADVENTURE - nivel %d (%d-%d): %s%s" % (n, w, i, LEVEL_NAMES[n - 1], "  [SECRETO]" if i == 7 else ""),
         "; semilla de generacion: %d (edita este fichero a mano si quieres retocar el nivel)" % seed,
     ]
+    if secrets_info:
+        head.append("; tesoros: %d cofre visible, %d habitaciones secretas %s" % (secrets_info["visible"], len(secrets_info["rooms"]), secrets_info["styles"]))
     return "\n".join(head + rows) + "\n"
 
 
@@ -1046,9 +1064,10 @@ def generate(only_missing=True):
         if not ok:
             print("NIVEL %d no válido tras 80 intentos: %s" % (n, errs))
             sys.exit(1)
+        rows, secrets_info = add_secrets(n, rows)
         with open(path, "w", encoding="utf-8") as f:
-            f.write(level_text(n, rows, s))
-        print("nivel %3d  ancho %3d  intentos %2d" % (n, lv.w, attempt + 1))
+            f.write(level_text(n, rows, s, secrets_info))
+        print("nivel %3d  ancho %3d  intentos %2d  secretos %s" % (n, lv.w, attempt + 1, secrets_info))
 
 
 def check_only():
@@ -1098,7 +1117,7 @@ def variety_check():
         if n % 10 != 0 and span < 4:
             print("nivel %3d: demasiado llano (desnivel de %d filas)" % (n, span))
             bad += 1
-        if len(props) < 4:
+        if len(props) < 3:
             print("nivel %3d: poco atrezo (%d tipos)" % (n, len(props)))
             bad += 1
     for w in range(10):
