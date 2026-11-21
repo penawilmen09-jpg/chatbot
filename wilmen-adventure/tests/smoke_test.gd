@@ -77,6 +77,13 @@ func _run() -> void:
 	_scene = load("res://levels/level.tscn")
 	_check(_scene != null, "level.tscn carga")
 
+	if OS.get_cmdline_user_args().has("--golem"):
+		# ejecución rápida solo del combate contra el Golem: godot --headless --script res://tests/smoke_test.gd -- --golem
+		await _test_golem_combat()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
+
 	_test_resources()
 	_test_offline_static()
 	await _test_audio_system()
@@ -668,6 +675,12 @@ func _test_bosses() -> void:
 
 
 # ============================ 9b. Golem de Cristal (2-10): pisotón, poder, invulnerabilidad ======
+func _away(p, b) -> void:
+	## Aparta al jugador del jefe (si no, el rebote lo devuelve encima y encadena otro pisotón legítimo).
+	p.global_position = b.global_position + Vector2(-110.0, 8.0)
+	p.velocity = Vector2.ZERO
+
+
 func _stomp(p, b) -> void:
 	## El jugador cae desde arriba sobre la cabeza del jefe.
 	p.global_position = b.global_position + Vector2(0, -36)
@@ -715,15 +728,18 @@ func _test_golem_combat() -> void:
 	# 2) otro pisotón mientras el jefe aún es invulnerable: rebote sin daño para nadie
 	await _stomp(p, b)
 	_check(b.hp == max_hp - 1 and p.hp == hp0, "pisar con el jefe invulnerable no lo daña ni daña al jugador")
+	_away(p, b)
 	await _frames(70)
 	# 3) pisotones repetidos: no muere con 2 ni 3 saltos
 	await _stomp(p, b)
 	hits += 1
+	_away(p, b)
 	await _frames(70)
 	await _stomp(p, b)
 	hits += 1
 	_check(b.hp == max_hp - 3 and not b.dead, "tras 3 saltos el jefe sigue vivo con %d de %d" % [b.hp, max_hp])
 	_check(p.hp == hp0, "tres pisotones sin perder vida")
+	_away(p, b)
 	await _frames(70)
 	# 4) contacto lateral: sí quita un corazón, solo uno, y da invulnerabilidad breve
 	var boss_hp_before: int = b.hp
@@ -748,7 +764,9 @@ func _test_golem_combat() -> void:
 	lvl.add_child(shot)
 	await _frames(5)
 	_check(p.hp == hp0 - 2, "un ataque del jefe también quita vida (%d)" % p.hp)
+	_check(b.hp == boss_hp_before, "el ataque lateral tampoco daña al jefe (%d)" % b.hp)
 	await _frames(110)
+	_check(b.hp == boss_hp_before, "el jefe conserva su vida mientras el jugador espera (%d)" % b.hp)
 	p.hp = hp0
 	# 5) habilidad especial real (Impulso de Cristal) contra el jefe vulnerable
 	_check(p.power == "dash", "el poder del mundo 2 es el Impulso de Cristal")
@@ -766,6 +784,7 @@ func _test_golem_combat() -> void:
 	await _frames(40)
 	hits += 1
 	_check(b.hp == boss_hp_before - 1, "el Impulso de Cristal daña al Golem exactamente 1 (%d -> %d)" % [boss_hp_before, b.hp])
+	_away(p, b)
 	await _frames(70)
 	# 6) un proyectil del jugador respeta el escudo del jefe y lo daña cuando es vulnerable
 	b.shielded = true
@@ -791,6 +810,7 @@ func _test_golem_combat() -> void:
 	_check(b.hp == before_shield - 1, "sin escudo el proyectil daña al Golem exactamente 1 (%d -> %d)" % [before_shield, b.hp])
 	# 7) derrota con el último punto de vida
 	_check(not b.dead and b.hp == 1, "el jefe llega a su último punto de vida (%d)" % b.hp)
+	_away(p, b)
 	await _frames(70)
 	await _stomp(p, b)
 	hits += 1
