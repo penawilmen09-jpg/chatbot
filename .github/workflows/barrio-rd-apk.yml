@@ -1,0 +1,43 @@
+name: BARRIO RD - APK Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ccr-a5c0e4e6-5cpr4n]
+    paths: ['barrio-rd/**', '.github/workflows/barrio-rd-apk.yml']
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: barrio-rd
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: barrio-rd/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - run: npm ci
+      - run: npm run build
+      - name: Crear proyecto Android
+        run: |
+          npx cap add android
+          npx cap sync android
+          M=android/app/src/main/AndroidManifest.xml
+          # horizontal + pantalla completa inmersiva
+          sed -i 's|<activity|<activity android:screenOrientation="sensorLandscape"|' "$M"
+          S=android/app/src/main/res/values/styles.xml
+          sed -i 's|<style name="AppTheme.NoActionBar" parent="Theme.AppCompat.DayNight.NoActionBar">|&\n        <item name="android:windowFullscreen">true</item>|' "$S"
+      - name: Compilar APK (debug, instalable directamente)
+        working-directory: barrio-rd/android
+        run: ./gradlew assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BARRIO-RD-apk
+          path: barrio-rd/android/app/build/outputs/apk/debug/app-debug.apk

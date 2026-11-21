@@ -1,0 +1,7 @@
+{
+  "appId": "com.barriord.game",
+  "appName": "BARRIO RD",
+  "webDir": "dist",
+  "backgroundColor": "#0b3d4a",
+  "android": { "allowMixedContent": false }
+}
