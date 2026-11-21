@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b3d4a" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <title>BARRIO RD</title>
+</head>
+<body>
+  <div id="app">
+    <canvas id="c"></canvas>
+
+    <div id="loading">
+      <div class="logo">BARRIO <span>RD</span></div>
+      <div class="sub">Mundo abierto dominicano</div>
+      <div class="bar"><i id="load-bar"></i></div>
+      <div id="load-text">Cargando…</div>
+      <div id="load-tip">Consejo: usa el joystick izquierdo para caminar y arrastra a la derecha para mirar.</div>
+      <button id="btn-start" hidden>JUGAR</button>
+    </div>
+
+    <div id="hud" hidden>
+      <div class="top-left">
+        <div class="chip" id="money">RD$ 0</div>
+        <div class="chip small" id="zone-load" hidden>Cargando zona…</div>
+      </div>
+      <div id="zone-label"></div>
+      <div class="top-right">
+        <div class="chip" id="clock">--:--</div>
+        <button class="round" id="btn-fs" title="Pantalla completa" aria-label="Pantalla completa">⛶</button>
+        <button class="round" id="btn-menu" title="Menú" aria-label="Menú">☰</button>
+      </div>
+      <div id="waypoint"><span id="wp-arrow">➤</span><span id="wp-text"></span></div>
+      <div id="fps" hidden></div>
+      <div id="toast"></div>
+
+      <div id="controls">
+        <div id="look-zone"></div>
+        <div id="joy-zone">
+          <div id="joy-base"><div id="joy-knob"></div></div>
+        </div>
+        <button id="btn-run" aria-label="Correr"><b>CORRER</b></button>
+        <button id="btn-act" hidden><span id="act-icon">✋</span><b id="act-label">Interactuar</b></button>
+      </div>
+      <div id="help">WASD / flechas: mover · Shift: correr · E: interactuar · ←→ o arrastrar: cámara</div>
+    </div>
+
+    <div id="dialog" hidden>
+      <div class="panel">
+        <h3 id="dlg-title"></h3>
+        <p id="dlg-text"></p>
+        <button id="dlg-ok">Cerrar</button>
+      </div>
+    </div>
+
+    <div id="menu" hidden>
+      <div class="panel">
+        <h2>BARRIO RD</h2>
+        <label>Gráficos
+          <select id="opt-quality">
+            <option value="auto">Automático (recomendado)</option>
+            <option value="low">Bajo (más FPS)</option>
+            <option value="medium">Medio</option>
+            <option value="high">Alto</option>
+          </select>
+        </label>
+        <label>Sensibilidad de cámara <input id="opt-sens" type="range" min="0.4" max="2.2" step="0.05" value="1" /></label>
+        <label class="row"><input id="opt-sound" type="checkbox" checked /> Sonido y música</label>
+        <label class="row"><input id="opt-cycle" type="checkbox" checked /> Ciclo de día y noche</label>
+        <label>Hora del día <input id="opt-hour" type="range" min="0" max="23.9" step="0.1" value="15" /></label>
+        <label class="row"><input id="opt-fps" type="checkbox" /> Mostrar FPS</label>
+        <div class="btns">
+          <button id="menu-casa">Ir a Mi Casa Real</button>
+          <button id="menu-save">Guardar</button>
+          <button id="menu-close">Volver al juego</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

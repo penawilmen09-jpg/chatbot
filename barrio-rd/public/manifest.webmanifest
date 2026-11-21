@@ -1,0 +1,11 @@
+{
+  "name": "BARRIO RD",
+  "short_name": "BARRIO RD",
+  "description": "Videojuego 3D de mundo abierto inspirado en República Dominicana",
+  "start_url": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0b3d4a",
+  "theme_color": "#0b3d4a",
+  "icons": [{ "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}
