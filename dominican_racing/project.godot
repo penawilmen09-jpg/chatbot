@@ -1,0 +1,50 @@
+; Engine configuration file.
+config_version=5
+
+[application]
+
+config/name="DOMINICAN RACING"
+config/description="Juego de carreras de montaña 2D original."
+run/main_scene="res://scenes/main_menu.tscn"
+config/features=PackedStringArray("4.3", "GL Compatibility")
+run/max_fps=60
+boot_splash/bg_color=Color(0.07, 0.12, 0.25, 1)
+boot_splash/show_image=false
+config/icon="res://icon.png"
+config/quit_on_go_back=false
+
+[autoload]
+
+SaveManager="*res://scripts/autoload/save_manager.gd"
+Sfx="*res://scripts/autoload/audio_manager.gd"
+Nav="*res://scripts/autoload/nav.gd"
+
+[display]
+
+window/size/viewport_width=1280
+window/size/viewport_height=720
+window/size/mode=0
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=0
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+pointing/emulate_mouse_from_touch=true
+
+[physics]
+
+common/physics_ticks_per_second=60
+2d/default_gravity=1400.0
+2d/default_linear_damp=0.0
+2d/default_angular_damp=0.0
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.07, 0.12, 0.25, 1)
+2d/snap/snap_2d_transforms_to_pixel=false
+anti_aliasing/quality/msaa_2d=1
