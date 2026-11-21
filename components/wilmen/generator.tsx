@@ -8,6 +8,7 @@ const MAX = 2000;
 const EJEMPLOS = [
   "Una publicación para anunciar la apertura de mi cafetería",
   "Una historia corta sobre un robot que aprende a pintar",
+  "Una publicación anunciando una carrera de arrancones este sábado en Santo Domingo",
   "Un guion de 30 segundos para un video sobre ahorrar dinero",
 ];
 

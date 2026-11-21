@@ -5,6 +5,7 @@ export const TIPOS = [
   { etiqueta: "Guion", icono: "🎬", id: "guion" },
   { etiqueta: "Descripción", icono: "🛍️", id: "descripcion" },
   { etiqueta: "Ideas de negocio", icono: "💡", id: "idea" },
+  { etiqueta: "Carreras RD", icono: "🏁", id: "carreras" },
   { etiqueta: "Texto libre", icono: "✍️", id: "libre" },
 ] as const;
 
@@ -18,6 +19,8 @@ export type TipoId = (typeof TIPOS)[number]["id"];
 export type TonoId = (typeof TONOS)[number]["id"];
 
 const INSTRUCCION_TIPO: Record<TipoId, string> = {
+  carreras:
+    "Escribe contenido sobre el automovilismo y las carreras en República Dominicana (autódromo, arrancones, rally, motos, pilotos, equipos y eventos). Puede ser una crónica de carrera, un anuncio de evento, una publicación para redes o una presentación de equipo o piloto. Usa un ambiente de pasión por la velocidad y toques del español dominicano sin exagerar. No inventes resultados, nombres ni cifras reales: si faltan datos, usa marcadores como [piloto] o [fecha].",
   correo:
     "Redacta un correo electrónico completo con asunto, saludo, cuerpo y despedida.",
   descripcion:
