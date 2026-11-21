@@ -46,6 +46,8 @@ var _sprite: AnimatedSprite2D
 var _hit: Area2D
 var _home: Vector2
 var _invuln_t: float = 0.0
+var _stomp_grace_t: float = 0.0  # tras un pisotón, el contacto que queda no hace daño al jugador
+var _deflect_t: float = 0.0  # evita repetir el sonido/efecto de impacto rechazado cada fotograma
 var _charge_dir: int = 1
 var _hover_target: Vector2 = Vector2.ZERO
 var _gen: int = 0
@@ -142,6 +144,8 @@ func _physics_process(delta: float) -> void:
 	if dead:
 		return
 	_invuln_t = maxf(0.0, _invuln_t - delta)
+	_stomp_grace_t = maxf(0.0, _stomp_grace_t - delta)
+	_deflect_t = maxf(0.0, _deflect_t - delta)
 	_sprite.visible = true if _invuln_t <= 0.0 or mode == "vanish" else int(_invuln_t * 18.0) % 2 == 0
 	var grav: bool = true
 	match mode:
@@ -186,19 +190,43 @@ func _check_player() -> void:
 		if p.is_attacking():
 			hit_boss(1)
 		elif not shielded and p.velocity.y > 20.0 and above:
+			# Pisotón desde arriba: cuenta como UN golpe al jefe, el jugador rebota y no recibe daño por este impacto.
+			# (Antes el rebote dejaba al jugador solapado con el jefe sin caer: al fotograma siguiente contaba como
+			# contacto lateral y le quitaba un corazón.) Si el jefe aún es invulnerable, rebota igualmente sin dañarlo.
 			if _invuln_t <= 0.0:
 				hit_boss(1)
-				p.bounce(true)
+			else:
+				_deflect()
+			p.bounce(true)
+			_stomp_grace_t = 0.5
+		elif _stomp_grace_t > 0.0:
+			pass  # acaba de rebotar: sigue saliendo del cuerpo del jefe
 		elif mode != "stun":
 			p.hurt(1, global_position.x)
 
 
 func take_hit(_shot: String) -> void:
+	## Proyectiles y poderes del jugador: se registran siempre (daño si es vulnerable; si no, rebotan con efecto).
+	if dead or not active:
+		return
 	hit_boss(1)
 
 
+func _deflect() -> void:
+	## El impacto se registra pero no hace daño (escudo activo o jefe aún invulnerable tras el golpe anterior).
+	if _deflect_t > 0.0:
+		return
+	_deflect_t = 0.25
+	Audio.play_sfx("shield", 1.3)
+	if level != null:
+		level.spawn_burst(global_position + Vector2(0, -6), Color("#9ad4ff"), 4)
+
+
 func hit_boss(dmg: int) -> void:
-	if dead or shielded or _invuln_t > 0.0 or not active:
+	if dead or not active:
+		return
+	if shielded or _invuln_t > 0.0:
+		_deflect()
 		return
 	hp = maxi(0, hp - dmg)
 	_invuln_t = 1.0

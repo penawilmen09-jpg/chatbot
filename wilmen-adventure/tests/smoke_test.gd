@@ -90,6 +90,7 @@ func _run() -> void:
 	await _test_entities()
 	await _test_powers()
 	await _test_bosses()
+	await _test_golem_combat()
 	await _test_flow()
 	await _test_touch_controls()
 	await _test_menus()
@@ -663,6 +664,146 @@ func _test_bosses() -> void:
 		_check(lvl.finished and _game.is_done(n), "nivel %d: completado y guardado" % n)
 		_check(_game.worlds_done.has(w) and _game.lives == lives_before + _game.WORLD_REWARD_LIVES, "mundo %d completado: recompensa entregada una vez" % w)
 		await _free_level(lvl)
+	_reset_game()
+
+
+# ============================ 9b. Golem de Cristal (2-10): pisotón, poder, invulnerabilidad ======
+func _stomp(p, b) -> void:
+	## El jugador cae desde arriba sobre la cabeza del jefe.
+	p.global_position = b.global_position + Vector2(0, -36)
+	p.velocity = Vector2(0, 240)
+	await _frames(5)
+
+
+func _test_golem_combat() -> void:
+	print("Golem de Cristal (nivel 20): un pisotón = un golpe, sin daño al jugador, poder, invulnerabilidad y derrota")
+	var expected_hp: Array = [5, 6, 7, 8, 10, 11, 12, 13, 14, 16]
+	var BossScript = load("res://enemies/boss.gd")
+	var ProjScene: PackedScene = load("res://items/projectile.tscn")
+	var hp_ok: bool = true
+	for w in range(1, 11):
+		if int(BossScript.CONFIG[w]["hp"]) != int(expected_hp[w - 1]):
+			hp_ok = false
+	_check(hp_ok, "la vida de los 10 jefes no ha cambiado (%s)" % str(expected_hp))
+	_reset_game()
+	var lvl = await _load_level(20)
+	var b = lvl.boss
+	var p = lvl.player
+	p.position = Vector2(lvl.gate_x + 8.0, lvl.boss_home_y)
+	p.camera.reset_smoothing()
+	await _frames(30)
+	_check(lvl.fight_started and b.active, "el combate empieza")
+	var max_hp: int = b.max_hp
+	_check(b.world == 2 and max_hp == 6, "Golem de Cristal con su vida original (%d)" % max_hp)
+	# se detiene su IA para medir con precisión cada golpe
+	b._gen += 1
+	await _frames(5)
+	b.mode = "idle"
+	b.shielded = false
+	b._invuln_t = 0.0
+	p._invuln_t = 0.0
+	var hp0: int = p.hp
+	var hits: int = 0
+	# 1) pisotón
+	await _stomp(p, b)
+	hits += 1
+	_check(b.hp == max_hp - 1, "el pisotón quita exactamente 1 de %d al jefe (le quedan %d)" % [max_hp, b.hp])
+	_check(p.hp == hp0, "el jugador NO pierde corazones por pisar al jefe (%d -> %d)" % [hp0, p.hp])
+	_check(p.velocity.y < 0.0 or p.global_position.y < b.global_position.y - 20.0, "el jugador rebota hacia arriba")
+	await _frames(40)
+	_check(p.hp == hp0 and b.hp == max_hp - 1, "un solo salto cuenta como un solo golpe (sin daño posterior al jugador)")
+	# 2) otro pisotón mientras el jefe aún es invulnerable: rebote sin daño para nadie
+	await _stomp(p, b)
+	_check(b.hp == max_hp - 1 and p.hp == hp0, "pisar con el jefe invulnerable no lo daña ni daña al jugador")
+	await _frames(70)
+	# 3) pisotones repetidos: no muere con 2 ni 3 saltos
+	await _stomp(p, b)
+	hits += 1
+	await _frames(70)
+	await _stomp(p, b)
+	hits += 1
+	_check(b.hp == max_hp - 3 and not b.dead, "tras 3 saltos el jefe sigue vivo con %d de %d" % [b.hp, max_hp])
+	_check(p.hp == hp0, "tres pisotones sin perder vida")
+	await _frames(70)
+	# 4) contacto lateral: sí quita un corazón, solo uno, y da invulnerabilidad breve
+	var boss_hp_before: int = b.hp
+	p.global_position = b.global_position + Vector2(-27.0, 8.0)
+	p.velocity = Vector2.ZERO
+	await _frames(4)
+	_check(p.hp == hp0 - 1, "el contacto lateral quita un corazón (%d -> %d)" % [hp0, p.hp])
+	_check(b.hp == boss_hp_before, "y no daña al jefe")
+	p.global_position = b.global_position + Vector2(-27.0, 8.0)
+	await _frames(10)
+	_check(p.hp == hp0 - 1 and p._invuln_t > 0.0, "invulnerabilidad breve: no pierde varios corazones seguidos")
+	# un ataque del jefe también daña (proyectil enemigo)
+	await _frames(110)
+	p.global_position = b.global_position + Vector2(-90.0, 8.0)
+	p.velocity = Vector2.ZERO
+	await _frames(5)
+	var shot = ProjScene.instantiate()
+	shot.team = "enemy"
+	shot.kind = "shard"
+	shot.velocity = Vector2.ZERO
+	shot.position = p.position
+	lvl.add_child(shot)
+	await _frames(5)
+	_check(p.hp == hp0 - 2, "un ataque del jefe también quita vida (%d)" % p.hp)
+	await _frames(110)
+	p.hp = hp0
+	# 5) habilidad especial real (Impulso de Cristal) contra el jefe vulnerable
+	_check(p.power == "dash", "el poder del mundo 2 es el Impulso de Cristal")
+	b._invuln_t = 0.0
+	boss_hp_before = b.hp
+	p.global_position = b.global_position + Vector2(-70.0, 8.0)
+	p.velocity = Vector2.ZERO
+	p.facing = 1
+	p.skill_cd = 0.0
+	await _frames(3)
+	Input.action_press("skill")
+	await _frames(3)
+	Input.action_release("skill")
+	_check(p.skill_cd > 0.5, "la habilidad tiene tiempo de reutilización (%.2f s)" % p.skill_cd)
+	await _frames(40)
+	hits += 1
+	_check(b.hp == boss_hp_before - 1, "el Impulso de Cristal daña al Golem exactamente 1 (%d -> %d)" % [boss_hp_before, b.hp])
+	await _frames(70)
+	# 6) un proyectil del jugador respeta el escudo del jefe y lo daña cuando es vulnerable
+	b.shielded = true
+	b._invuln_t = 0.0
+	var before_shield: int = b.hp
+	var sp = ProjScene.instantiate()
+	sp.team = "player"
+	sp.kind = "spark"
+	sp.velocity = Vector2(300.0, 0.0)
+	sp.position = b.position + Vector2(-40.0, 4.0)
+	lvl.add_child(sp)
+	await _frames(25)
+	_check(b.hp == before_shield, "con el escudo activo el proyectil se registra pero no daña")
+	b.shielded = false
+	var sp2 = ProjScene.instantiate()
+	sp2.team = "player"
+	sp2.kind = "spark"
+	sp2.velocity = Vector2(300.0, 0.0)
+	sp2.position = b.position + Vector2(-40.0, 4.0)
+	lvl.add_child(sp2)
+	await _frames(25)
+	hits += 1
+	_check(b.hp == before_shield - 1, "sin escudo el proyectil daña al Golem exactamente 1 (%d -> %d)" % [before_shield, b.hp])
+	# 7) derrota con el último punto de vida
+	_check(not b.dead and b.hp == 1, "el jefe llega a su último punto de vida (%d)" % b.hp)
+	await _frames(70)
+	await _stomp(p, b)
+	hits += 1
+	_check(b.dead, "el Golem es derrotado tras %d golpes en total (su vida es %d)" % [hits, max_hp])
+	_check(hits == max_hp, "hacen falta exactamente tantos golpes como puntos de vida")
+	await _frames(100)
+	_check(_audio.current_music == "victory_world", "suena la música de victoria")
+	_check(lvl.goal != null and lvl.goal.active, "aparece la meta")
+	lvl.complete_level()
+	await _frames(150)
+	_check(lvl.finished and _game.is_done(20), "nivel 20 completado y guardado")
+	_check(_game.is_unlocked(21), "el nivel siguiente (21) queda desbloqueado")
+	await _free_level(lvl)
 	_reset_game()
 
 
