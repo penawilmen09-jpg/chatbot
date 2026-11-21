@@ -10,7 +10,7 @@ signal bumped(strength: float)
 signal fuel_empty
 
 const GRAV := 1400.0
-const KMH_PER_PXS := 0.15
+const KMH_PER_PXS := 0.12
 const TERRAIN_MASK := 1
 
 var def: Dictionary = {}
@@ -264,7 +264,9 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 			_crash_pending = "flip"
 		elif _hull_hit_cd <= 0.0:
 			var imp := state.get_contact_impulse(i).length()
-			if imp > mass * 60.0:
+			if imp > mass * 760.0:
+				_crash_pending = "choque"
+			elif imp > mass * 60.0:
 				_hull_hit_cd = 0.25
 				bumped.emit(clampf(imp / (mass * 300.0), 0.2, 1.0))
 	if _crash_pending != "":

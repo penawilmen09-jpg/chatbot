@@ -6,11 +6,26 @@ const OUTLINE := Color(0.06, 0.07, 0.10)
 
 static func _poly(ci: CanvasItem, pts: Array, col: Color, outline := true) -> void:
 	var p := PackedVector2Array(pts)
-	ci.draw_colored_polygon(p, col)
+	if Geometry2D.triangulate_polygon(p).is_empty():
+		p = Geometry2D.convex_hull(p)
+		if p.size() > 1 and p[0] == p[p.size() - 1]:
+			p.remove_at(p.size() - 1)
+	if p.size() < 3:
+		return
+	var ymin := 1e9
+	var ymax := -1e9
+	for v in p:
+		ymin = minf(ymin, v.y)
+		ymax = maxf(ymax, v.y)
+	var span := maxf(ymax - ymin, 1.0)
+	var cols := PackedColorArray()
+	for v in p:
+		cols.append(col.lightened(0.20).lerp(col.darkened(0.25), (v.y - ymin) / span))
+	ci.draw_polygon(p, cols)
 	if outline:
 		var q := p.duplicate()
 		q.append(p[0])
-		ci.draw_polyline(q, OUTLINE, 2.0, true)
+		ci.draw_polyline(q, OUTLINE, 2.6, true)
 
 static func _ell(ci: CanvasItem, c: Vector2, rx: float, ry: float, col: Color, n := 18) -> void:
 	var pts := PackedVector2Array()
@@ -36,19 +51,25 @@ static func flag(ci: CanvasItem, base: Vector2, size := 14.0, t := 0.0) -> void:
 	ci.draw_rect(Rect2(o + Vector2(0, h * 0.43), Vector2(w, h * 0.14)), Color.WHITE)
 
 static func wheel(ci: CanvasItem, pos: Vector2, r: float, spin: float, rim: Color, big_tread := false) -> void:
-	ci.draw_circle(pos, r, Color(0.08, 0.08, 0.09))
-	var n := 12 if not big_tread else 14
+	ci.draw_circle(pos, r + 1.5, OUTLINE)
+	ci.draw_circle(pos, r, Color(0.10, 0.10, 0.12))
+	var n := 14 if big_tread else 12
 	for i in n:
 		var a := spin + TAU * i / n
 		var d := Vector2(cos(a), sin(a))
-		ci.draw_line(pos + d * r * 0.86, pos + d * r * 1.0, Color(0.22, 0.22, 0.25), 3.0 if r < 30.0 else 5.0)
-	ci.draw_circle(pos, r * 0.74, Color(0.16, 0.16, 0.18))
+		var kn := Color(0.24, 0.24, 0.28)
+		ci.draw_line(pos + d * r * 0.84, pos + d * r * 1.0, kn, maxf(3.0, r * 0.14))
+	ci.draw_arc(pos, r * 0.78, 0.0, TAU, 28, Color(0.20, 0.20, 0.24), maxf(2.0, r * 0.1), true)
+	ci.draw_circle(pos, r * 0.62, rim.darkened(0.25))
 	ci.draw_circle(pos, r * 0.56, rim)
-	for i in 5:
-		var a2 := spin + TAU * i / 5.0
-		ci.draw_line(pos, pos + Vector2(cos(a2), sin(a2)) * r * 0.54, rim.darkened(0.4), 2.0)
-	ci.draw_circle(pos, r * 0.16, rim.darkened(0.55))
-	ci.draw_arc(pos, r, 0.0, TAU, 28, OUTLINE, 1.5, true)
+	for i in 6:
+		var a2 := spin + TAU * i / 6.0
+		var d2 := Vector2(cos(a2), sin(a2))
+		ci.draw_line(pos + d2 * r * 0.14, pos + d2 * r * 0.52, rim.darkened(0.45), maxf(2.0, r * 0.1))
+	ci.draw_circle(pos, r * 0.2, rim.lightened(0.2))
+	ci.draw_circle(pos, r * 0.09, OUTLINE)
+	# brillo fijo (no gira) para dar volumen
+	ci.draw_arc(pos, r * 0.9, PI * 1.15, PI * 1.45, 8, Color(1, 1, 1, 0.22), maxf(2.0, r * 0.08), true)
 
 static func strut(ci: CanvasItem, anchor: Vector2, wpos: Vector2) -> void:
 	var d := wpos - anchor
@@ -57,14 +78,30 @@ static func strut(ci: CanvasItem, anchor: Vector2, wpos: Vector2) -> void:
 		return
 	var dir := d / len
 	var nrm := Vector2(-dir.y, dir.x)
-	ci.draw_line(anchor, wpos, Color(0.55, 0.57, 0.62), 5.0)
+	# amortiguador telescópico + muelle visible
+	ci.draw_line(anchor, anchor + dir * len * 0.55, Color(0.18, 0.18, 0.22), 9.0)
+	ci.draw_line(anchor, anchor + dir * len * 0.55, Color(0.55, 0.57, 0.64), 6.0)
+	ci.draw_line(anchor + dir * len * 0.45, wpos, Color(0.85, 0.87, 0.92), 4.0)
 	var pts := PackedVector2Array()
-	var segs := 7
+	var segs := 9
 	for i in segs + 1:
 		var f := float(i) / segs
-		var side := 5.0 if i % 2 == 0 else -5.0
-		pts.append(anchor + dir * len * f * 0.9 + nrm * side * (0.0 if i == 0 or i == segs else 1.0))
-	ci.draw_polyline(pts, Color(0.95, 0.75, 0.15), 2.0, true)
+		var side := 7.0 if i % 2 == 0 else -7.0
+		pts.append(anchor + dir * len * (0.08 + f * 0.8) + nrm * side * (0.0 if i == 0 or i == segs else 1.0))
+	ci.draw_polyline(pts, OUTLINE, 4.6, true)
+	ci.draw_polyline(pts, Color(1.0, 0.78, 0.12), 2.8, true)
+
+## Conductor de dibujos animados.
+static func driver(ci: CanvasItem, head: Vector2, t: float, shirt: Color, cap: Color, bob := 1.0) -> void:
+	var h := head + Vector2(0, sin(t * 11.0) * 1.2 * bob)
+	ci.draw_rect(Rect2(h + Vector2(-8, 6), Vector2(16, 16)), shirt.darkened(0.1))
+	ci.draw_circle(h, 10.5, OUTLINE)
+	ci.draw_circle(h, 9.2, Color(0.97, 0.76, 0.56))
+	ci.draw_arc(h, 9.4, PI, TAU, 12, cap, 5.0, true)
+	ci.draw_rect(Rect2(h + Vector2(2, -4), Vector2(11, 3.4)), cap.darkened(0.15))
+	ci.draw_circle(h + Vector2(3.5, -0.5), 2.6, Color.WHITE)
+	ci.draw_circle(h + Vector2(4.4, -0.3), 1.3, Color(0.1, 0.1, 0.15))
+	ci.draw_arc(h + Vector2(3, 3.5), 3.8, 0.2, PI - 0.3, 6, Color(0.5, 0.15, 0.1), 1.6, true)
 
 ## Dibuja el vehículo completo. wheel_pos / wheel_spin: arreglos de 2 elementos (trasera, delantera).
 static func draw(ci: CanvasItem, def: Dictionary, wheel_pos: Array, wheel_spin: Array, t := 0.0, throttle := 0.0) -> void:
@@ -105,6 +142,7 @@ static func draw(ci: CanvasItem, def: Dictionary, wheel_pos: Array, wheel_spin: 
 
 # ---------------------------------------------------------------- jeep
 static func _draw_jeep(ci: CanvasItem, d: Dictionary, t: float, classic: bool) -> void:
+	var _unused := 0
 	var c1: Color = d["c1"]
 	var c2: Color = d["c2"]
 	var hl: float = d["L"] * 0.5
@@ -115,9 +153,11 @@ static func _draw_jeep(ci: CanvasItem, d: Dictionary, t: float, classic: bool) -
 		Vector2(hl * 0.62, -hh * 0.4), Vector2(-hl * 0.2, -hh * 0.4)], c1)
 	# franja lateral
 	ci.draw_rect(Rect2(-hl + 4, hh * 0.1, hl * 2 - 8, hh * 0.28), c2)
-	# cabina
+	# cabina (con conductor visible tras el cristal)
 	var top := -hh * 2.2
-	_poly(ci, [Vector2(-hl * 0.65, -hh * 0.4), Vector2(-hl * 0.58, top), Vector2(hl * 0.02, top), Vector2(hl * 0.22, -hh * 0.4)], glass)
+	driver(ci, Vector2(-hl * 0.26, -hh * 1.35), t, c2, c1.darkened(0.2))
+	_poly(ci, [Vector2(-hl * 0.65, -hh * 0.4), Vector2(-hl * 0.58, top), Vector2(hl * 0.02, top), Vector2(hl * 0.22, -hh * 0.4)], Color(glass.r, glass.g, glass.b, 0.55))
+	ci.draw_line(Vector2(-hl * 0.5, -hh * 0.6), Vector2(-hl * 0.2, -hh * 1.9), Color(1, 1, 1, 0.5), 3.0)
 	ci.draw_line(Vector2(-hl * 0.58, top), Vector2(hl * 0.02, top), c1.darkened(0.3), 5.0)
 	ci.draw_line(Vector2(-hl * 0.2, top), Vector2(-hl * 0.2, -hh * 0.4), c1.darkened(0.3), 3.0)
 	if classic:
@@ -186,7 +226,8 @@ static func _draw_pickup(ci: CanvasItem, d: Dictionary, t: float) -> void:
 	_poly(ci, [Vector2(-hl, -hh * 0.5), Vector2(-hl, -hh * 1.2), Vector2(-hl * 0.2, -hh * 1.2), Vector2(-hl * 0.2, -hh * 0.5)], c1.darkened(0.15))
 	ci.draw_rect(Rect2(-hl + 5, -hh * 1.0, hl * 0.7, 6), Color(0.45, 0.3, 0.2))
 	# cabina
-	_poly(ci, [Vector2(-hl * 0.18, -hh * 0.5), Vector2(-hl * 0.1, -hh * 2.0), Vector2(hl * 0.32, -hh * 2.0), Vector2(hl * 0.5, -hh * 0.5)], Color(0.65, 0.88, 1.0))
+	driver(ci, Vector2(hl * 0.12, -hh * 1.3), t, c2, c1.darkened(0.2))
+	_poly(ci, [Vector2(-hl * 0.18, -hh * 0.5), Vector2(-hl * 0.1, -hh * 2.0), Vector2(hl * 0.32, -hh * 2.0), Vector2(hl * 0.5, -hh * 0.5)], Color(0.65, 0.88, 1.0, 0.55))
 	ci.draw_line(Vector2(-hl * 0.1, -hh * 2.0), Vector2(hl * 0.32, -hh * 2.0), c1.darkened(0.3), 5.0)
 	ci.draw_rect(Rect2(hl - 6, -hh * 0.3, 6, 10), Color(1.0, 0.95, 0.55))
 	ci.draw_rect(Rect2(-hl + 6, hh * 0.15, hl * 2 - 12, hh * 0.25), c2)
@@ -205,8 +246,7 @@ static func _draw_buggy(ci: CanvasItem, d: Dictionary) -> void:
 	ci.draw_line(Vector2(-hl * 0.1, -37), Vector2(-hl * 0.1, -6), tube, 3.0)
 	_poly(ci, [Vector2(-hl * 0.95, -22), Vector2(-hl * 0.65, -24), Vector2(-hl * 0.6, -2), Vector2(-hl * 0.95, -2)], Color(0.4, 0.4, 0.45))  # motor
 	_poly(ci, [Vector2(-hl * 0.3, -8), Vector2(-hl * 0.1, -18), Vector2(0, -8)], Color(0.15, 0.15, 0.2))  # asiento
-	ci.draw_circle(Vector2(-hl * 0.18, -22), 9, Color(0.95, 0.75, 0.6))
-	ci.draw_arc(Vector2(-hl * 0.18, -24), 10, PI, TAU, 10, c1, 6.0)
+	driver(ci, Vector2(-hl * 0.18, -26), 0.0, c2.lightened(0.2), c1)
 	_ell(ci, Vector2(hl * 0.92, 2), 6, 6, Color(1.0, 0.95, 0.6))
 
 # ---------------------------------------------------------------- monster
@@ -216,7 +256,8 @@ static func _draw_monster(ci: CanvasItem, d: Dictionary, wp: Array) -> void:
 	var hl: float = d["L"] * 0.5
 	var hh: float = d["H"] * 0.5
 	_poly(ci, [Vector2(-hl, -hh * 0.1), Vector2(-hl * 0.95, hh * 0.7), Vector2(hl * 0.95, hh * 0.7), Vector2(hl, -hh * 0.05), Vector2(hl * 0.7, -hh * 0.5), Vector2(-hl * 0.9, -hh * 0.5)], c1)
-	_poly(ci, [Vector2(-hl * 0.4, -hh * 0.5), Vector2(-hl * 0.3, -hh * 1.5), Vector2(hl * 0.25, -hh * 1.5), Vector2(hl * 0.4, -hh * 0.5)], Color(0.65, 0.88, 1.0))
+	driver(ci, Vector2(-hl * 0.02, -hh * 0.95), 0.0, c2, c1)
+	_poly(ci, [Vector2(-hl * 0.4, -hh * 0.5), Vector2(-hl * 0.3, -hh * 1.5), Vector2(hl * 0.25, -hh * 1.5), Vector2(hl * 0.4, -hh * 0.5)], Color(0.65, 0.88, 1.0, 0.55))
 	ci.draw_line(Vector2(-hl * 0.3, -hh * 1.5), Vector2(hl * 0.25, -hh * 1.5), c1.darkened(0.3), 5.0)
 	# llamas decorativas
 	for i in 4:
@@ -232,7 +273,8 @@ static func _draw_sport(ci: CanvasItem, d: Dictionary) -> void:
 	var hl: float = d["L"] * 0.5
 	var hh: float = d["H"] * 0.5
 	_poly(ci, [Vector2(-hl, -hh * 0.1), Vector2(-hl, hh), Vector2(hl, hh), Vector2(hl, hh * 0.1), Vector2(hl * 0.6, -hh * 0.45), Vector2(hl * 0.1, -hh * 0.55), Vector2(-hl * 0.55, -hh * 0.5), Vector2(-hl * 0.95, -hh * 0.4)], c1)
-	_poly(ci, [Vector2(-hl * 0.45, -hh * 0.5), Vector2(-hl * 0.2, -hh * 1.45), Vector2(hl * 0.12, -hh * 1.45), Vector2(hl * 0.42, -hh * 0.5)], Color(0.55, 0.8, 0.95))
+	driver(ci, Vector2(-hl * 0.04, -hh * 0.85), 0.0, c2.lightened(0.3), c2)
+	_poly(ci, [Vector2(-hl * 0.45, -hh * 0.5), Vector2(-hl * 0.2, -hh * 1.45), Vector2(hl * 0.12, -hh * 1.45), Vector2(hl * 0.42, -hh * 0.5)], Color(0.55, 0.8, 0.95, 0.55))
 	ci.draw_rect(Rect2(-hl, -hh * 0.9, 6, hh * 0.9), c2)                               # alerón
 	ci.draw_rect(Rect2(-hl - 6, -hh * 1.0, 26, 5), c2)
 	ci.draw_rect(Rect2(-hl * 0.7, hh * 0.1, hl * 1.5, 4), c2)
@@ -249,7 +291,8 @@ static func _draw_truck(ci: CanvasItem, d: Dictionary) -> void:
 	for i in 4:
 		ci.draw_line(Vector2(-hl + 14 + i * 24, -hh * 0.9), Vector2(-hl + 14 + i * 24, hh * 0.1), c2.lightened(0.2), 2.0)
 	_poly(ci, [Vector2(hl * 0.2, hh * 0.2), Vector2(hl * 0.2, -hh * 1.4), Vector2(hl * 0.62, -hh * 1.4), Vector2(hl, -hh * 0.4), Vector2(hl, hh * 0.2)], c1)
-	_poly(ci, [Vector2(hl * 0.3, -hh * 1.25), Vector2(hl * 0.58, -hh * 1.25), Vector2(hl * 0.88, -hh * 0.45), Vector2(hl * 0.3, -hh * 0.45)], Color(0.65, 0.88, 1.0))
+	driver(ci, Vector2(hl * 0.5, -hh * 0.9), 0.0, c2, c1.darkened(0.3))
+	_poly(ci, [Vector2(hl * 0.3, -hh * 1.25), Vector2(hl * 0.58, -hh * 1.25), Vector2(hl * 0.88, -hh * 0.45), Vector2(hl * 0.3, -hh * 0.45)], Color(0.65, 0.88, 1.0, 0.55))
 	ci.draw_line(Vector2(hl * 0.18, -hh * 1.0), Vector2(hl * 0.18, -hh * 2.0), Color(0.7, 0.7, 0.75), 5.0)  # escape
 	ci.draw_rect(Rect2(hl - 6, -hh * 0.25, 6, 10), Color(1.0, 0.95, 0.55))
 
@@ -264,7 +307,8 @@ static func _draw_bus(ci: CanvasItem, d: Dictionary, ) -> void:
 	ci.draw_rect(Rect2(-hl + 2, hh * 0.32, hl * 2 - 4, hh * 0.1), Color(0.1, 0.35, 0.8))
 	for i in 6:
 		ci.draw_rect(Rect2(-hl + 14 + i * 33.0, -hh * 1.05, 24, hh * 0.85), Color(0.65, 0.88, 1.0))
-	_poly(ci, [Vector2(hl * 0.62, -hh * 1.05), Vector2(hl * 0.92, -hh * 0.45), Vector2(hl * 0.62, -hh * 0.45)], Color(0.65, 0.88, 1.0), false)
+	driver(ci, Vector2(hl * 0.72, -hh * 0.78), 0.0, c2, c1.darkened(0.3))
+	_poly(ci, [Vector2(hl * 0.62, -hh * 1.05), Vector2(hl * 0.92, -hh * 0.45), Vector2(hl * 0.62, -hh * 0.45)], Color(0.65, 0.88, 1.0, 0.5), false)
 	# equipaje en el techo
 	ci.draw_rect(Rect2(-hl * 0.6, -hh * 1.55, 40, 12), Color(0.55, 0.35, 0.2))
 	ci.draw_rect(Rect2(-hl * 0.2, -hh * 1.5, 30, 8), Color(0.2, 0.5, 0.3))
@@ -281,7 +325,8 @@ static func _draw_special(ci: CanvasItem, d: Dictionary, t: float, throttle: flo
 	var fl := 18.0 + throttle * 26.0 + sin(t * 40.0) * 4.0
 	_poly(ci, [Vector2(-hl, 0), Vector2(-hl - fl, hh * 0.2), Vector2(-hl, hh * 0.4)], Color(1.0, 0.7, 0.1).lerp(c2, 0.2), false)
 	_poly(ci, [Vector2(-hl, -hh * 0.2), Vector2(-hl * 0.9, hh), Vector2(hl * 0.95, hh), Vector2(hl, -hh * 0.05), Vector2(hl * 0.55, -hh * 0.55), Vector2(-hl * 0.6, -hh * 0.6)], c1)
-	_poly(ci, [Vector2(-hl * 0.3, -hh * 0.6), Vector2(-hl * 0.1, -hh * 1.6), Vector2(hl * 0.25, -hh * 1.6), Vector2(hl * 0.5, -hh * 0.55)], Color(0.7, 0.95, 1.0).lerp(c2, 0.2))
+	driver(ci, Vector2(-hl * 0.02, -hh * 1.0), t, c2, c1.darkened(0.2))
+	_poly(ci, [Vector2(-hl * 0.3, -hh * 0.6), Vector2(-hl * 0.1, -hh * 1.6), Vector2(hl * 0.25, -hh * 1.6), Vector2(hl * 0.5, -hh * 0.55)], Color(0.7, 0.95, 1.0, 0.55).lerp(c2, 0.2))
 	_poly(ci, [Vector2(-hl, -hh * 0.5), Vector2(-hl * 1.05, -hh * 1.5), Vector2(-hl * 0.7, -hh * 0.5)], c2)
 	ci.draw_line(Vector2(-hl * 0.8, hh * 0.3), Vector2(hl * 0.8, hh * 0.3), c2, 3.0)
 	ci.draw_line(Vector2(-hl * 0.5, 0), Vector2(hl * 0.6, 0), Color.WHITE, 2.0)

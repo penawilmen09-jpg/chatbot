@@ -3,7 +3,8 @@
 ## Hecho y probado (headless + capturas con render real)
 - Guardado/recuperación, economía, compras, mejoras, progresión, recompensas (tests/game_test.gd).
 - Partida completa con la escena real: cuenta atrás, pedales táctiles simulados, freno, pausa, fin por combustible, resultados.
-- Conducción de los 11 vehículos en los 5 mundos con un piloto automático (tests/sim_test.gd).
+- Conducción de los 11 vehículos en recorridos infinitos de 3 semillas con un piloto automático (tests/sim_test.gd).
+- Terreno infinito: generación, liberación y memoria acotada; los 6 biomas aparecen; cada partida es distinta.
 - Exportación APK debug y release firmadas; manifiesto verificado (landscape, sin permisos, minSdk 21).
 
 ## Sin verificar (requiere dispositivo)

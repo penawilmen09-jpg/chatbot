@@ -21,13 +21,10 @@ static func defaults() -> Dictionary:
 		"owned": ["jeep_dom"],
 		"selected": "jeep_dom",
 		"upgrades": {"jeep_dom": VehicleDefs.default_upgrades()},
-		"worlds": [1],
-		"levels": {},
 		"records": {"best_distance": 0.0, "best_score": 0, "total_distance": 0.0,
-			"coins_earned": 0, "runs": 0, "best_by_world": {}},
+			"coins_earned": 0, "runs": 0},
 		"settings": {"music": 0.7, "sfx": 0.9, "mute": false},
 		"profile": {"name": "Piloto"},
-		"last": {"world": 1, "level": 1},
 	}
 
 ## Fusiona y valida lo cargado con los valores predeterminados.
@@ -63,20 +60,6 @@ static func sanitize(raw: Variant) -> Dictionary:
 		for id in d["owned"]:
 			up2[id] = VehicleDefs.default_upgrades()
 		d["upgrades"] = up2
-	if typeof(r.get("worlds")) == TYPE_ARRAY:
-		var ws := [1]
-		for w in r["worlds"]:
-			if typeof(w) in [TYPE_INT, TYPE_FLOAT] and int(w) >= 1 and int(w) <= WorldDefs.WORLDS.size() and not int(w) in ws:
-				ws.append(int(w))
-		d["worlds"] = ws
-	if typeof(r.get("levels")) == TYPE_DICTIONARY:
-		var lv := {}
-		for k in r["levels"]:
-			var e: Variant = r["levels"][k]
-			if typeof(k) == TYPE_STRING and typeof(e) == TYPE_DICTIONARY:
-				lv[k] = {"done": bool(e.get("done", false)), "coins_goal": bool(e.get("coins_goal", false)),
-					"best_m": float(e.get("best_m", 0.0))}
-		d["levels"] = lv
 	if typeof(r.get("records")) == TYPE_DICTIONARY:
 		var rc: Dictionary = d["records"]
 		var rr: Dictionary = r["records"]
@@ -86,8 +69,6 @@ static func sanitize(raw: Variant) -> Dictionary:
 		for k in ["best_score", "coins_earned", "runs"]:
 			if typeof(rr.get(k)) in [TYPE_INT, TYPE_FLOAT]:
 				rc[k] = maxi(0, int(rr[k]))
-		if typeof(rr.get("best_by_world")) == TYPE_DICTIONARY:
-			rc["best_by_world"] = rr["best_by_world"]
 	if typeof(r.get("settings")) == TYPE_DICTIONARY:
 		var s: Dictionary = d["settings"]
 		var rs: Dictionary = r["settings"]
@@ -100,9 +81,6 @@ static func sanitize(raw: Variant) -> Dictionary:
 		var nm: String = String(r["profile"]["name"]).strip_edges().left(14)
 		if nm != "":
 			d["profile"]["name"] = nm
-	if typeof(r.get("last")) == TYPE_DICTIONARY:
-		d["last"]["world"] = clampi(int(r["last"].get("world", 1)), 1, WorldDefs.WORLDS.size())
-		d["last"]["level"] = clampi(int(r["last"].get("level", 1)), 0, WorldDefs.LEVELS_PER_WORLD)
 	return d
 
 func _read_file(path: String) -> Variant:
@@ -179,8 +157,8 @@ func owns(id: String) -> bool:
 
 func special_unlocked(id: String) -> bool:
 	var def: Dictionary = VehicleDefs.get_def(id)
-	if def.has("unlock_levels"):
-		return completed_levels() >= int(def["unlock_levels"])
+	if def.has("unlock_distance"):
+		return float(data["records"]["best_distance"]) >= float(def["unlock_distance"])
 	return true
 
 func buy_vehicle(id: String) -> bool:
@@ -221,61 +199,13 @@ func buy_upgrade(id: String, key: String) -> bool:
 	save_game()
 	return true
 
-# ---------------- Mundos y niveles ----------------
-func world_unlocked(w: int) -> bool:
-	return w in data["worlds"]
-
-func buy_world(w: int) -> bool:
-	if world_unlocked(w):
-		return false
-	if not spend(int(WorldDefs.world(w)["price"])):
-		return false
-	data["worlds"].append(w)
-	save_game()
-	return true
-
-func level_done(w: int, l: int) -> bool:
-	return data["levels"].get(WorldDefs.key(w, l), {}).get("done", false)
-
-func level_info(w: int, l: int) -> Dictionary:
-	return data["levels"].get(WorldDefs.key(w, l), {"done": false, "coins_goal": false, "best_m": 0.0})
-
-func level_unlocked(w: int, l: int) -> bool:
-	if not world_unlocked(w):
-		return false
-	return l <= 1 or level_done(w, l - 1)
-
-func completed_levels() -> int:
-	var n := 0
-	for k in data["levels"]:
-		if data["levels"][k].get("done", false):
-			n += 1
-	return n
-
-func stars(w: int, l: int) -> int:
-	var e: Dictionary = level_info(w, l)
-	return (1 if e["done"] else 0) + (1 if e["coins_goal"] else 0)
-
 # ---------------- Fin de partida ----------------
-## Aplica el resultado de una partida y devuelve el desglose de recompensas.
-func apply_run(world_id: int, level_idx: int, dist_m: float, coins: int, completed: bool) -> Dictionary:
+## Aplica el resultado de una partida infinita y devuelve el desglose de recompensas.
+func apply_run(dist_m: float, coins: int) -> Dictionary:
 	var rec: Dictionary = data["records"]
-	var lvl: Dictionary = {}
-	var first_time := false
-	var coins_goal_met := false
-	var coin_bonus_new := false
-	if level_idx > 0:
-		lvl = WorldDefs.level(world_id, level_idx)
-		first_time = not level_done(world_id, level_idx)
-		coins_goal_met = completed and coins >= int(lvl["coin_goal"])
-		coin_bonus_new = coins_goal_met and not level_info(world_id, level_idx)["coins_goal"]
 	var prev_best: float = float(rec["best_distance"])
 	var new_record: bool = dist_m > prev_best
-	var rewards: Dictionary = WorldDefs.calc_rewards({
-		"dist_m": dist_m, "coins": coins, "completed": completed, "level": lvl,
-		"first_time": first_time, "coins_goal_met": coins_goal_met, "coin_bonus_new": coin_bonus_new,
-		"new_record": new_record,
-	})
+	var rewards: Dictionary = WorldDefs.calc_rewards({"dist_m": dist_m, "coins": coins, "new_record": new_record})
 	var score: int = int(dist_m * 10.0) + coins * 5
 	var new_score_record: bool = score > int(rec["best_score"])
 	if new_record:
@@ -285,20 +215,6 @@ func apply_run(world_id: int, level_idx: int, dist_m: float, coins: int, complet
 	rec["total_distance"] = float(rec["total_distance"]) + dist_m
 	rec["coins_earned"] = int(rec["coins_earned"]) + int(rewards["total"])
 	rec["runs"] = int(rec["runs"]) + 1
-	var bw: Dictionary = rec["best_by_world"]
-	var wk := str(world_id)
-	if dist_m > float(bw.get(wk, 0.0)):
-		bw[wk] = dist_m
-	if level_idx > 0:
-		var key := WorldDefs.key(world_id, level_idx)
-		var e: Dictionary = level_info(world_id, level_idx).duplicate()
-		e["best_m"] = maxf(float(e["best_m"]), dist_m)
-		if completed:
-			e["done"] = true
-		if coins_goal_met:
-			e["coins_goal"] = true
-		data["levels"][key] = e
-	data["last"] = {"world": world_id, "level": level_idx}
 	add_coins(int(rewards["total"]))
 	save_game()
 	rewards["prev_best"] = prev_best
@@ -307,5 +223,8 @@ func apply_run(world_id: int, level_idx: int, dist_m: float, coins: int, complet
 	rewards["new_score_record"] = new_score_record
 	return rewards
 
+func best_distance() -> float:
+	return float(data["records"]["best_distance"])
+
 func player_level() -> int:
-	return 1 + int(float(data["records"]["total_distance"]) / WorldDefs.PX_PER_M / 1500.0) + completed_levels()
+	return 1 + int(float(data["records"]["total_distance"]) / 2000.0)

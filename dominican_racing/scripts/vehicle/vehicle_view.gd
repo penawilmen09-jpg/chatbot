@@ -50,6 +50,16 @@ func _draw() -> void:
 	for i in 2:
 		wp.append(vehicle.wheel_local_pos(i))
 		ws.append(vehicle.wheels[i]["spin"])
+	# sombras de contacto bajo cada rueda apoyada
+	for i in 2:
+		var w: Dictionary = vehicle.wheels[i]
+		if w["grounded"]:
+			var gp: Vector2 = wp[i] + Vector2(0, vehicle.def["r"] * 0.95)
+			var pts := PackedVector2Array()
+			for k in 12:
+				var a := TAU * k / 12.0
+				pts.append(gp + Vector2(cos(a) * vehicle.def["r"] * 1.1, sin(a) * 5.0))
+			draw_colored_polygon(pts, Color(0, 0, 0, 0.2))
 	VehicleArt.draw(self, vehicle.def, wp, ws, t, vehicle.gas if vehicle.engine_on else 0.0)
 
 ## Explosión de chispas/polvo al chocar.

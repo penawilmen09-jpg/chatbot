@@ -4,13 +4,9 @@ extends CanvasLayer
 const MENU := "res://scenes/main_menu.tscn"
 const GARAGE := "res://scenes/garage.tscn"
 const SHOP := "res://scenes/shop.tscn"
-const MAPS := "res://scenes/maps.tscn"
 const SETTINGS := "res://scenes/settings.tscn"
 const GAME := "res://scenes/gameplay.tscn"
 
-var run_world: int = 1
-var run_level: int = 1   # 0 = distancia infinita
-var shop_tab: int = 0
 
 var _fade: ColorRect
 var _busy := false
@@ -55,9 +51,7 @@ func go(path: String) -> void:
 	await t2.finished
 	_busy = false
 
-func start_run(world_id: int, level_idx: int) -> void:
-	run_world = world_id
-	run_level = level_idx
+func start_run() -> void:
 	go(GAME)
 
 func _notification(what: int) -> void:

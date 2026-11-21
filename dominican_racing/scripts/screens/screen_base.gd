@@ -14,11 +14,11 @@ func _ready() -> void:
 func _build() -> void:
 	pass
 
-func add_backdrop(world_id := 1, vehicle: Dictionary = {}, speed := 60.0) -> void:
+func add_backdrop(vehicle: Dictionary = {}, speed := 60.0) -> void:
 	if backdrop:
 		backdrop.queue_free()
 	backdrop = Backdrop.new()
-	backdrop.setup(world_id, vehicle, speed)
+	backdrop.setup(vehicle, speed)
 	add_child(backdrop)
 	move_child(backdrop, 0)
 

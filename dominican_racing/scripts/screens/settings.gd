@@ -4,7 +4,7 @@ extends ScreenBase
 var name_edit: LineEdit
 
 func _build() -> void:
-	add_backdrop(1, {}, 40.0)
+	add_backdrop({}, 40.0)
 	var shade := ColorRect.new()
 	shade.color = Color(0.02, 0.05, 0.14, 0.5)
 	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -55,8 +55,8 @@ func _build() -> void:
 	v.add_child(mute)
 	v.add_child(HSeparator.new())
 	var rec: Dictionary = SaveManager.data["records"]
-	var stats := UIKit.label("Récord: %d m  ·  Mejor puntuación: %d  ·  Partidas: %d\nNiveles completados: %d  ·  Distancia total: %d m" % [
-		int(rec["best_distance"]), rec["best_score"], rec["runs"], SaveManager.completed_levels(), int(float(rec["total_distance"]) / WorldDefs.PX_PER_M)], 20, Color(0.8, 0.9, 1.0), false)
+	var stats := UIKit.label("Récord: %d m  ·  Mejor puntuación: %d  ·  Partidas: %d\nMonedas ganadas en total: %d  ·  Distancia total: %d m" % [
+		int(rec["best_distance"]), rec["best_score"], rec["runs"], rec["coins_earned"], int(rec["total_distance"])], 20, Color(0.8, 0.9, 1.0), false)
 	v.add_child(stats)
 	var reset := UIKit.button("REINICIAR PROGRESO", UIKit.RED, Vector2(360, 58), 24)
 	reset.pressed.connect(_confirm_reset)

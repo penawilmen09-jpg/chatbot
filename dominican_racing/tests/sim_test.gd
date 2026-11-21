@@ -9,13 +9,15 @@ var bot := false
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	var vids: Array = VehicleDefs.ids()
-	var worlds := [1, 2, 3, 4, 5]
+	var worlds := [0]   # compatibilidad: ahora el recorrido es infinito; el segundo argumento es la semilla
 	var secs := 25.0
 	bot = OS.get_cmdline_user_args().has("bot")
 	if args.size() > 0 and args[0] != "all":
 		vids = [args[0]]
 	if args.size() > 1 and args[1] != "all":
 		worlds = [int(args[1])]
+	else:
+		worlds = [11, 222, 3333]
 	if args.size() > 2:
 		secs = float(args[2])
 	for w in worlds:
@@ -27,13 +29,12 @@ func _ready() -> void:
 	get_tree().quit()
 
 func _run(vid: String, wid: int, secs: float) -> void:
-	var world := WorldDefs.world(wid)
 	var terrain := TerrainManager.new()
 	add_child(terrain)
-	terrain.setup(world, world["diff"] + 0.2, 1234)
+	terrain.setup(wid)
 	var pf := PickupField.new()
 	add_child(pf)
-	pf.setup(terrain.gen, 1234, world["diff"] + 0.2)
+	pf.setup(terrain.gen, wid)
 	terrain.chunk_created.connect(pf.populate)
 	var got := {"coins": 0, "fuel": 0}
 	pf.collected.connect(func(k, val, _p):
@@ -45,7 +46,7 @@ func _run(vid: String, wid: int, secs: float) -> void:
 	terrain.update_for(220.0)
 	var v := Vehicle.new()
 	v_ref[0] = v
-	v.setup(vid, VehicleDefs.default_upgrades(), world["grip"])
+	v.setup(vid, VehicleDefs.default_upgrades(), 1.0)
 	var d: Dictionary = v.def
 	v.position = Vector2(220.0, terrain.gen.y_at(220.0) - (d["ay"] + d["travel"] + d["r"]) - 6.0)
 	add_child(v)
@@ -71,6 +72,7 @@ func _run(vid: String, wid: int, secs: float) -> void:
 			v.brake = 1.0 if err < -0.12 else 0.0
 		pf.check([v.global_position, v.to_global(v.wheel_local_pos(0)), v.to_global(v.wheel_local_pos(1))], v.global_position.x - 1400.0)
 		terrain.update_for(v.global_position.x)
+		v.world_grip = terrain.track.blend_at(v.global_position.x)["grip"]
 		await get_tree().physics_frame
 		t += 1.0 / 60.0
 		frames += 1
@@ -92,7 +94,7 @@ func _run(vid: String, wid: int, secs: float) -> void:
 	if box["c"] != "":
 		crashed = box["c"]
 	var dist := WorldDefs.to_m(v.global_position.x - 220.0)
-	var line := "%-13s W%d dist=%5.0fm t=%4.1fs vmax=%4.0fkmh air=%.1fs fuel=%3.0f%% coins=%d cans=%d end=%s  [%s]" % [vid, wid, dist, t, maxv * 0.15, air_max, v.fuel_ratio() * 100.0, got["coins"], got["fuel"], crashed if crashed != "" else "ok", wheel_dbg]
+	var line := "%-13s S%d dist=%5.0fm t=%4.1fs vmax=%4.0fkmh air=%.1fs fuel=%3.0f%% coins=%d cans=%d end=%s  [%s]" % [vid, wid, dist, t, maxv * 0.15, air_max, v.fuel_ratio() * 100.0, got["coins"], got["fuel"], crashed if crashed != "" else "ok", wheel_dbg + " biomas=" + str(terrain.track.ids.size()) + " pts=" + str(terrain.gen.ys.size())]
 	print(line)
 	results.append(line)
 	v.queue_free()

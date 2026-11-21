@@ -38,7 +38,7 @@ class Avatar extends Control:
 
 func _build() -> void:
 	var def := VehicleDefs.get_def(SaveManager.data["selected"])
-	add_backdrop(1, def, 230.0)
+	add_backdrop(def, 230.0)
 	# ---- perfil ----
 	var prof := UIKit.panel(Color(0.05, 0.09, 0.22, 0.88), 22, 10)
 	prof.position = Vector2(20, 16)
@@ -53,7 +53,7 @@ func _build() -> void:
 	v.add_theme_constant_override("separation", 0)
 	h.add_child(v)
 	v.add_child(UIKit.label(String(SaveManager.data["profile"]["name"]), 28, Color.WHITE))
-	v.add_child(UIKit.label("Nivel %d  ·  Récord: %d m" % [SaveManager.player_level(), int(SaveManager.data["records"]["best_distance"])], 20, Color(0.8, 0.9, 1.0)))
+	v.add_child(UIKit.label("Nivel %d  ·  Récord: %d m" % [SaveManager.player_level(), int(SaveManager.best_distance())], 20, Color(0.8, 0.9, 1.0)))
 	var pbtn := Button.new()
 	pbtn.flat = true
 	pbtn.focus_mode = Control.FOCUS_NONE
@@ -83,23 +83,22 @@ func _build() -> void:
 	col.anchor_right = 1.0
 	col.offset_left = -360
 	col.offset_right = -30
-	col.offset_top = 235
+	col.offset_top = 250
 	col.add_theme_constant_override("separation", 10)
 	add_child(col)
-	var nxt := _next_playable()
-	var play := UIKit.button("JUGAR", UIKit.GREEN, Vector2(330, 84), 44)
-	play.pressed.connect(func(): Nav.start_run(nxt[0], nxt[1]))
+	var play := UIKit.button("JUGAR", UIKit.GREEN, Vector2(330, 92), 48)
+	play.pressed.connect(func(): Nav.start_run())
 	col.add_child(play)
-	var sub := UIKit.label(_play_caption(nxt), 18, Color(1, 1, 1, 0.9))
-	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	col.add_child(sub)
-	var items := [["GARAJE", UIKit.BLUE, Nav.GARAGE], ["TIENDA", UIKit.ORANGE, Nav.SHOP], ["MAPAS", Color(0.55, 0.3, 0.8), Nav.MAPS], ["CONFIGURACIÓN", UIKit.GRAY, Nav.SETTINGS]]
-	var delay := 0.1
+	var items := [["GARAJE", UIKit.BLUE, Nav.GARAGE], ["TIENDA", UIKit.ORANGE, Nav.SHOP], ["CONFIGURACIÓN", UIKit.GRAY, Nav.SETTINGS]]
 	for it in items:
-		var b := UIKit.button(it[0], it[1], Vector2(330, 60), 28)
+		var b := UIKit.button(it[0], it[1], Vector2(330, 64), 28)
 		var path: String = it[2]
 		b.pressed.connect(func(): Nav.go(path))
 		col.add_child(b)
+	# récord destacado
+	var rec := UIKit.label("MEJOR DISTANCIA: %d m" % int(SaveManager.best_distance()), 24, Color(1.0, 0.9, 0.4))
+	rec.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	col.add_child(rec)
 	# animaciones de entrada
 	await get_tree().process_frame
 	for i in col.get_child_count():
@@ -108,23 +107,6 @@ func _build() -> void:
 			UIKit.slide_in(c, Vector2(120, 0), 0.05 * i)
 	UIKit.slide_in(logo, Vector2(0, -80), 0.0)
 	UIKit.slide_in(prof, Vector2(-80, 0), 0.1)
-
-func _next_playable() -> Array:
-	for w in WorldDefs.WORLDS:
-		var wid: int = w["id"]
-		if not SaveManager.world_unlocked(wid):
-			continue
-		for l in range(1, WorldDefs.LEVELS_PER_WORLD + 1):
-			if SaveManager.level_unlocked(wid, l) and not SaveManager.level_done(wid, l):
-				return [wid, l]
-	var last: Dictionary = SaveManager.data["last"]
-	return [clampi(int(last["world"]), 1, 5) if SaveManager.world_unlocked(int(last["world"])) else 1, 0]
-
-func _play_caption(nxt: Array) -> String:
-	var w := WorldDefs.world(nxt[0])
-	if nxt[1] == 0:
-		return "%s · Distancia infinita" % w["name"]
-	return "%s · Nivel %d" % [w["name"], nxt[1]]
 
 func on_back() -> void:
 	SaveManager.save_game()

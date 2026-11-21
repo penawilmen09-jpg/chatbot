@@ -9,7 +9,7 @@ var preview: VehiclePreview
 
 func _build() -> void:
 	view_id = SaveManager.data["selected"]
-	add_backdrop(1, {}, 20.0)
+	add_backdrop({}, 20.0)
 	var shade := ColorRect.new()
 	shade.color = Color(0.02, 0.05, 0.14, 0.45)
 	shade.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -163,7 +163,6 @@ func _refresh_center() -> void:
 	else:
 		btn = UIKit.button("IR A LA TIENDA", UIKit.ORANGE, Vector2(320, 62), 26)
 		btn.pressed.connect(func():
-			Nav.shop_tab = 0
 			Nav.go(Nav.SHOP))
 	btn.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 	center_box.add_child(btn)

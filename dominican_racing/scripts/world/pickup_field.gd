@@ -5,24 +5,24 @@ extends Node2D
 
 signal collected(kind: String, value: int, pos: Vector2)
 
-const FUEL_FRACTION := 0.42   # fracción de la capacidad del depósito que recupera un bidón
+const FUEL_FRACTION := 0.5   # fracción de la capacidad del depósito que recupera un bidón
 
 var gen: TerrainGen
 var seed_value := 1
 var difficulty := 1.0
 var items: Array = []        # {x, y, k ("c1","c5","c10","fuel"), ph}
-var popups: Array = []       # {text, pos, age, color}
+var popups: Array = []
+var sparks: Array = []       # partículas de recogida {pos, vel, age, color, life}       # {text, pos, age, color}
 var next_fuel_x := 3000.0
 var fuel_spacing := 3000.0
 var cam_x := 0.0
 var t := 0.0
 var _last_chunk := -1
 
-func setup(g: TerrainGen, seed_val: int, diff: float) -> void:
+func setup(g: TerrainGen, seed_val: int) -> void:
 	gen = g
 	seed_value = seed_val
-	difficulty = diff
-	fuel_spacing = 5400.0 + 300.0 * diff
+	fuel_spacing = 5200.0
 
 func populate(idx: int) -> void:
 	if idx <= _last_chunk:
@@ -109,11 +109,23 @@ func _collect(it: Dictionary) -> void:
 			col = Color(1.0, 0.45, 0.35)
 	if it["k"] != "fuel":
 		text = "+%d" % value
+	_spawn_sparks(Vector2(it["x"], it["y"]), col, 14 if it["k"] == "fuel" else 8)
 	popups.append({"text": text, "pos": Vector2(it["x"], it["y"]), "age": 0.0, "color": col})
 	collected.emit(it["k"], value, Vector2(it["x"], it["y"]))
 
+func _spawn_sparks(pos: Vector2, col: Color, n: int) -> void:
+	for i in n:
+		var a := TAU * i / n + randf() * 0.5
+		var sp := randf_range(120.0, 320.0)
+		sparks.append({"pos": pos, "vel": Vector2(cos(a), sin(a)) * sp, "age": 0.0, "life": randf_range(0.35, 0.6), "color": col.lightened(0.3)})
+
 func _process(delta: float) -> void:
 	t += delta
+	for sp in sparks:
+		sp["age"] += delta
+		sp["pos"] += sp["vel"] * delta
+		sp["vel"] *= 1.0 - minf(delta * 3.0, 1.0)
+	sparks = sparks.filter(func(s): return s["age"] < s["life"])
 	for p in popups:
 		p["age"] += delta
 	popups = popups.filter(func(p): return p["age"] < 0.9)
@@ -131,6 +143,14 @@ func _draw() -> void:
 			"c5": _coin(c, 15.0, Color(0.82, 0.88, 0.98), it["ph"])
 			"c10": _coin(c, 18.0, Color(1.0, 0.55, 0.15), it["ph"])
 			"fuel": _can(c)
+	for sp in sparks:
+		var al: float = 1.0 - sp["age"] / sp["life"]
+		var c: Color = sp["color"]
+		c.a = al
+		var r := 4.5 * al + 1.0
+		var q: Vector2 = sp["pos"]
+		draw_colored_polygon(PackedVector2Array([q + Vector2(0, -r * 1.6), q + Vector2(r * 0.5, 0), q + Vector2(0, r * 1.6), q + Vector2(-r * 0.5, 0)]), c)
+		draw_colored_polygon(PackedVector2Array([q + Vector2(-r * 1.6, 0), q + Vector2(0, r * 0.5), q + Vector2(r * 1.6, 0), q + Vector2(0, -r * 0.5)]), c)
 	var f := ThemeDB.fallback_font
 	for p in popups:
 		var a: float = 1.0 - p["age"] / 0.9
