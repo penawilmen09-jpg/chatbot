@@ -461,19 +461,24 @@ func _link_stations() -> void:
 		var end_px: float = st2.x * TILE + 8.0 if st2.x >= 0 else INF
 		var state := {"chaser": null}
 		a.body_entered.connect(func(b):
-			if not b.is_in_group("player"):
-				return
-			var cur = state["chaser"]
-			if cur != null and is_instance_valid(cur):
-				return
-			var ch = ChaserScript.new()
-			ch.level = self
-			ch.end_x = end_px
-			ch.position = Vector2(a.position.x - 260.0, a.position.y - 2.0)
-			add_child(ch)
-			state["chaser"] = ch
-			popup("¡CORRE!", b.global_position + Vector2(0, -30))
-			Audio.play_sfx("boss_roar"))
+			if b.is_in_group("player"):
+				call_deferred("_start_chase", a.position, end_px, state, b))
+
+
+func _start_chase(origin: Vector2, end_px: float, state: Dictionary, player_node) -> void:
+	## (diferido: no se pueden añadir áreas de colisión dentro de una llamada de la física)
+	var cur = state["chaser"]
+	if cur != null and is_instance_valid(cur):
+		return
+	var ch = ChaserScript.new()
+	ch.level = self
+	ch.end_x = end_px
+	ch.position = Vector2(origin.x - 260.0, origin.y - 2.0)
+	add_child(ch)
+	state["chaser"] = ch
+	if is_instance_valid(player_node):
+		popup("¡CORRE!", player_node.global_position + Vector2(0, -30))
+	Audio.play_sfx("boss_roar")
 
 
 func _make_secret_marker(x: int, y: int) -> void:
