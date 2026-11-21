@@ -1,0 +1,10 @@
+{
+  "name": "Dominican Racing",
+  "short_name": "Dom. Racing",
+  "start_url": "./index.html",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#0b3d6e",
+  "theme_color": "#0b3d6e",
+  "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }]
+}
