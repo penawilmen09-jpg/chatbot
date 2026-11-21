@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 90 (9-10): El Coloso Mecánico
 ; semilla de generacion: 16790 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 0 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 0 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
               ##############################    ##############                           ############                                                                                          ##
                ############################     ##############                           ############                                                                                          ##
                 ##########################      ##############                           ############                                                                                          ##

@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 26 (3-6): Templo Hundido
 ; semilla de generacion: 8406 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 0 habitaciones secretas []
+; tesoros: 1 cofre visible, 0 habitaciones secretas []; vehiculos: []
                                                                   #########                                               ##########                                           ###########
                                                                   #########                                               ##########                                           ###########
                                                                   #########                                               ##########                                           ###########
@@ -8,7 +8,7 @@
                                                                   #########                                               ##########                                           ###########
                                                                   #########                          ooo                  ##########                                           ###########
                                                                   #########                                               ##########                                           ###########           *
-                                                     oooo         #########                                               ##########                                           ###########          ===
+                                                     oooo         #########                          q                    ##########                                           ###########          ===
                                                        *          #########                       ######                  ####   ###                                           ###########
                                  oo                  ====         #########                       ######                  #### o ###                                           ###########        K
                                          oo                       #########                    ############               ####o*o###                   oo                      ###########

@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 16 (2-6): Veta de Amatista
 ; semilla de generacion: 7096 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                                ###########    ############################                                                                           ###########################
                                                ###########     ##########################                                                                             #########################
                                                ###########      ########################                                                                               #######################

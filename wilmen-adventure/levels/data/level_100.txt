@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 100 (10-10): El Emperador del Vacío
 ; semilla de generacion: 18100 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                                                             ##############                                                                                          ##
                                                                             ##############                                                                                          ##
                                                                             ##############                                                                                          ##

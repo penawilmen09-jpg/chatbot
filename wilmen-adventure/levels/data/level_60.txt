@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 60 (6-10): Nido del Águila Tormenta
 ; semilla de generacion: 12860 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 0 cofre visible, 0 habitaciones secretas []
+; tesoros: 0 cofre visible, 0 habitaciones secretas []; vehiculos: []
                                                                                                                   ##########                                                              ##
                                                                                                                   ##########                                                              ##
                                                                                                                   ##########                                                              ##

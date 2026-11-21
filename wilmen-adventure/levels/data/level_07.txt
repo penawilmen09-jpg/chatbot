@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 7 (1-7): Cámara Secreta del Bosque  [SECRETO]
 ; semilla de generacion: 5917 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 2 habitaciones secretas ['cellar', 'cellar']
+; tesoros: 1 cofre visible, 2 habitaciones secretas ['cellar', 'cellar']; vehiculos: []
                                        ##########################    ##########                                                                                                ###########################
                                         ########################     ##########                                                                                                 #########################
                                          ######################      ##########                                                                                                  #######################

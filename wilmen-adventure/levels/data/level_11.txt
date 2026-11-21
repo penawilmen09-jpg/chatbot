@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 11 (2-1): Galería Brillante
 ; semilla de generacion: 6441 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 2 habitaciones secretas ['cellar', 'cellar']
+; tesoros: 1 cofre visible, 2 habitaciones secretas ['cellar', 'cellar']; vehiculos: []
                                                                                     ##############################                                                          ##############################    #############
                                                                                      ############################                                                            ############################     #############
                                                                                       ##########################                                                              ##########################      #############

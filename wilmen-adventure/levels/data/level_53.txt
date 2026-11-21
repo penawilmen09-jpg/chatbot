@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 53 (6-3): Molinos del Viento
 ; semilla de generacion: 11943 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                                                                                                                                                                                                                       #############
                                                                                                                                                                                                                                       #############
                                                                                                                                                                                                                                       #############

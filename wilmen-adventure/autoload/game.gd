@@ -113,6 +113,7 @@ var score_at_level_start: int = 0
 var save_path: String = "user://wilmen_save.json"
 var last_reward: Dictionary = {}  # recompensa de mundo de la última partida (para la pantalla de resultados)
 var migrated_from_v1: bool = false
+var mode: String = "story"  # story | time | challenge | bonus | survival | bossrush (modos desbloqueables)
 
 
 func _ready() -> void:
@@ -280,12 +281,49 @@ func is_world_unlocked(w: int) -> bool:
 
 
 func start_level(n: int) -> bool:
-	## ÚNICA puerta de entrada a un nivel: valida el desbloqueo.
+	## ÚNICA puerta de entrada a un nivel de la historia: valida el desbloqueo.
 	if not is_unlocked(n):
 		push_warning("Nivel %d bloqueado: no se puede jugar." % n)
 		return false
+	mode = "story"
 	current_level = n
 	return true
+
+
+func mode_allowed(m: String, n: int) -> bool:
+	## Reglas de entrada de cada modo (todas dependen del progreso normal; nada se compra).
+	if m == "story":
+		return is_unlocked(n)
+	if n < 1 or n > LEVEL_COUNT or not Progress.mode_unlocked(m):
+		return false
+	var w: int = world_of(n)
+	match m:
+		"time", "challenge":
+			return is_done(n)
+		"bonus", "bossrush":
+			return worlds_done.has(w)
+		"survival":
+			return is_world_unlocked(w)
+	return false
+
+
+func start_mode(m: String, n: int) -> bool:
+	## Puerta de entrada de los modos extra (ver mode_allowed). No toca el progreso de la historia.
+	if not mode_allowed(m, n):
+		push_warning("Modo %s no disponible para el nivel %d." % [m, n])
+		return false
+	mode = m
+	current_level = n
+	return true
+
+
+func level_file(n: int) -> String:
+	match mode:
+		"bonus":
+			return LEVEL_DIR + "bonus_%02d.txt" % world_of(n)
+		"survival":
+			return LEVEL_DIR + "survival_%02d.txt" % world_of(n)
+	return level_path(n)
 
 
 func begin_level(n: int) -> void:

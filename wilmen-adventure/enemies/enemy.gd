@@ -273,6 +273,7 @@ func kill() -> void:
 	if dead:
 		return
 	dead = true
+	Progress.stats["enemies"] = int(Progress.stats["enemies"]) + 1
 	set_deferred("collision_layer", 0)
 	_hit.set_deferred("monitoring", false)
 	Audio.play_sfx("stomp")

@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 14 (2-4): Gruta de los Ecos
 ; semilla de generacion: 6834 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 0 habitaciones secretas []
+; tesoros: 1 cofre visible, 0 habitaciones secretas []; vehiculos: []
               ##########################    ##############
                ########################     ##############
                 ######################      ##############

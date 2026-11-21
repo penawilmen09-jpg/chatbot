@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 99 (10-9): Antesala del Emperador
 ; semilla de generacion: 17969 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 0 habitaciones secretas []
+; tesoros: 1 cofre visible, 0 habitaciones secretas []; vehiculos: []
                                                                                                                                                                                                                                                         ###########
                                                                                                                                                                                                                                                         ###########
                                                                                                                                                                                                                                                         ###########
@@ -8,7 +8,7 @@
                                                                                                                                                                                                                                                         ###########
                                                            oo                                                                                                                                                             ooo                           ###########             oo
                                                                              *                                                                                                                                                                          ###########
-                                                          3 6               ===                                                                                            oooo                                            6                            ###########              6
+                                                          3 6               ===                                                                                            oooo                                            l                            ###########              6
                                                           ####                                                                                                               *                                           #####                          ####   ####            ####
                                                         ==####            K                                                     oo      oo   oo                            ====                                        ==#####                          #### o ####          ==####             oo        oo
                                                           ####                                                                      oo   4                                                    f                          #####                          ####o*o####            ####

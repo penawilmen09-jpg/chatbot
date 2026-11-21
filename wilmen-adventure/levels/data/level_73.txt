@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 73 (8-3): Ruinas Cubiertas
 ; semilla de generacion: 14563 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 2 habitaciones secretas ['cellar', 'cellar']
+; tesoros: 1 cofre visible, 2 habitaciones secretas ['cellar', 'cellar']; vehiculos: []
                                                                                                                                                                               ##########
                                                                                                                                                                               ##########
                                                                                                                                                                               ##########

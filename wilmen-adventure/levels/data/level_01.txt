@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 1 (1-1): Claro del Bosque
 ; semilla de generacion: 5131 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                                       ##############
                                                       ##############
                                                       ##############

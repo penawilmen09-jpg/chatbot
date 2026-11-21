@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 30 (3-10): Tumba del Escarabajo
 ; semilla de generacion: 8930 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                                                                                     ##########                                                              ##
                                                                                                     ##########                                                              ##
                                                                                                     ##########                                                              ##

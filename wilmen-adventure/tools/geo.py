@@ -480,3 +480,110 @@ def arena_props(lv, ctx, world, approach, total):
             lv.set(xx, 2, "7") if lv.get(xx, 1) == "#" else None
     if lv.get(approach + 22, 0) == " ":
         pass
+
+
+# ------------------------------------------------- losas de vehículos ------
+def slab(kind, world, gt, rnd):
+    """Tramo especial que se intercala en un nivel (ver vehicles_pass.py): carrito, barco, plataforma voladora,
+    mecha o persecución. Empieza y acaba a la altura gt del suelo y siempre se puede cruzar a pie."""
+    W = {"cart": 46, "boat": 44, "flyer": 46, "mech": 44, "chase": 62}[kind]
+    lv = L.Lv(W)
+    L.ground(lv, 0, W, gt)
+    ctx = dict(rnd=rnd, gt=gt, d=0.5, world=world, pool=["w", "j", "f"], gems=0, lava=(world == 7))
+    if kind == "cart":
+        lv.set(3, gt - 1, "V")
+        lv.set(W - 5, gt - 1, "y")
+        x = 12
+        while x < W - 12:
+            what = rnd.choice(["spikes", "block", "gap", "spikes"])
+            if what == "spikes":
+                for k in range(2):
+                    lv.set(x + k, gt - 1, "^")
+                L.coin_arc(lv, x - 1, x + 3, gt - 2, 2)
+            elif what == "block":
+                for k in range(2):
+                    lv.set(x + k, gt - 1, "#")
+                L.coin_arc(lv, x - 1, x + 3, gt - 3, 2)
+            else:
+                for k in range(3):
+                    for y in range(gt, R):
+                        lv.set(x + k, y, " ")
+                    if ctx["lava"]:
+                        lv.set(x + k, R - 2, "L")
+                        lv.set(x + k, R - 1, "L")
+                L.coin_arc(lv, x - 1, x + 4, gt - 2, 3)
+            x += rnd.randint(8, 10)
+    elif kind == "boat":
+        for x in range(6, W - 6):
+            for y in range(gt, R):
+                lv.set(x, y, " ")
+            for y in range(gt, gt + 3):
+                lv.set(x, y, "a")
+        lv.set(3, gt - 1, "V")
+        lv.set(W - 5, gt - 1, "y")
+        x = 12
+        while x < W - 12:  # rocas a la altura del agua
+            lv.set(x, gt - 1, "^")
+            L.coin_arc(lv, x - 2, x + 3, gt - 2, 2)
+            x += rnd.randint(7, 9)
+        px_ = 7
+        while px_ < W - 9:  # camino a pie por plataformas altas
+            for k in range(3):
+                lv.set(px_ + k, gt - 4, "=")
+            px_ += rnd.randint(5, 6)
+    elif kind == "flyer":
+        for x in range(6, W - 6):
+            for y in range(gt, R):
+                lv.set(x, y, " ")
+        lv.set(3, gt - 1, "V")
+        lv.set(W - 5, gt - 1, "y")
+        x = 12
+        while x < W - 10:  # pilares desde abajo y estalactitas desde arriba
+            top_h = rnd.randint(3, 5)
+            for xx in (x, x + 1):
+                for y in range(0, top_h):
+                    lv.set(xx, y, "#")
+            bx = x + 5
+            if bx < W - 8:
+                for xx in (bx, bx + 1):
+                    for y in range(gt + 1, R):
+                        lv.set(xx, y, "#")
+            L.coin_line(lv, x + 2, x + 6, rnd.randint(8, 11))
+            if rnd.random() < 0.5 and "f" in ctx["pool"]:
+                lv.set(x + 3, rnd.randint(8, 10), "f")
+            x += 10
+        px_ = 7
+        while px_ < W - 9:
+            for k in range(3):
+                lv.set(px_ + k, gt - 3, "=")
+            px_ += rnd.randint(5, 6)
+    elif kind == "mech":
+        lv.set(3, gt - 1, "V")
+        lv.set(W - 5, gt - 1, "y")
+        for bx in (13, 23, 33):
+            for k in range(2):
+                for yy in (gt - 2, gt - 1):
+                    lv.set(bx + k, yy, "B")
+            lv.set(bx - 3, gt - 1, rnd.choice(["w", "s"]))
+            L.coin_line(lv, bx, bx + 2, gt - 4)
+    else:  # chase
+        lv.set(4, gt - 1, "r")
+        lv.set(W - 5, gt - 1, "y")
+        x = 14
+        while x < W - 12:
+            what = rnd.choice(["spikes", "block", "gap"])
+            if what == "spikes":
+                lv.set(x, gt - 1, "^")
+                lv.set(x + 1, gt - 1, "^")
+            elif what == "block":
+                lv.set(x, gt - 1, "#")
+            else:
+                for k in range(3):
+                    for y in range(gt, R):
+                        lv.set(x + k, y, " ")
+                    if ctx["lava"]:
+                        lv.set(x + k, R - 2, "L")
+                        lv.set(x + k, R - 1, "L")
+            L.coin_line(lv, x - 2, x + 4, gt - 3)
+            x += rnd.randint(9, 11)
+    return lv.g, W

@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 71 (8-1): Selva Espesa
 ; semilla de generacion: 14301 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                                   ############
                                                   ############
                                                   ############

@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 77 (8-7): Cámara Secreta de la Selva  [SECRETO]
 ; semilla de generacion: 15087 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                           ############################                                                                        #############                                   ##########################
                                            ##########################                                                                         #############                                    ########################
                                             ########################                                                                          #############                                     ######################

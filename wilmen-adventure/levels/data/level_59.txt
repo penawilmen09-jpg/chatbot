@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 59 (6-9): Ciudadela de Nubes
 ; semilla de generacion: 12729 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 0 habitaciones secretas []
+; tesoros: 1 cofre visible, 0 habitaciones secretas []; vehiculos: []
                                      ############
                                      ############
                                      ############

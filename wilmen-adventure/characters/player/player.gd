@@ -47,6 +47,7 @@ var barrier_t: float = 0.0
 var giant_t: float = 0.0
 var giant_hit_used: bool = false  # el gigante daña al jefe una sola vez por transformación (no lo derrota de golpe)
 var scale_mul: float = 1.0
+var vehicle = null  # vehículo que está conduciendo (carrito, barco, plataforma voladora o mecha)
 
 # efectos del entorno: los fija el nivel en cada paso de física
 var env_conveyor: float = 0.0
@@ -126,6 +127,12 @@ func _physics_process(delta: float) -> void:
 	shield_t = maxf(0.0, shield_t - delta)
 	dash_t = maxf(0.0, dash_t - delta)
 	_tick_powers(delta)
+	if vehicle != null:
+		# conduciendo: el vehículo mueve al jugador; aquí solo se animan sus efectos
+		velocity = Vector2.ZERO
+		_update_visuals(0.0, true, delta)
+		_update_cosmetics()
+		return
 
 	var dir: float = 0.0
 	var jump_pressed: bool = false
@@ -390,7 +397,7 @@ func _blink() -> void:
 
 
 func is_attacking() -> bool:
-	return dash_t > 0.0 or shield_t > 0.0 or giant_t > 0.0
+	return dash_t > 0.0 or shield_t > 0.0 or giant_t > 0.0 or (vehicle != null and vehicle.kind == "mech")
 
 
 # --------------------------------------------------------- daño y estado --
@@ -398,6 +405,9 @@ func hurt(dmg: int = 1, from_x: float = 0.0) -> bool:
 	if dead or _invuln_t > 0.0 or shield_t > 0.0 or dash_t > 0.0:
 		return false
 	if not controllable:
+		return false
+	if vehicle != null and vehicle.absorb_hit():
+		_invuln_t = 0.8  # el mecha recibe el golpe por Wilmen
 		return false
 	if barrier:
 		# Escudo protector: resiste UN golpe
@@ -445,6 +455,9 @@ func die() -> void:
 		return
 	dead = true
 	hp = 0
+	if vehicle != null:
+		vehicle.release_rider()
+		vehicle = null
 	hp_changed.emit(hp, MAX_HP)
 	Audio.play_sfx("die")
 	velocity = Vector2(0.0, -260.0)

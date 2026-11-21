@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 20 (2-10): Corazón de Cristal
 ; semilla de generacion: 7620 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 0 habitaciones secretas []
+; tesoros: 1 cofre visible, 0 habitaciones secretas []; vehiculos: []
                                                                                                             ###########                                                              ##
                                                                                                             ###########                                                              ##
                                                                                                             ###########                                                              ##

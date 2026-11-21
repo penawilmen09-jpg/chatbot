@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 40 (4-10): Trono del Yeti
 ; semilla de generacion: 10240 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 0 habitaciones secretas []
+; tesoros: 1 cofre visible, 0 habitaciones secretas []; vehiculos: []
                                                                                                                       ############                                                              ##
                                                                                                                       ############                                                              ##
                                                                                                                       ############                                                              ##

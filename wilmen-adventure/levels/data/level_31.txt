@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 31 (4-1): Llanura Helada
 ; semilla de generacion: 9061 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                                                                                                                  ###########
                                                                                                                                  ###########
                                                                                                                                  ###########

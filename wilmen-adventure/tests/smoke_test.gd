@@ -79,6 +79,15 @@ func _run() -> void:
 	_scene = load("res://levels/level.tscn")
 	_check(_scene != null, "level.tscn carga")
 
+	if OS.get_cmdline_user_args().has("--exp2"):
+		await _test_secret_variants()
+		await _test_vehicles()
+		await _test_modes()
+		await _test_extras_ui()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
+
 	if OS.get_cmdline_user_args().has("--exp"):
 		# ejecución rápida solo de la expansión: godot --headless --script res://tests/smoke_test.gd -- --exp
 		await _test_expansion()
@@ -108,6 +117,10 @@ func _run() -> void:
 	await _test_bosses()
 	await _test_golem_combat()
 	await _test_expansion()
+	await _test_secret_variants()
+	await _test_vehicles()
+	await _test_modes()
+	await _test_extras_ui()
 	await _test_flow()
 	await _test_touch_controls()
 	await _test_menus()
@@ -982,6 +995,312 @@ func _test_expansion() -> void:
 	_check(not _prog.equip("hat", "corona"), "no se puede equipar lo que no se ha desbloqueado")
 	await _free_level(lvl)
 	_prog.reset_all()
+	_reset_game()
+
+
+# ============== EXPANSIÓN 2: vehículos, persecuciones, modos de juego y pantallas de extras ==========
+func _level_having(ch: String, world_pred: Callable = Callable()) -> int:
+	for n in range(1, 101):
+		if world_pred.is_valid() and not world_pred.call(_game.world_of(n)):
+			continue
+		var f := FileAccess.open(_game.level_path(n), FileAccess.READ)
+		var txt: String = f.get_as_text()
+		f.close()
+		var body: String = ""
+		for line in txt.split("\n"):
+			if not String(line).begins_with(";"):
+				body += line
+		if body.contains(ch):
+			return n
+	return -1
+
+
+func _vehicles_of(lvl) -> Array:
+	return lvl.get_children().filter(func(n): return n.get_script() != null and str(n.get_script().resource_path).ends_with("vehicle.gd"))
+
+
+func _test_vehicles() -> void:
+	print("Vehículos y persecuciones")
+	for kind in ["cart", "boat", "flyer", "mech"]:
+		_reset_game()
+		_prog.reset_all()
+		var n: int = _level_having("V", func(w): return _prog.WORLD_VEHICLES[w] == kind)
+		_check(n > 0, "hay un nivel con %s (nivel %d)" % [kind, n])
+		if n < 0:
+			continue
+		var lvl = await _load_level(n)
+		var p = lvl.player
+		var vs: Array = _vehicles_of(lvl)
+		_check(vs.size() >= 1 and vs[0].kind == kind, "%s: el vehículo se crea" % kind)
+		var v = vs[0]
+		_check(v.end_x < INF, "%s: tiene estación de llegada (x=%d)" % [kind, int(v.end_x)])
+		p.global_position = v.global_position + Vector2(0, -6)
+		p.velocity = Vector2.ZERO
+		await _frames(8)
+		_check(p.vehicle == v, "%s: Wilmen sube al tocarlo" % kind)
+		var x0: float = v.global_position.x
+		var y0: float = v.global_position.y
+		if kind == "flyer":
+			Input.action_press("jump")
+			await _frames(30)
+			Input.action_release("jump")
+			_check(v.global_position.y < y0 - 8.0, "flyer: manteniendo salto sube (%.0f px)" % (y0 - v.global_position.y))
+			var y1: float = v.global_position.y
+			var ymin: float = y1
+			for k in range(7):
+				await _frames(10)
+				ymin = minf(ymin, v.global_position.y)
+			_check(v.global_position.y > ymin + 6.0, "flyer: al soltar baja (%.0f px bajo su punto más alto)" % (v.global_position.y - ymin))
+		elif kind == "mech":
+			Input.action_press("move_right")
+			await _frames(30)
+			Input.action_release("move_right")
+			_check(v.global_position.x > x0 + 20.0, "mech: camina (%.0f px)" % (v.global_position.x - x0))
+		else:
+			await _frames(40)
+			_check(v.global_position.x > x0 + 30.0, "%s: avanza solo (%.0f px)" % [kind, v.global_position.x - x0])
+			Input.action_press("jump")
+			await _frames(6)
+			Input.action_release("jump")
+			_check(v.global_position.y < y0 - 2.0 or p.global_position.y < y0, "%s: el salto brinca" % kind)
+		_check(p.global_position.distance_to(v.global_position) < 40.0, "%s: Wilmen va sentado en el vehículo" % kind)
+		if kind == "mech":
+			var hp0: int = p.hp
+			p._invuln_t = 0.0
+			var r1: bool = p.hurt(1, p.global_position.x + 5.0)
+			_check(not r1 and p.hp == hp0 and v.armor == 2, "mech: aguanta golpes por Wilmen (armadura %d)" % v.armor)
+		# bajar con el botón de poder
+		await _frames(20)
+		Input.action_press("skill")
+		await _frames(3)
+		Input.action_release("skill")
+		await _frames(4)
+		_check(p.vehicle == null, "%s: el botón de poder baja del vehículo" % kind)
+		await _free_level(lvl)
+		# llegar a la estación baja solo
+		lvl = await _load_level(n)
+		p = lvl.player
+		v = _vehicles_of(lvl)[0]
+		var end_px: float = v.end_x
+		p.global_position = v.global_position + Vector2(0, -6)
+		await _frames(8)
+		_check(p.vehicle == v, "%s: sube otra vez" % kind)
+		v.global_position.x = end_px + 1.0
+		await _frames(10)
+		_check(p.vehicle == null and p.global_position.x >= end_px - 2.0, "%s: al llegar a la estación baja y sigue a pie" % kind)
+		await _free_level(lvl)
+	# persecución
+	_reset_game()
+	var nc: int = _level_having("r")
+	_check(nc > 0, "hay un nivel con persecución (nivel %d)" % nc)
+	var lc = await _load_level(nc)
+	var pc = lc.player
+	var rc: Vector2i = _find_cell(lc, "r")
+	pc.global_position = Vector2(rc.x * 16 + 8, rc.y * 16 + 4)
+	await _frames(10)
+	var chasers: Array = lc.get_children().filter(func(n2): return n2.get_script() != null and str(n2.get_script().resource_path).ends_with("chaser.gd"))
+	_check(chasers.size() == 1, "al pasar por el inicio aparece el perseguidor")
+	var hpc: int = pc.hp
+	pc._invuln_t = 0.0
+	chasers[0].global_position = pc.global_position
+	await _frames(6)
+	_check(pc.hp == hpc - 1, "si te alcanza pierdes un corazón (%d -> %d)" % [hpc, pc.hp])
+	var xa: float = chasers[0].global_position.x
+	await _frames(60)
+	_check(chasers[0].global_position.x > xa - 60.0, "el perseguidor sigue avanzando")
+	await _free_level(lc)
+	_reset_game()
+
+
+func _test_modes() -> void:
+	print("Modos: contrarreloj, desafío, bonus, supervivencia y desafío de jefes")
+	_reset_game()
+	_prog.reset_all()
+	_check(not _game.mode_allowed("time", 1) and not _game.mode_allowed("bonus", 1) and not _game.mode_allowed("survival", 1), "en una partida nueva los modos extra están bloqueados")
+	_check(_game.mode_allowed("story", 1) and not _game.mode_allowed("story", 2), "la historia sigue bloqueada nivel a nivel")
+	_check(not _game.start_mode("bonus", 1), "no se puede entrar a un modo bloqueado")
+	# progreso normal: completar el mundo 1
+	for i in range(1, 11):
+		_mark_done(i)
+	_game.worlds_done = [1]
+	_check(_game.mode_allowed("time", 3) and _game.mode_allowed("bonus", 1) and _game.mode_allowed("bossrush", 10), "al completar el mundo 1 se abren contrarreloj, bonus y desafío de jefe")
+	_check(not _game.mode_allowed("time", 11) and not _game.mode_allowed("survival", 11), "pero no los niveles aún no jugados")
+	_check(not _game.mode_allowed("challenge", 3), "el modo desafío pide completar 2 mundos")
+	var unlocked_before: int = _game.unlocked.size()
+	# --- contrarreloj
+	_check(_game.start_mode("time", 3), "contrarreloj: se puede empezar en el nivel 3")
+	var lvl = await _load_level_mode(3)
+	_check(lvl.mode == "time" and not lvl.blocked, "contrarreloj: el nivel carga en su modo")
+	lvl.elapsed = 5.0
+	lvl.complete_level()
+	await _frames(150)
+	_check(_prog.best_time(3) > 0.0, "contrarreloj: se guarda el mejor tiempo (%.2f s)" % _prog.best_time(3))
+	_check(_game.unlocked.size() == unlocked_before, "contrarreloj no altera los niveles desbloqueados")
+	await _free_level(lvl)
+	# --- bonus
+	_check(_game.start_mode("bonus", 1), "bonus: se abre al derrotar al jefe del mundo")
+	lvl = await _load_level_mode(1)
+	_check(lvl.mode == "bonus" and lvl.goal != null and _find_cell(lvl, "N").x >= 0, "bonus: nivel con meta y cofres")
+	var chest_c: Vector2i = _find_cell(lvl, "N")
+	var coins_b: int = _game.total_coins
+	lvl.player.global_position = Vector2(chest_c.x * 16 + 8, chest_c.y * 16 + 4)
+	await _frames(8)
+	_check(_game.total_coins > coins_b, "bonus: los cofres dan botín")
+	lvl.complete_level()
+	await _frames(160)
+	_check(_prog.is_done("bonus", 1), "bonus: se guarda como completado")
+	_check(_game.unlocked.size() == unlocked_before and not _game.is_done(11), "bonus no toca el progreso de la historia")
+	await _free_level(lvl)
+	# --- desafío (pide 2 mundos)
+	_game.worlds_done = [1, 2]
+	for i in range(11, 21):
+		_mark_done(i)
+	_check(_game.start_mode("challenge", 3), "desafío: disponible con 2 mundos")
+	lvl = await _load_level_mode(3)
+	_check(lvl.player.hp == 1, "desafío: un solo corazón")
+	lvl.player.hurt(1, lvl.player.global_position.x + 5.0)
+	await _frames(100)
+	_check(lvl.finished, "desafío: un solo intento (al perder el corazón termina)")
+	_check(_game.lives >= 3, "desafío: no gasta vidas de la historia")
+	await _free_level(lvl)
+	# --- supervivencia
+	_game.worlds_done = [1, 2, 3]
+	for i in range(21, 31):
+		_mark_done(i)
+	_check(_game.start_mode("survival", 1), "supervivencia: disponible con 3 mundos")
+	lvl = await _load_level_mode(1)
+	await _frames(240)
+	_check(lvl.survival != null and lvl.survival.wave >= 1 and lvl.survival._alive.size() >= 3, "supervivencia: aparece la primera oleada (%d enemigos)" % lvl.survival._alive.size())
+	for e in lvl.survival._alive:
+		if is_instance_valid(e):
+			e.kill()
+	await _frames(240)
+	_check(lvl.survival.wave >= 2, "supervivencia: al vencer la oleada llega la siguiente (oleada %d)" % lvl.survival.wave)
+	lvl.player.hp = 1
+	lvl.player._invuln_t = 0.0
+	lvl.player.hurt(1, lvl.player.global_position.x + 5.0)
+	await _frames(110)
+	_check(lvl.finished and int(_prog.records.get("survival:1", 0)) >= 1, "supervivencia: se guarda el récord de oleadas (%d)" % int(_prog.records.get("survival:1", 0)))
+	await _free_level(lvl)
+	# --- desafío de jefes
+	_check(_game.start_mode("bossrush", 10), "desafío de jefes: disponible tras derrotar al jefe")
+	lvl = await _load_level_mode(10)
+	await _frames(40)
+	_check(lvl.player.hp == 2 and lvl.boss != null and lvl.boss.max_hp == 5, "desafío de jefes: 2 corazones y el jefe con su vida original (%d)" % lvl.boss.max_hp)
+	_check(lvl.fight_started, "desafío de jefes: el combate empieza en la arena")
+	lvl.boss._invuln_t = 0.0
+	lvl.boss.shielded = false
+	var hits_b: int = 0
+	while not lvl.boss.dead and hits_b < 20:
+		lvl.boss._invuln_t = 0.0
+		lvl.boss.hit_boss(1)
+		hits_b += 1
+		await _frames(2)
+	_check(lvl.boss.dead and hits_b == 5, "desafío de jefes: el jefe sigue necesitando %d golpes" % hits_b)
+	await _frames(100)
+	lvl.complete_level()
+	await _frames(160)
+	_check(_prog.is_done("boss", 1), "desafío de jefes: recompensa registrada")
+	await _free_level(lvl)
+	_check(_game.unlocked.size() == unlocked_before + 0 or _game.unlocked.size() >= unlocked_before, "los modos no han quitado nada del progreso")
+	_game.mode = "story"
+	_reset_game()
+	_prog.reset_all()
+
+
+func _load_level_mode(n: int):
+	## Como _load_level, pero sin tocar el modo ya fijado con Game.start_mode.
+	var lvl = _scene.instantiate()
+	lvl.redirect_on_block = false
+	root.add_child(lvl)
+	await process_frame
+	await _frames(5)
+	return lvl
+
+
+func _test_extras_ui() -> void:
+	print("Pantallas de extras: vestuario, logros, estadísticas y modos")
+	_reset_game()
+	_prog.reset_all()
+	_game.mode = "story"
+	# logros: se desbloquean con el progreso y dan cosméticos
+	_check(not _prog.achievements.has("first_chest"), "al empezar no hay logros")
+	_prog.open_chest(1, 99, "normal")
+	_check(_prog.achievements.has("first_chest") and _prog.has_cosmetic("hat", "gorra"), "el primer cofre desbloquea un logro y su sombrero")
+	_prog.stats["secrets"] = 1
+	_prog.check_achievements()
+	_check(_prog.achievements.has("secrets_1"), "descubrir un secreto da su logro")
+	var prev: int = _prog.cosmetics_owned()
+	for i in range(0, 12):
+		_prog.open_chest(5, 100 + i, "special")
+	_check(_prog.cosmetics_owned() > prev and _prog.special_gems >= 20, "los cofres especiales dan cosméticos y gemas (%d cosméticos)" % _prog.cosmetics_owned())
+	_check(_prog.achievements.has("chests_10"), "10 cofres abiertos dan el logro «Cazatesoros»")
+	# recompensa por mundo completado
+	var info: Dictionary = _prog.world_completed(2)
+	_check(_prog.has_cosmetic("hat", "minero"), "completar el mundo 2 da el casco de minero")
+	# pantalla de extras
+	var scene: PackedScene = load("res://ui/extras.tscn")
+	var ex = scene.instantiate()
+	root.add_child(ex)
+	await _frames(5)
+	for t in ["wardrobe", "achievements", "stats", "modes", "wardrobe"]:
+		ex._show_tab(t)
+		await _frames(4)
+	ex._cat = "hat"
+	ex._show_tab("wardrobe")
+	await _frames(4)
+	_check(ex._grid != null and ex._grid.get_child_count() >= 3, "el vestuario lista las piezas")
+	ex.queue_free()
+	await process_frame
+	# apariencia especial por logro
+	_check(not _prog.equip("skin", "dorado"), "la apariencia especial sigue bloqueada")
+	_prog.unlock_cosmetic("skin", "dorado")
+	_check(_prog.equip("skin", "dorado") and _prog.effective("hat") == "corona" and _prog.effective("suit") == "dorado", "la apariencia especial aporta sus piezas")
+	_prog.reset_all()
+	_reset_game()
+
+
+func _test_secret_variants() -> void:
+	print("Habitaciones secretas: puerta secreta y bóveda de ladrillos con orbe gigante")
+	_reset_game()
+	_prog.reset_all()
+	# puerta secreta
+	var nd: int = _level_having("D")
+	_check(nd > 0, "hay un nivel con puerta secreta (nivel %d)" % nd)
+	if nd > 0:
+		var l1 = await _load_level(nd)
+		var dc: Vector2i = _find_cell(l1, "D")
+		var s0: int = int(_prog.stats["secrets"])
+		l1.player.global_position = Vector2(dc.x * 16 + 8, dc.y * 16 + 8)
+		l1.player.velocity = Vector2.ZERO
+		await _frames(6)
+		_check(int(_prog.stats["secrets"]) == s0 + 1, "la puerta secreta se atraviesa y cuenta como secreto")
+		await _free_level(l1)
+	# bóveda: ladrillos que solo rompe el gigante (o el impulso) y marcador dentro
+	var nv: int = _level_having("x")
+	_check(nv > 0, "hay un nivel con bóveda sellada (nivel %d)" % nv)
+	if nv > 0:
+		_reset_game()
+		var l2 = await _load_level(nv)
+		var p = l2.player
+		var xc: Vector2i = _find_cell(l2, "x")
+		# el orbe gigante está cerca de la pared de ladrillos
+		var orbs: Array = l2.get_children().filter(func(n): return n.get_script() != null and str(n.get_script().resource_path).ends_with("orb.gd"))
+		_check(orbs.size() >= 1, "hay un orbe cerca de la bóveda")
+		var bricks: Array = l2.get_children().filter(func(n): return n is StaticBody2D and n.get("kind") == "brick" and absf(n.position.x - float(xc.x * 16)) < 110.0 and absf(n.position.y - float(xc.y * 16)) < 40.0)
+		_check(bricks.size() >= 2, "la entrada de la bóveda son ladrillos (%d)" % bricks.size())
+		var side: float = -1.0 if bricks[0].position.x > float(xc.x * 16) else 1.0
+		p.global_position = Vector2(bricks[0].position.x + side * 40.0, bricks[0].position.y)
+		p.velocity = Vector2.ZERO
+		p.grant_power("giant")
+		await _frames(4)
+		Input.action_press("move_left" if side > 0.0 else "move_right")
+		await _frames(70)
+		Input.action_release("move_left")
+		Input.action_release("move_right")
+		var left_b: int = bricks.filter(func(b): return is_instance_valid(b) and not b.is_queued_for_deletion()).size()
+		_check(left_b < bricks.size(), "el gigante rompe los ladrillos de la bóveda (%d -> %d)" % [bricks.size(), left_b])
+		await _free_level(l2)
 	_reset_game()
 
 

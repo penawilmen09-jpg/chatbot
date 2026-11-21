@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 13 (2-3): Mina Abandonada
 ; semilla de generacion: 6703 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                 ##########                                                                               ##############      #######            ##########################
                 ##########                                                                               ##############      #######             ########################
                 ##########                                                                               ##############      #######              ######################

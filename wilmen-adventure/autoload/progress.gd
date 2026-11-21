@@ -69,10 +69,11 @@ const ACHIEVEMENTS := {
 const POWERUPS := {
 	"flame": "Fuego", "freeze": "Hielo", "pulse": "Electricidad", "barrier": "Escudo protector", "giant": "Gigante",
 }
+const WORLD_VEHICLES := {1: "boat", 2: "cart", 3: "cart", 4: "boat", 5: "cart", 6: "flyer", 7: "cart", 8: "boat", 9: "mech", 10: "flyer"}
 const POWERUP_ORB_CHARS := {"e": "flame", "i": "freeze", "k": "pulse", "l": "barrier", "q": "giant"}
 
 ## Modos que se desbloquean con el progreso normal (mundos completados).
-const MODE_NEEDS := {"time": 1, "challenge": 2, "bonus": 1, "survival": 3, "bossrush": 4}
+const MODE_NEEDS := {"time": 1, "challenge": 2, "bonus": 1, "survival": 3, "bossrush": 1}
 const MODE_NAMES := {
 	"time": "Contrarreloj", "challenge": "Modo desafío", "bonus": "Niveles bonus", "survival": "Supervivencia",
 	"bossrush": "Desafío de jefes",
@@ -445,6 +446,11 @@ func world_completed(w: int) -> Dictionary:
 		pass
 	check_achievements()
 	return info
+
+
+func claim_chest(group: int, idx: int, kind: String) -> Dictionary:
+	## Cofre de recompensa de un modo (desafío, bonus, jefe, supervivencia): una sola vez por clave.
+	return open_chest(group, idx, kind)
 
 
 # ----------------------------------------------------------------- modos ---

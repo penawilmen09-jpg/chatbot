@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 66 (7-6): Cráter Rugiente
 ; semilla de generacion: 13646 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 2 habitaciones secretas ['door', 'cellar']
+; tesoros: 1 cofre visible, 2 habitaciones secretas ['door', 'cellar']; vehiculos: []
                                                                              ##############                                                                                                                                                                                              ########################
                                                                              ##############                                                                                                                                                                                               ######################
                                                                              ##############                                                                                                                                                                                                ####################

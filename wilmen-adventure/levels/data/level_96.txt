@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 96 (10-6): Fortaleza Dorada
 ; semilla de generacion: 17576 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 0 habitaciones secretas []
+; tesoros: 1 cofre visible, 0 habitaciones secretas []; vehiculos: []
                                                                                                                                                                                                                                       ##########                                   ##############
                                                                                                                                                                                                                                       ##########                                   ##############
                                                                                                                                                                                                                                       ##########                                   ##############

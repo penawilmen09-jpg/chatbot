@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 94 (10-4): Puente de Estrellas
 ; semilla de generacion: 17314 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                 #############
                                 #############
                                 #############

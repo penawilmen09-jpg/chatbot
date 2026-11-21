@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 86 (9-6): Línea de Montaje
 ; semilla de generacion: 16266 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 0 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 0 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                                                                                                                                                                                                                                                                          ###########      ################
                                                                                                                                                                                                                                                                                          ###########      ################
                                                                                                                                                                                                                                                                                          ###########      ################

@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 63 (7-3): Géiseres Ardientes
 ; semilla de generacion: 13253 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                                                                                                                                                                                                                                            ############
                                                                                                                                                                                                                                                            ############
                                                                                                                                                                                                                       ooooo                                ############

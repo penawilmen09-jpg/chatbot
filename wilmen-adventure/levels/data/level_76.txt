@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 76 (8-6): Cascada Oculta
 ; semilla de generacion: 14956 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                                                                                                                                              #############
                                                                                                                                                              #############
                                                                                                                                                              #############

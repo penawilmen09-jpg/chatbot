@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 50 (5-10): El Señor de las Sombras
 ; semilla de generacion: 11550 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 0 cofre visible, 0 habitaciones secretas []
+; tesoros: 0 cofre visible, 0 habitaciones secretas []; vehiculos: []
                                                                                              ############                                                              ##
                                                                                              ############                                                              ##
                                                                                              ############                                                              ##

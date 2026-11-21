@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 70 (7-10): Guarida del Dragón de Magma
 ; semilla de generacion: 14170 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 0 cofre visible, 0 habitaciones secretas []
+; tesoros: 0 cofre visible, 0 habitaciones secretas []; vehiculos: []
               ##########################                                                                      ##########                                                              ##
                ########################                                                                       ##########                                                              ##
                 ######################                                                                        ##########                                                              ##

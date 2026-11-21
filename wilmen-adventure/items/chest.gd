@@ -82,7 +82,14 @@ func open() -> void:
 	var n: int = level.number if level != null else 0
 	var info: Dictionary = Progress.open_chest(n, idx, kind)
 	_set_frame(true)
-	Audio.play_sfx("chest_" + kind if kind != "normal" else "chest_open")
+	var sfx_name: String = "chest_open"
+	if kind == "rare":
+		sfx_name = "chest_rare"
+	elif kind == "special":
+		sfx_name = "chest_special"
+	elif kind == "secret":
+		sfx_name = "chest_secret"
+	Audio.play_sfx(sfx_name)
 	var tw := create_tween()
 	tw.tween_property(_sprite, "scale", Vector2(1.3, 0.75), 0.08)
 	tw.tween_property(_sprite, "scale", Vector2(0.9, 1.25), 0.1)

@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 54 (6-4): Puente de Cuerdas
 ; semilla de generacion: 12074 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']
+; tesoros: 1 cofre visible, 1 habitaciones secretas ['cellar']; vehiculos: []
                                                                                                                                                                                                                                    #############
                                                                                                                                                                                                                                    #############
                                                                                                                                                                                                                                    #############

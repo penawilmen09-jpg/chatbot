@@ -1009,11 +1009,30 @@ def add_secrets(n, rows):
     for r in rows:
         if "G" in r:
             gate = r.index("G")
-    new, info = secrets_pass.apply(n, list(rows), w, i, gate)
+    # 1) vehículos y persecuciones (si el resultado no valida, el nivel queda sin ellos)
+    import vehicles_pass
+    def _ok(cand):
+        while len(cand) < R:
+            cand.append("")
+        return not validate(cand, n)
+
+    veh_rows, vehicles = vehicles_pass.apply(n, list(rows), w, i, geo.slab, gate, _ok)
+    while len(veh_rows) < R:
+        veh_rows.append("")
+    if vehicles and validate(veh_rows, n):
+        veh_rows, vehicles = list(rows), []
+    # 2) cofres y habitaciones secretas
+    base = veh_rows if vehicles else list(rows)
+    gate2 = None
+    for r in base:
+        if "G" in r:
+            gate2 = r.index("G")
+    new, info = secrets_pass.apply(n, list(base), w, i, gate2)
     while len(new) < R:
         new.append("")
     if validate(new, n):
-        return rows, {"visible": 0, "rooms": [], "styles": []}
+        new, info = base, {"visible": 0, "rooms": [], "styles": []}
+    info["vehicles"] = vehicles
     return new, info
 
 
@@ -1024,7 +1043,7 @@ def level_text(n, rows, seed, secrets_info=None):
         "; semilla de generacion: %d (edita este fichero a mano si quieres retocar el nivel)" % seed,
     ]
     if secrets_info:
-        head.append("; tesoros: %d cofre visible, %d habitaciones secretas %s" % (secrets_info["visible"], len(secrets_info["rooms"]), secrets_info["styles"]))
+        head.append("; tesoros: %d cofre visible, %d habitaciones secretas %s; vehiculos: %s" % (secrets_info["visible"], len(secrets_info["rooms"]), secrets_info["styles"], secrets_info.get("vehicles", [])))
     return "\n".join(head + rows) + "\n"
 
 
@@ -1070,6 +1089,89 @@ def generate(only_missing=True):
         print("nivel %3d  ancho %3d  intentos %2d  secretos %s" % (n, lv.w, attempt + 1, secrets_info))
 
 
+def build_bonus(w, seed):
+    """Nivel bonus del mundo w: recorrido corto y generoso (monedas dobles, 3 cofres, orbe gigante)."""
+    import secrets_pass
+    n = (w - 1) * 10 + 5
+    rows = None
+    for attempt in range(60):
+        lv, ctx = build_regular(n, seed + attempt, False)
+        base = lv.rows()
+        while len(base) < R:
+            base.append("")
+        if validate(base, n):
+            continue
+        g, width = secrets_pass._grid(base)
+        # monedas dobles: una moneda extra sobre cada moneda
+        for y in range(1, R):
+            for x in range(width):
+                if g[y][x] == "o" and g[y - 1][x] == " ":
+                    g[y - 1][x] = "o"
+        rnd = random.Random(seed + attempt)
+        for kind in ("N", "R", "E"):
+            secrets_pass._visible_chest(g, width, rnd, kind, width)
+        secrets_pass._visible_chest(g, width, rnd, "q", width)
+        out = secrets_pass._out(g)
+        while len(out) < R:
+            out.append("")
+        if not validate(out, n):
+            return out
+    raise SystemExit("bonus %d no válido" % w)
+
+
+def build_survival(w):
+    """Arena de supervivencia del mundo w (sin meta): suelo, muros laterales y plataformas."""
+    W = 70
+    lv = Lv(W)
+    for x in range(W):
+        for y in range(15, R):
+            lv.set(x, y, "#")
+    for y in range(3, 15):
+        for x in (0, 1, W - 2, W - 1):
+            lv.set(x, y, "#")
+    for (x0, x1, y) in ((12, 20, 11), (50, 58, 11), (28, 42, 8), (4, 9, 7), (61, 66, 7)):
+        for x in range(x0, x1):
+            lv.set(x, y, "=")
+    lv.set(35, 14, "P")
+    lv.set(20, 7, "h") if False else None
+    ctx = dict(rnd=random.Random(w * 77), gt=15, d=0.5, world=w, pool=[], gems=0, lava=False)
+    geo.scenery(lv, ctx, w, 1, W, protect_x=[35])
+    return lv.rows()
+
+
+def generate_modes():
+    for w in range(1, 11):
+        rows = build_bonus(w, 31000 + w * 101)
+        path = os.path.join(OUT, "bonus_%02d.txt" % w)
+        with open(path, "w", encoding="utf-8") as f:
+            f.write("; WILMEN ADVENTURE - nivel bonus del mundo %d (se desbloquea al derrotar al jefe)\n" % w + "\n".join(rows) + "\n")
+        sv = build_survival(w)
+        with open(os.path.join(OUT, "survival_%02d.txt" % w), "w", encoding="utf-8") as f:
+            f.write("; WILMEN ADVENTURE - arena de supervivencia del mundo %d\n" % w + "\n".join(sv) + "\n")
+    print("modos: 10 niveles bonus y 10 arenas de supervivencia")
+
+
+def check_modes():
+    bad = 0
+    for w in range(1, 11):
+        n = (w - 1) * 10 + 5
+        path = os.path.join(OUT, "bonus_%02d.txt" % w)
+        rows = [l.rstrip("\n") for l in open(path, encoding="utf-8") if not l.startswith(";")]
+        while len(rows) < R:
+            rows.append("")
+        errs = validate(rows, n)
+        if sum(r.count("N") + r.count("R") + r.count("E") for r in rows) < 3:
+            errs.append("faltan cofres")
+        if errs:
+            print("bonus %d: %s" % (w, errs))
+            bad += 1
+        sv = open(os.path.join(OUT, "survival_%02d.txt" % w), encoding="utf-8").read()
+        if sv.count("P") < 1:
+            print("supervivencia %d: sin inicio" % w)
+            bad += 1
+    return bad
+
+
 def check_only():
     bad = 0
     import hashlib
@@ -1085,6 +1187,7 @@ def check_only():
             print("nivel %3d: %s" % (n, errs))
             bad += 1
     bad += variety_check()
+    bad += check_modes()
     print("niveles revisados: 100 | con errores: %d" % bad)
     sys.exit(1 if bad else 0)
 
@@ -1136,4 +1239,5 @@ if __name__ == "__main__":
         check_only()
     else:
         generate(only_missing="--all" not in sys.argv)
+        generate_modes()
         check_only()

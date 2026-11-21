@@ -43,12 +43,13 @@ func _ready() -> void:
 	tw.tween_property(tbox, "position:y", 18.0, 1.1).set_trans(Tween.TRANS_SINE)
 
 	_menu = VBoxContainer.new()
-	_menu.position = Vector2(250, 112)
-	_menu.add_theme_constant_override("separation", 5)
+	_menu.position = Vector2(250, 92)
+	_menu.add_theme_constant_override("separation", 3)
 	add_child(_menu)
 	var has_progress: bool = Game.continue_level() > 1 or Game.levels.size() > 0
 	var first := _add_button("Continuar" if has_progress else "Jugar", _on_play)
 	_add_button("Mapa de niveles", func(): Transition.change_scene("res://ui/level_select.tscn"))
+	_add_button("Extras", func(): Transition.change_scene("res://ui/extras.tscn"))
 	_add_button("Opciones", _show_options)
 	_add_button("Salir", func(): get_tree().quit())
 	first.grab_focus()
@@ -56,7 +57,7 @@ func _ready() -> void:
 	var info := UiTheme.label("Niveles %d/100   Gemas %d/300   Puntos %d" % [Game.completed_count(), Game.total_gems(), Game.score], 10, Color("#ffffff"))
 	info.position = Vector2(8, 250)
 	add_child(info)
-	var ver := UiTheme.label("v2.0 - 100 niveles - sin anuncios", 9, Color("#cfc6ff"))
+	var ver := UiTheme.label("v2.1 - 100 niveles, tesoros y vehículos - sin anuncios", 9, Color("#cfc6ff"))
 	ver.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
 	ver.offset_left = -190
 	ver.offset_top = -18
@@ -80,7 +81,13 @@ func _notification(what: int) -> void:
 
 
 func _add_button(text: String, cb: Callable) -> Button:
-	var b := UiTheme.button(text, Vector2(200, 36))
+	var b := UiTheme.button(text, Vector2(200, 30))
+	b.add_theme_font_size_override("font_size", 14)
+	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var sb: StyleBoxFlat = theme.get_stylebox(st, "Button").duplicate()
+		sb.content_margin_top = 3
+		sb.content_margin_bottom = 3
+		b.add_theme_stylebox_override(st, sb)
 	b.pressed.connect(func():
 		Audio.play_sfx("select")
 		cb.call())

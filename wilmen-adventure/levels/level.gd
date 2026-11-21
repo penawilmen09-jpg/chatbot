@@ -22,11 +22,16 @@ const ChestScript := preload("res://items/chest.gd")
 const OrbScript := preload("res://items/orb.gd")
 const SpecialGemScript := preload("res://items/special_gem.gd")
 const SecretWallScript := preload("res://items/secret_wall.gd")
+const SurvivalScript := preload("res://levels/survival.gd")
+const VehicleScript := preload("res://items/vehicle.gd")
+const ChaserScript := preload("res://items/chaser.gd")
 const HudScript := preload("res://ui/hud.gd")
 const UiTheme := preload("res://ui/ui_theme.gd")
 const CHUNK_COLS := 24
 
 var number: int = 1
+var mode: String = "story"
+var elapsed: float = 0.0  # segundos jugados en este intento (contrarreloj y misión de tiempo)
 var world: int = 1
 var is_boss: bool = false
 var slippery: bool = false
@@ -66,22 +71,28 @@ var hit_taken: bool = false  # el jugador ha perdido corazones en este nivel (mi
 var _chest_counter: int = 0
 var _sgem_counter: int = 0
 var _secret_counter: int = 0
+var survival = null
+var _stations: Array = []  # celdas 'y': estación donde acaba cada tramo de vehículo o persecución
+var _vehicles: Array = []
+var _chase_triggers: Array = []
 var _coin_combo_t: float = 0.0
 
 
 func _ready() -> void:
 	number = Game.current_level
+	mode = Game.mode
 	# Validación de desbloqueo también al cargar la escena directamente (no solo en el menú).
-	if not Game.is_unlocked(number):
+	if not Game.mode_allowed(mode, number):
 		blocked = true
-		push_warning("Intento de cargar el nivel %d bloqueado: se vuelve al mapa." % number)
+		push_warning("Intento de cargar el nivel %d (%s) bloqueado: se vuelve al mapa." % [number, mode])
 		if redirect_on_block:
-			Transition.change_scene("res://ui/level_select.tscn")
+			Transition.change_scene("res://ui/level_select.tscn" if mode == "story" else "res://ui/extras.tscn")
 		return
 	world = Game.world_of(number)
-	is_boss = Game.is_boss_level(number)
+	is_boss = Game.is_boss_level(number) and mode != "bonus" and mode != "survival"
 	slippery = world == 4
 	Game.begin_level(number)
+	Engine.set_meta("in_level", true)
 	_load_rows()
 	_tileset = load("res://assets/tiles/tiles_w%d.png" % world)
 	_build_background()
@@ -90,12 +101,23 @@ func _ready() -> void:
 	_spawn_player()
 	_build_hud()
 	Audio.play_music(Game.music_for_level(number))
-	hud.show_intro(Game.level_title(number), Game.WORLD_NAMES[world - 1])
+	hud.show_intro(_title(), Game.WORLD_NAMES[world - 1])
+	_start_mode()
+
+
+func _exit_tree() -> void:
+	Engine.set_meta("in_level", false)
+
+
+func _title() -> String:
+	if mode == "story":
+		return Game.level_title(number)
+	return "%s: %s" % [Progress.MODE_NAMES.get(mode, mode), Game.WORLD_NAMES[world - 1]] if mode in ["bonus", "survival", "bossrush"] else "%s  %s" % [Progress.MODE_NAMES.get(mode, mode), Game.level_title(number)]
 
 
 # ------------------------------------------------------------- carga ------
 func _load_rows() -> void:
-	var f := FileAccess.open(Game.level_path(number), FileAccess.READ)
+	var f := FileAccess.open(Game.level_file(number), FileAccess.READ)
 	if f == null:
 		push_error("No se pudo abrir el nivel %d" % number)
 		rows = [" "]
@@ -393,8 +415,65 @@ func _spawn_entities() -> void:
 					add_child(orb)
 				"x":
 					_make_secret_marker(x, y)
+				"y":
+					_stations.append(Vector2i(x, y))
+				"V":
+					var vh = VehicleScript.new()
+					vh.kind = Progress.WORLD_VEHICLES[world]
+					vh.level = self
+					vh.position = Vector2(x * TILE + 8, y * TILE + 16 - 12)
+					add_child(vh)
+					_vehicles.append(vh)
+				"r":
+					_chase_triggers.append(Vector2i(x, y))
 	respawn_pos = spawn_pos
 	_build_secret_walls()
+	_link_stations()
+
+
+func _station_after(px: float) -> Vector2i:
+	var best := Vector2i(-1, -1)
+	for st in _stations:
+		if st.x * TILE > px and (best.x < 0 or st.x < best.x):
+			best = st
+	return best
+
+
+func _link_stations() -> void:
+	## Cada vehículo y cada persecución acaba en la primera estación 'y' que tiene a su derecha.
+	for vh in _vehicles:
+		var st: Vector2i = _station_after(vh.position.x)
+		if st.x >= 0:
+			vh.end_x = st.x * TILE + 8.0
+			vh.end_y = st.y * TILE + 16.0
+	for tr in _chase_triggers:
+		var a := Area2D.new()
+		a.collision_layer = 0
+		a.collision_mask = 2
+		a.position = Vector2(tr.x * TILE + 8, tr.y * TILE + 8)
+		var cs := CollisionShape2D.new()
+		var rs := RectangleShape2D.new()
+		rs.size = Vector2(16, 64)
+		cs.shape = rs
+		a.add_child(cs)
+		add_child(a)
+		var st2: Vector2i = _station_after(a.position.x)
+		var end_px: float = st2.x * TILE + 8.0 if st2.x >= 0 else INF
+		var state := {"chaser": null}
+		a.body_entered.connect(func(b):
+			if not b.is_in_group("player"):
+				return
+			var cur = state["chaser"]
+			if cur != null and is_instance_valid(cur):
+				return
+			var ch = ChaserScript.new()
+			ch.level = self
+			ch.end_x = end_px
+			ch.position = Vector2(a.position.x - 260.0, a.position.y - 2.0)
+			add_child(ch)
+			state["chaser"] = ch
+			popup("¡CORRE!", b.global_position + Vector2(0, -30))
+			Audio.play_sfx("boss_roar"))
 
 
 func _make_secret_marker(x: int, y: int) -> void:
@@ -521,6 +600,7 @@ func _build_hud() -> void:
 func _physics_process(delta: float) -> void:
 	if blocked or player == null or player.dead or finished:
 		return
+	elapsed += delta
 	_coin_combo_t = maxf(0.0, _coin_combo_t - delta)
 	if _coin_combo_t <= 0.0:
 		_coin_combo = 0
@@ -540,12 +620,26 @@ func _on_player_died() -> void:
 	if _dying or finished:
 		return
 	_dying = true
-	Game.lose_life()
+	Progress.stats["deaths"] = int(Progress.stats["deaths"]) + 1
+	if mode == "story":
+		Game.lose_life()
 	await get_tree().create_timer(1.4, false).timeout
 	_dying = false
 	if finished:
 		return
-	if Game.lives <= 0:
+	if mode == "challenge" or mode == "bossrush" or mode == "survival":
+		# estos modos son de un solo intento: no se pierden vidas de la historia
+		finished = true
+		Audio.play_music("defeat", false, 0.3)
+		Audio.play_sfx("gameover")
+		var extra: Dictionary = {}
+		if mode == "survival" and survival != null:
+			extra = survival.finish()
+			for r in extra.get("rewards", []):
+				show_reward(r, player.global_position)
+		hud.show_mode_fail(mode, extra)
+		return
+	if mode == "story" and Game.lives <= 0:
 		finished = true
 		Audio.play_music("defeat", false, 0.3)
 		Audio.play_sfx("gameover")
@@ -555,6 +649,9 @@ func _on_player_died() -> void:
 
 
 func _respawn() -> void:
+	for c in get_children():
+		if c.get_script() == ChaserScript:
+			c.queue_free()  # la persecución se reinicia al pasar otra vez por su inicio
 	if is_boss and fight_started and boss != null and is_instance_valid(boss) and not boss.dead:
 		_reset_boss_fight()
 	player.respawn(respawn_pos)
@@ -660,11 +757,16 @@ func complete_level() -> void:
 	finished = true
 	player.celebrate()
 	Audio.play_sfx("goal")
+	if mode != "story":
+		await _complete_mode()
+		return
 	var bonus: int = 1000 + player.hp * 100
 	Game.add_score(bonus)
 	var level_score: int = Game.score - Game.score_at_level_start
 	# Solo aquí (al llegar a la meta) se marca el nivel como completado y se desbloquea el siguiente.
 	var reward: Dictionary = Game.register_complete(number, gems, level_score)
+	var missions_new: Array = Progress.level_completed(number, {"hit": hit_taken, "gems": gems})
+	var tinfo: Dictionary = Progress.record_time(number, elapsed, cols)
 	if reward.is_empty():
 		Audio.play_music("victory", false, 0.3)
 		popup("¡Nivel completado!", player.global_position + Vector2(0, -34))
@@ -683,7 +785,68 @@ func complete_level() -> void:
 		"bonus": bonus,
 		"hp": player.hp,
 		"reward": reward,
+		"missions": Progress.mission_record(number),
+		"missions_new": missions_new,
+		"time": elapsed,
+		"medal": str(tinfo.get("medal", "")),
+		"secrets": Progress.secrets_in_level(number),
 	})
+
+
+func _complete_mode() -> void:
+	## Final de un modo extra (contrarreloj, desafío, bonus, desafío de jefe): no toca el progreso de la historia.
+	var info: Dictionary = {"mode": mode, "time": elapsed, "coins": coins_level}
+	var rewards: Array = []
+	match mode:
+		"time":
+			var t: Dictionary = Progress.record_time(number, elapsed, cols)
+			info["medal"] = str(t.get("medal", ""))
+			info["best"] = float(t.get("best", elapsed))
+			info["better"] = bool(t.get("better", false))
+		"challenge":
+			if Progress.mark_done("challenge", number):
+				var r1: Dictionary = Progress.claim_chest(1000 + number, 0, "special")
+				if not r1.is_empty():
+					rewards.append(r1)
+			info["first"] = rewards.size() > 0
+		"bonus":
+			if Progress.mark_done("bonus", world):
+				for k in [[0, "rare"], [1, "normal"]]:
+					var r2: Dictionary = Progress.claim_chest(2000 + world, int(k[0]), str(k[1]))
+					if not r2.is_empty():
+						rewards.append(r2)
+			info["first"] = rewards.size() > 0
+		"bossrush":
+			if Progress.mark_done("boss", world):
+				var r3: Dictionary = Progress.claim_chest(3000 + world, 0, "special")
+				if not r3.is_empty():
+					rewards.append(r3)
+			info["first"] = rewards.size() > 0
+	info["rewards"] = rewards
+	Audio.play_music("victory", false, 0.3)
+	popup("¡%s superado!" % Progress.MODE_NAMES.get(mode, mode), player.global_position + Vector2(0, -34))
+	for r in rewards:
+		show_reward(r, player.global_position)
+	await get_tree().create_timer(1.8, false).timeout
+	hud.show_mode_result(info)
+
+
+func _start_mode() -> void:
+	match mode:
+		"challenge":
+			player.hp = 1
+			hud.set_hp(1, player.max_hp)
+		"bossrush":
+			player.hp = 2
+			hud.set_hp(2, player.max_hp)
+			if gate_x >= 0.0:
+				player.position = Vector2(gate_x + 8.0, boss_home_y)
+				respawn_pos = player.position
+				camera.reset_smoothing()
+		"survival":
+			survival = SurvivalScript.new()
+			survival.level = self
+			add_child(survival)
 
 
 # ------------------------------------------------------- utilidades -------
@@ -745,7 +908,9 @@ func restart_level() -> void:
 func go_menu() -> void:
 	get_tree().paused = false
 	Game.save_game()
-	Transition.change_scene("res://ui/level_select.tscn")
+	var back: String = "res://ui/level_select.tscn" if mode == "story" else "res://ui/extras.tscn"
+	Game.mode = "story"
+	Transition.change_scene(back)
 
 
 func next_level() -> void:

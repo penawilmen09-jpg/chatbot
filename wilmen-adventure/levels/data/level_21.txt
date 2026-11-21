@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 21 (3-1): Dunas Doradas
 ; semilla de generacion: 7751 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 1 cofre visible, 0 habitaciones secretas []
+; tesoros: 1 cofre visible, 0 habitaciones secretas []; vehiculos: []
                                                                                                                             ###########
                                                                                                                             ###########
                                                                                                                             ###########

@@ -1,6 +1,6 @@
 ; WILMEN ADVENTURE - nivel 61 (7-1): Falda del Volcán
 ; semilla de generacion: 12991 (edita este fichero a mano si quieres retocar el nivel)
-; tesoros: 0 cofre visible, 1 habitaciones secretas ['vault']
+; tesoros: 0 cofre visible, 1 habitaciones secretas ['vault']; vehiculos: []
                                                                                        ##########
                                                                                        ##########
                                                                        ooooo           ##########                                                                                                                         ooooo

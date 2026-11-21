@@ -21,6 +21,12 @@ var _boss_name: Label
 var _boss_fill: ColorRect
 var _overlay: Control = null
 var _intro: Control = null
+var _timer_label: Label
+var _power_label: Label
+var _mode_label: Label
+var _toast_box: PanelContainer = null
+var _toast_tw: Tween = null
+var _last_power: String = ""
 const BOSS_BAR_W := 200.0
 
 
@@ -35,8 +41,10 @@ func _ready() -> void:
 	_build_top()
 	_build_boss_bar()
 	_build_touch()
+	_build_extra_labels()
 	Game.stats_changed.connect(_refresh)
 	Game.settings_changed.connect(_apply_touch_visibility)
+	Progress.achievement_unlocked.connect(_on_achievement)
 	_refresh()
 
 
@@ -58,6 +66,114 @@ func _process(_delta: float) -> void:
 	if p.skill_cd_max > 0.0:
 		ratio = clampf(p.skill_cd / p.skill_cd_max, 0.0, 1.0)
 	_skill_btn.set_cooldown(ratio)
+	if p.power != _last_power:
+		# el botón muestra el poder activo (también los temporales de fuego, hielo y electricidad)
+		_last_power = p.power
+		var pi: int = Game.POWERS.find(p.power)
+		if pi >= 0:
+			_skill_btn.icon_tex = UiTheme.icon(UiTheme.ICON_POWER_BASE + pi)
+			_skill_btn.queue_redraw()
+	_timer_label.text = _fmt_time(level.elapsed)
+	var pl: String = p.power_label()
+	if pl != "":
+		_power_label.text = "%s  %ds" % [pl, int(ceil(p.power_timer()))] if p.power_timer() > 0.0 and not (p.barrier and p.temp_power == "" and p.giant_t <= 0.0) else pl
+		_power_label.visible = true
+	else:
+		_power_label.visible = false
+
+
+func _fmt_time(sec: float) -> String:
+	var t: int = int(sec)
+	return "%d:%02d" % [t / 60, t % 60]
+
+
+func _build_extra_labels() -> void:
+	## Cronómetro, poder temporal activo y nombre del modo (todo bajo la puntuación).
+	var box := VBoxContainer.new()
+	box.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	box.offset_left = -90
+	box.offset_right = 90
+	box.offset_top = 24
+	box.add_theme_constant_override("separation", 0)
+	box.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(box)
+	_timer_label = UiTheme.label("0:00", 10, Color("#cfc6ff"))
+	_timer_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(_timer_label)
+	_power_label = UiTheme.label("", 10, Color("#8affb0"))
+	_power_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_power_label.visible = false
+	box.add_child(_power_label)
+	_mode_label = UiTheme.label("", 10, Color("#ffd23a"))
+	_mode_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	box.add_child(_mode_label)
+	if level != null and level.mode != "story":
+		_mode_label.text = str(Progress.MODE_NAMES.get(level.mode, level.mode))
+
+
+func set_mode_label(text: String) -> void:
+	_mode_label.text = text
+
+
+func _on_achievement(id: String) -> void:
+	var a: Array = Progress.ACHIEVEMENTS.get(id, [])
+	if a.is_empty():
+		return
+	Audio.play_sfx("achievement")
+	var lines: Array = ["¡Logro desbloqueado!", str(a[0])]
+	var rw: Array = a[4]
+	if not rw.is_empty():
+		lines.append("Premio: %s" % Progress.cosmetic_name(str(rw[0]), str(rw[1])))
+	_toast(lines, Color("#ffd23a"))
+
+
+func show_reward(info: Dictionary) -> void:
+	## Banner de botín al abrir un cofre.
+	var titles := {"normal": "Cofre", "rare": "Cofre raro", "special": "Cofre especial", "secret": "¡COFRE SECRETO!"}
+	var cols := {"normal": Color("#ffe97a"), "rare": Color("#9ad4ff"), "special": Color("#e08aff"), "secret": Color("#ff7a8a")}
+	var kind: String = str(info.get("kind", "normal"))
+	var lines: Array = [str(titles.get(kind, "Tesoro"))]
+	if int(info.get("coins", 0)) > 0:
+		lines.append("+%d monedas" % int(info["coins"]))
+	if int(info.get("gems", 0)) > 0:
+		lines.append("+%d gemas especiales" % int(info["gems"]))
+	if info.has("cosmetic") and bool(info["cosmetic"].get("new", false)):
+		lines.append("Nuevo: %s" % Progress.cosmetic_name(str(info["cosmetic"]["cat"]), str(info["cosmetic"]["id"])))
+	if info.has("power"):
+		lines.append("Poder: %s" % str(Progress.POWERUPS.get(str(info["power"]), info["power"])))
+	_toast(lines, cols.get(kind, Color.WHITE))
+
+
+func _toast(lines: Array, color: Color, seconds: float = 2.6) -> void:
+	if _toast_box != null:
+		_toast_box.queue_free()
+	if _toast_tw != null and _toast_tw.is_valid():
+		_toast_tw.kill()
+	var pc := PanelContainer.new()
+	pc.process_mode = Node.PROCESS_MODE_ALWAYS
+	pc.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var v := VBoxContainer.new()
+	v.add_theme_constant_override("separation", 0)
+	pc.add_child(v)
+	for i in range(lines.size()):
+		var l := UiTheme.label(str(lines[i]), 12 if i == 0 else 10, color if i == 0 else Color.WHITE)
+		l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(l)
+	pc.set_anchors_preset(Control.PRESET_CENTER_TOP)
+	pc.position = Vector2(0, 64)
+	_root.add_child(pc)
+	_toast_box = pc
+	await get_tree().process_frame
+	if not is_instance_valid(pc):
+		return
+	pc.position.x = (_root.size.x - pc.size.x) * 0.5
+	pc.position.y = 40
+	pc.modulate.a = 0.0
+	_toast_tw = create_tween()
+	_toast_tw.tween_property(pc, "modulate:a", 1.0, 0.18)
+	_toast_tw.tween_interval(seconds)
+	_toast_tw.tween_property(pc, "modulate:a", 0.0, 0.4)
+	_toast_tw.tween_callback(pc.queue_free)
 
 
 # ----------------------------------------------------------- construcción -
@@ -357,14 +473,32 @@ func show_result(info: Dictionary) -> void:
 		g.modulate = Color.WHITE if info["gems"][i] else Color(0.25, 0.25, 0.3, 0.8)
 		gem_row.add_child(g)
 	left.add_child(gem_row)
+	var ms: Dictionary = info.get("missions", {})
+	var mrow := HBoxContainer.new()
+	mrow.alignment = BoxContainer.ALIGNMENT_CENTER
+	mrow.add_theme_constant_override("separation", 6)
+	for pair in [["nohit", "Sin daño"], ["gems", "3 gemas"], ["time", "Rápido"]]:
+		var done_m: bool = bool(ms.get(pair[0], false))
+		var ml := UiTheme.label(("✔ " if done_m else "· ") + str(pair[1]), 9, Color("#8affb0") if done_m else Color("#8a84a8"))
+		mrow.add_child(ml)
+	left.add_child(mrow)
+	var tsec: int = int(info.get("time", 0.0))
+	var medal_names := {"gold": "oro", "silver": "plata", "bronze": "bronce"}
+	var tline: String = "Tiempo %d:%02d" % [tsec / 60, tsec % 60]
+	if str(info.get("medal", "")) != "":
+		tline += " (%s)" % medal_names.get(str(info["medal"]), "")
+	if int(info.get("secrets", 0)) > 0:
+		tline += "  Secretos: %d" % int(info["secrets"])
 	var lines: Array = [
-		"Monedas: %d" % int(info["coins"]),
-		"Bonus: +%d" % int(info["bonus"]),
-		"Puntos del nivel: %d" % int(info["score"]),
-		"Puntos totales: %d" % Game.score,
+		"Monedas %d   Bonus +%d" % [int(info["coins"]), int(info["bonus"])],
+		"Puntos %d  (total %d)" % [int(info["score"]), Game.score],
+		tline,
 	]
 	if not reward.is_empty():
 		lines.append("Recompensa: +%d vidas, +%d puntos" % [int(reward["lives"]), int(reward["score"])])
+		var cr: Dictionary = reward.get("cosmetic", {})
+		if bool(cr.get("new", false)):
+			lines.append("¡Nuevo: %s!" % Progress.cosmetic_name(str(cr["cat"]), str(cr["id"])))
 	if Game.last_unlocked_level > 0:
 		lines.append("¡Nivel %d desbloqueado!" % Game.last_unlocked_level)
 	for line in lines:
@@ -376,6 +510,40 @@ func show_result(info: Dictionary) -> void:
 	var first := _menu_button(right, "Siguiente nivel" if n < Game.LEVEL_COUNT else "¡Final!", func(): level.next_level(), 150.0)
 	_menu_button(right, "Repetir nivel", func(): level.restart_level(), 150.0)
 	_menu_button(right, "Mapa de niveles", func(): level.go_menu(), 150.0)
+	first.grab_focus()
+
+
+func show_mode_result(info: Dictionary) -> void:
+	var m: String = str(info.get("mode", ""))
+	var v := _make_overlay("¡%s SUPERADO!" % str(Progress.MODE_NAMES.get(m, "MODO")).to_upper(), Color("#ffe97a"))
+	var tsec: int = int(info.get("time", 0.0))
+	var l1 := UiTheme.label("Tiempo %d:%02d" % [tsec / 60, tsec % 60], 12)
+	l1.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(l1)
+	if m == "time":
+		var medal_names := {"gold": "ORO", "silver": "PLATA", "bronze": "BRONCE", "": "sin medalla"}
+		var l2 := UiTheme.label("Medalla: %s   Mejor: %.1f s%s" % [medal_names.get(str(info.get("medal", "")), ""), float(info.get("best", 0.0)), "  ¡Nuevo récord!" if bool(info.get("better", false)) else ""], 11, Color("#8affb0"))
+		l2.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(l2)
+	elif bool(info.get("first", false)):
+		var l3 := UiTheme.label("¡Recompensa conseguida! (monedas, gemas y más)", 11, Color("#8affb0"))
+		l3.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(l3)
+	var first := _menu_button(v, "Repetir", func(): level.restart_level())
+	_menu_button(v, "Volver a Extras", func(): level.go_menu())
+	first.grab_focus()
+
+
+func show_mode_fail(m: String, info: Dictionary) -> void:
+	var v := _make_overlay("FIN DEL INTENTO", Color("#ff8a8a"))
+	var text := "No se pierden vidas de la historia. ¡Inténtalo de nuevo!"
+	if m == "survival":
+		text = "Oleadas superadas: %d   Récord del mundo: %d%s" % [int(info.get("waves", 0)), int(info.get("best", 0)), "  ¡NUEVO!" if bool(info.get("new_best", false)) else ""]
+	var l := UiTheme.label(text, 11)
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	v.add_child(l)
+	var first := _menu_button(v, "Reintentar", func(): level.restart_level())
+	_menu_button(v, "Volver a Extras", func(): level.go_menu())
 	first.grab_focus()
 
 

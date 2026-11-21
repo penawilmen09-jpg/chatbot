@@ -141,3 +141,26 @@ no una simulación exacta; la comprobación definitiva es jugar cada nivel.
 - **Franja negra**: el parallax no cubría el viewport ampliado (`expand`) y `Camera2D.offset` saltaba los límites; ver `levels/parallax_bg.gd`.
 - **Pruebas** (CI): `tests/smoke_test.gd`, `tests/persist_*.gd`, `tests/flow_test.gd`, `tests/render_test.gd` (11 resoluciones, rotación, redimensionado en vivo).
 - **Compilaciones**: APK (pruebas) y AAB (Google Play) como artefactos de GitHub Actions; la clave de firma de prueba está en `android/`.
+
+## Gran expansión (v2.1)
+
+Todo se consigue jugando; no hay compras ni anuncios y funciona sin Internet. El progreso nuevo vive en la clave `ext`
+del mismo guardado (`autoload/progress.gd`); una partida anterior (sin `ext`) carga intacta y se amplía sola.
+
+- **Tesoros**: cofres normal / raro / especial / secreto (`N R E Z` en los niveles), gemas especiales (`J`), botín
+  guardado por nivel y número (`Progress.treasures`). Un cofre abierto no vuelve a dar nada.
+- **Habitaciones secretas** (`tools/secrets_pass.py`): paredes falsas (`Y`), puertas secretas (`D`), bóvedas selladas con
+  ladrillos (`B`) cuya llave es un orbe gigante, y sótanos con trampilla. Se descubren al atravesarlas y se guardan.
+- **Poderes temporales** (orbes `e i k l q`, cofres): Fuego, Hielo, Electricidad (con relámpagos entre enemigos), Escudo
+  protector (resiste un golpe) y Gigante (más grande y fuerte; daña al jefe una sola vez por transformación).
+  Cada uno con sonido, aura y efecto propios.
+- **Vehículos** (`V` + estación `y`): carrito minero, barco, plataforma voladora y mecha (`items/vehicle.gd`), con los
+  mismos botones táctiles; y **persecuciones** (`r` + `y`, `items/chaser.gd`). Todos los tramos se pueden cruzar a pie.
+- **Personalización**: 8 trajes, 10 sombreros, 5 armaduras, 6 efectos y 3 apariencias especiales (`Extras > Vestuario`).
+- **Misiones y logros**: sin daño, 3 gemas y contrarreloj por nivel; 25 logros; pantalla de estadísticas.
+- **Modos** (`Extras > Modos`, se abren con el progreso): contrarreloj, desafío (1 corazón), niveles bonus, supervivencia
+  por oleadas y desafío de jefes (la vida del jefe no cambia). No tocan el progreso de la historia.
+- **Recompensas por mundo completado**: un cosmético especial por cada mundo (`Progress.WORLD_COSMETICS`).
+
+Herramientas: `gen_expansion.py` (arte), `gen_sfx2.py` (sonidos), `secrets_pass.py` / `vehicles_pass.py` (niveles).
+Pruebas rápidas: `godot --headless --script res://tests/smoke_test.gd -- --exp` y `-- --exp2`.

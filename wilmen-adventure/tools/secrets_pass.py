@@ -195,4 +195,9 @@ def apply(n, rows, world, idx, gate_x=None):
             continue
     if vis and _visible_chest(g, w, rnd, vis, xmax):
         summary["visible"] = 1
+    # orbe de poder temporal (fuego, hielo, electricidad, escudo protector o gigante) a mitad de camino
+    if idx != 10 and rnd.random() < 0.55:
+        orb = rnd.choice(["e", "i", "k", "l", "q"])
+        if _visible_chest(g, w, rnd, orb, xmax):
+            summary["orb"] = orb
     return _out(g), summary
