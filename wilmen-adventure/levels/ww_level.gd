@@ -259,7 +259,7 @@ func _spawn_mechanics() -> void:
 	for r in _runs("-"):
 		var ph = PhaseScript.new()
 		ph.cells = int(r["w"])
-		ph.offset = float(int(r["x"]) % 7) * 0.55
+		ph.offset = float(int(r["x"]) % 7) * 0.9
 		ph.position = Vector2(int(r["x"]) * TILE + 8, int(r["y"]) * TILE + 8)
 		add_child(ph)
 	for r in _runs("_"):
@@ -416,6 +416,8 @@ func _on_player_died() -> void:
 		return
 	_dying = true
 	Game.lose_life()
+	if number == WW.LAB:
+		Game.lives = maxi(Game.lives, 3)  # el taller no gasta vidas
 	await get_tree().create_timer(1.4, false).timeout
 	_dying = false
 	if finished:

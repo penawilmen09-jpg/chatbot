@@ -90,7 +90,7 @@ func _physics_process(delta: float) -> void:
 func _release(v: Vector2, jumped: bool) -> void:
 	var p = rider
 	rider = null
-	_cool = 0.5
+	_cool = 0.9
 	if p != null and is_instance_valid(p):
 		if p.vehicle == self:
 			p.vehicle = null

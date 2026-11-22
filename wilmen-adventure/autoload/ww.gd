@@ -11,6 +11,7 @@ const SAVE_VERSION := 2
 const REGION_COUNT := 6
 const LEVELS_PER_REGION := 20
 const LEVEL_COUNT := 120
+const LAB := 950  # Taller de mecánicas (nivel de pruebas, no cuenta para el progreso ni se guarda)
 const START_LIVES := 5
 const REGION_NAMES := ["Bosque Esmeralda", "Desierto Dorado", "Reino Volcánico", "Reino Congelado", "Océano Perdido",
 	"Reino de las Sombras"]
@@ -227,7 +228,7 @@ func level_path(n: int) -> String:
 
 
 func has_level(n: int) -> bool:
-	return n >= 1 and n <= LEVEL_COUNT and FileAccess.file_exists(level_path(n))
+	return ((n >= 1 and n <= LEVEL_COUNT) or n == LAB) and FileAccess.file_exists(level_path(n))
 
 
 func available_levels() -> Array:
@@ -244,6 +245,7 @@ func start_level(n: int) -> bool:
 		push_warning("Nivel %d de WILMEN WORLD no disponible." % n)
 		return false
 	current_level = n
+	_lab_rec = {}
 	return true
 
 
@@ -312,11 +314,24 @@ func level_info(n: int) -> Dictionary:
 	return d["meta"]
 
 
+var _lab_rec: Dictionary = {}
+
+
+func _blank_rec() -> Dictionary:
+	return {"done": false, "gems": [false, false, false], "best_time": 0.0, "best_left": 0.0, "keys_taken": [], "opened": [], "secret": false}
+
+
 func record(n: int) -> Dictionary:
+	if n == LAB:
+		if _lab_rec.is_empty():
+			_lab_rec = _blank_rec()
+		return _lab_rec
 	return levels.get(str(n), {"done": false, "gems": [false, false, false], "best_time": 0.0, "best_left": 0.0, "keys_taken": [], "opened": [], "secret": false})
 
 
 func _rec_for_write(n: int) -> Dictionary:
+	if n == LAB:
+		return record(n)
 	if not levels.has(str(n)):
 		levels[str(n)] = {"done": false, "gems": [false, false, false], "best_time": 0.0, "best_left": 0.0, "keys_taken": [], "opened": [], "secret": false}
 	return levels[str(n)]
@@ -332,6 +347,8 @@ func gems_in(n: int) -> int:
 
 func register_complete(n: int, gem_flags: Array, elapsed: float, time_left: float, secret_exit: bool = false) -> Dictionary:
 	## Al llegar a la meta. Devuelve {"first": bool, "new_best": bool}. Repetir un nivel fusiona gemas y mejora el récord.
+	if n == LAB:
+		return {"first": false, "new_best": false, "secret": secret_exit}
 	var rec: Dictionary = _rec_for_write(n)
 	var first: bool = not bool(rec["done"])
 	rec["done"] = true
@@ -359,6 +376,8 @@ func take_key(n: int, id: String) -> bool:
 	if key_taken(n, id):
 		return false
 	_rec_for_write(n)["keys_taken"].append(id)
+	if n == LAB:
+		return true
 	keys[KEY_TYPE] = int(keys.get(KEY_TYPE, 0)) + 1
 	changed.emit()
 	return true
@@ -389,7 +408,7 @@ func mark_open(n: int, id: String) -> void:
 # ------------------------------------------------- cartera del nivel -----
 func harvest() -> void:
 	## Pasa a la partida de WILMEN WORLD lo ganado en el nivel (vidas, monedas y puntos) y la guarda.
-	if not Game.world_active():
+	if not Game.world_active() or current_level == LAB:
 		return
 	lives = maxi(1, Game.lives)
 	coins = maxi(0, Game.coins)

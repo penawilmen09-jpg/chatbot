@@ -2784,7 +2784,7 @@ func _test_ww_mech_phase_bridge() -> void:
 		await physics_frame
 		seen_solid = seen_solid or not ph._cs.disabled
 		seen_ghost = seen_ghost or ph._cs.disabled
-		warned = warned or (ph.solid and ph._t > 0 and fposmod(ph._t, 3.6) > 2.0)
+		warned = warned or (ph.solid and ph._t > 0 and fposmod(ph._t, 4.8) > 2.0)
 	_check(seen_solid and seen_ghost and warned, "alterna: sólida, parpadeo de aviso y oculta (sin colisión)")
 	# el jugador de pie sobre ella cae cuando desaparece
 	ph._t = 0.0
@@ -3109,6 +3109,277 @@ func _test_ww_tall_level() -> void:
 	await _frames(3)
 
 
+func _lab_open():
+	_ww.test_text = ""
+	_ww.start_level(_ww.LAB)
+	var lvl = load("res://levels/ww_level.tscn").instantiate()
+	root.add_child(lvl)
+	await process_frame
+	await _frames(4)
+	if is_instance_valid(lvl.hud._intro):
+		lvl.hud._intro.queue_free()
+		lvl.hud._intro = null
+	lvl.player._invuln_t = 0.0
+	return lvl
+
+
+func _lab_put(lvl, cx: float, cy: int) -> void:
+	## Coloca al jugador de pie sobre la celda (columna cx, fila cy) y espera a que se pose.
+	lvl.player.global_position = Vector2(cx * 16.0 + 8.0, cy * 16.0)
+	lvl.player.velocity = Vector2.ZERO
+	lvl.player.vehicle = null
+	await _frames(6)
+
+
+func _hold(action: String, frames: int, stop: Callable = Callable()) -> bool:
+	## Mantiene una acción pulsada durante `frames` fotogramas de física (o hasta que `stop` devuelva true).
+	for i in range(frames):
+		Input.action_press(action)
+		await physics_frame
+		if stop.is_valid() and stop.call():
+			Input.action_release(action)
+			return true
+	Input.action_release(action)
+	return false
+
+
+func _vine_cross(lvl, vine, from_col: int, land_lo: float, land_hi: float, floor_y: float) -> bool:
+	## Jugador virtual: espera en el borde, salta hacia el asa cuando pasa cerca, se agarra y suelta cuando la trayectoria cae
+	## en la zona de aterrizaje. Devuelve true si aterriza (apoyado) dentro de [land_lo, land_hi].
+	var pl = lvl.player
+	await _until(func(): return not pl.dead, 600)
+	await _lab_put(lvl, from_col, 24)
+	var state: String = "wait"
+	var jump_frames: int = 0
+	for i in range(1500):
+		if pl.dead:
+			print("    [liana] murió en estado %s x=%.0f y=%.0f" % [state, pl.global_position.x, pl.global_position.y])
+			return false
+		if state == "wait":
+			var a_f: float = vine.AMP * sin(TAU * (vine._t + 0.30) / vine.PERIOD)
+			var hp: Vector2 = vine.to_global(Vector2(sin(a_f), cos(a_f)) * vine.length_px)
+			if pl.is_on_floor() and absf(hp.x - (pl.global_position.x + 32.0)) < 14.0 and absf(hp.y - (pl.global_position.y - 54.0)) < 22.0:
+				Input.action_press("move_right")
+				Input.action_press("jump")
+				state = "jump"
+		elif state == "jump":
+			jump_frames += 1
+			if jump_frames > 22:
+				Input.action_release("jump")
+			if pl.vehicle == vine:
+				Input.action_release("move_right")
+				state = "ride"
+			elif pl.is_on_floor() and i > 0:
+				pass
+		elif state == "ride":
+			var vel: Vector2 = vine.handle_vel * 1.08 + Vector2(0, -150.0)
+			var x: float = pl.global_position.x
+			var y: float = pl.global_position.y
+			var vy: float = vel.y
+			var hit_x: float = -1.0
+			var t: float = 0.0
+			while t < 3.0:
+				vy = minf(vy + 900.0 * 0.01, 340.0)
+				x += vel.x * 0.01
+				y += vy * 0.01
+				t += 0.01
+				if y > floor_y and vy > 0.0:
+					hit_x = x
+					break
+			if pl.global_position.y < floor_y - 22.0 and hit_x > land_lo + 12.0 and hit_x < land_hi - 12.0:
+				print("    [liana] suelto en x=%.0f y=%.0f vel=%s" % [pl.global_position.x, pl.global_position.y, vine.handle_vel])
+				Input.action_press("jump")
+				await physics_frame
+				Input.action_release("jump")
+				state = "fly"
+		elif state == "fly":
+			if pl.vehicle == vine:
+				state = "ride"  # se ha vuelto a agarrar: sigue intentándolo
+			if pl.is_on_floor():
+				Input.action_release("move_right")
+				return pl.global_position.x >= land_lo and pl.global_position.x <= land_hi
+		await physics_frame
+	Input.action_release("move_right")
+	Input.action_release("jump")
+	print("    [liana] sin resultado, estado=%s x=%.0f y=%.0f vehicle=%s rider=%s vel=%s" % [state, pl.global_position.x, pl.global_position.y, pl.vehicle.get_script().resource_path if pl.vehicle != null else "-", vine.rider, pl.velocity])
+	return false
+
+
+func _bot_run(lvl, target_x: float, max_frames: int, hop_over: Callable = Callable(), start_frame_stuck: int = 14) -> bool:
+	## Jugador virtual que corre a la derecha y salta cuando se atasca (escalones) o cuando `hop_over` lo pide.
+	var pl = lvl.player
+	var stuck: int = 0
+	var last_x: float = pl.global_position.x
+	var jumping: int = 0
+	for i in range(max_frames):
+		if pl.dead:
+			Input.action_release("move_right")
+			Input.action_release("jump")
+			return false
+		if pl.global_position.x >= target_x and pl.is_on_floor():
+			Input.action_release("move_right")
+			Input.action_release("jump")
+			return true
+		Input.action_press("move_right")
+		if jumping > 0:
+			jumping -= 1
+			if jumping == 0:
+				Input.action_release("jump")
+		elif pl.is_on_floor():
+			if absf(pl.global_position.x - last_x) < 0.4:
+				stuck += 1
+			else:
+				stuck = 0
+			if stuck >= start_frame_stuck or (hop_over.is_valid() and hop_over.call()):
+				Input.action_press("jump")
+				jumping = 20
+				stuck = 0
+		last_x = pl.global_position.x
+		await physics_frame
+	Input.action_release("move_right")
+	Input.action_release("jump")
+	return false
+
+
+func _lab_alive(lvl) -> void:
+	await _until(func(): return not lvl.player.dead, 600)
+	await _frames(4)
+
+
+func _phase_left(ph) -> float:
+	## Segundos que le quedan sólida a una plataforma que desaparece (0 si ya está oculta).
+	var cyc: float = ph.VISIBLE + ph.WARN + ph.HIDDEN
+	var f: float = fposmod(ph._t, cyc)
+	return maxf(0.0, ph.VISIBLE + ph.WARN * 0.0 - f)
+
+
+
+func _test_ww_lab() -> void:
+	print("Taller de mecánicas (nivel real ww_950): cada estación se supera jugando")
+	var lvl = await _lab_open()
+	var pl = lvl.player
+	_check(lvl.nrows == 30 and lvl.cols == 450, "el taller mide 450x30 (%dx%d)" % [lvl.cols, lvl.nrows])
+	# 1a) seta vertical: andando hacia ella se llega a la repisa alta
+	await _lab_put(lvl, 31, 24)
+	var ok1: bool = await _hold("move_right", 240, func(): return pl.is_on_floor() and pl.global_position.y < 19 * 16 and pl.global_position.x > 37 * 16)
+	_check(ok1, "estación 1: la seta vertical sube a la repisa (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
+	# 1b) seta diagonal: salva el foso 57..66
+	await _lab_put(lvl, 52, 24)
+	var ok2: bool = await _hold("move_right", 300, func(): return pl.is_on_floor() and pl.global_position.x > 68 * 16)
+	_check(ok2 and not pl.dead, "estación 1: la seta diagonal salva el foso (x=%.0f)" % pl.global_position.x)
+	# 2) lianas: cruzar los dos fosos agarrándose y soltando
+	var vines: Array = _nodes_of(lvl, "res://items/ww_vine.gd")
+	vines.sort_custom(func(a, b): return a.position.x < b.position.x)
+	_check(vines.size() == 2, "estación 2: dos lianas (%d)" % vines.size())
+	var c1: bool = await _vine_cross(lvl, vines[0], 80, 91 * 16.0, 100 * 16.0, 25 * 16.0 - 10.0)
+	_check(c1, "estación 2: la primera liana lleva a la isla (x=%.0f)" % pl.global_position.x)
+	var c2: bool = await _vine_cross(lvl, vines[1], 98, 109 * 16.0, 164 * 16.0, 25 * 16.0 - 10.0)
+	_check(c2, "estación 2: la segunda liana lleva a tierra firme (x=%.0f)" % pl.global_position.x)
+	# 3) troncos: cruzar la zona de la tolva saltando los troncos que ruedan
+	await _lab_alive(lvl)
+	await _lab_put(lvl, 118, 24)
+	var hp0: int = pl.hp
+	var logs_seen: int = 0
+	var hop_logs := func():
+		for n in _nodes_of(lvl, "res://items/ww_log.gd"):
+			var d: float = n.position.x - pl.global_position.x
+			if d > 6.0 and d < 46.0 and absf(n.position.y - pl.global_position.y) < 30.0:
+				return true
+		return false
+	var c3: bool = await _bot_run(lvl, 158 * 16.0, 1800, hop_logs)
+	_check(c3 and pl.hp == hp0, "estación 3: se cruza la zona de troncos saltándolos (x=%.0f, corazones %d/%d)" % [pl.global_position.x, pl.hp, hp0])
+	# 4) plataformas que desaparecen: salta a la siguiente cuando le quede tiempo sólida de sobra
+	await _lab_alive(lvl)
+	var phs: Array = _nodes_of(lvl, "res://items/ww_phase.gd")
+	phs.sort_custom(func(a, b): return a.position.x < b.position.x)
+	_check(phs.size() == 5, "estación 4: cinco plataformas que desaparecen (%d)" % phs.size())
+	await _lab_put(lvl, 163, 24)
+	var idx: int = 0
+	var done4: bool = false
+	var jump_hold: int = 0
+	for i in range(2400):
+		if pl.dead:
+			break
+		if pl.global_position.x > 197 * 16 and pl.is_on_floor():
+			done4 = true
+			break
+		if jump_hold > 0:
+			jump_hold -= 1
+			Input.action_press("move_right")
+			if jump_hold == 0:
+				Input.action_release("jump")
+				Input.action_release("move_right")
+		elif pl.is_on_floor():
+			var nxt = phs[idx] if idx < phs.size() else null
+			if nxt == null:
+				var last_edge: float = phs[phs.size() - 1].position.x + phs[phs.size() - 1].cells * 16.0 - 14.0
+				if pl.global_position.x < last_edge:
+					Input.action_press("move_right")
+				else:
+					Input.action_press("jump")
+					Input.action_press("move_right")
+					jump_hold = 26
+			else:
+				var tx: float = nxt.position.x
+				# ¿estoy ya sobre ella?
+				if pl.global_position.x > tx - 14.0 and pl.global_position.x < tx + nxt.cells * 16.0 - 2.0 and absf(pl.global_position.y - (nxt.position.y - 18.0)) < 8.0:
+					idx += 1
+				else:
+					var edge_x: float = 164.0 * 16.0 - 6.0 if idx == 0 else phs[idx - 1].position.x + phs[idx - 1].cells * 16.0 - 14.0
+					if pl.global_position.x < edge_x:
+						Input.action_press("move_right")
+					elif _phase_left(nxt) > 0.8 and nxt.solid:
+						Input.action_release("move_right")
+						Input.action_press("jump")
+						Input.action_press("move_right")
+						jump_hold = 26
+					else:
+						Input.action_release("move_right")
+		await physics_frame
+	Input.action_release("jump")
+	Input.action_release("move_right")
+	_check(done4, "estación 4: la cadena se cruza con buen ritmo (x=%.0f, plataforma %d)" % [pl.global_position.x, idx])
+	# 5) puente que se derrumba: se cruza corriendo sin parar
+	await _lab_alive(lvl)
+	await _lab_put(lvl, 200, 24)
+	var c5: bool = await _bot_run(lvl, 238 * 16.0, 900)
+	_check(c5, "estación 5: el puente se cruza sin detenerse (x=%.0f)" % pl.global_position.x)
+	# 6) interruptores: pisar el interruptor abre el muro y crea el camino; el segundo interruptor levanta la escalera
+	await _lab_alive(lvl)
+	await _lab_put(lvl, 240, 24)
+	var c6: bool = await _bot_run(lvl, 298 * 16.0, 2400)
+	_check(c6 and lvl.sw[0] and lvl.sw[1], "estación 6: los interruptores abren el muro, el puente de bloques y la escalera (x=%.0f)" % pl.global_position.x)
+	# 7) corrientes: a favor, a contracorriente y columna de burbujas hasta la repisa alta
+	await _lab_alive(lvl)
+	await _lab_put(lvl, 311, 24)
+	var c7a: bool = await _bot_run(lvl, 357 * 16.0, 1800)
+	_check(c7a, "estación 7: se cruza el río y el tramo a contracorriente (x=%.0f)" % pl.global_position.x)
+	var in_col: bool = false
+	for i in range(400):
+		if pl.dead:
+			break
+		var px: float = pl.global_position.x
+		if px < 360 * 16.0 + 6.0 and pl.global_position.y > 12 * 16.0 and not in_col:
+			Input.action_press("move_right")
+		else:
+			in_col = true
+			Input.action_release("move_right")
+			if pl.global_position.y < 12 * 16.0 + 6.0:
+				Input.action_press("move_right")
+				Input.action_press("jump")
+		if pl.global_position.x > 365 * 16.0 and pl.is_on_floor() and pl.global_position.y < 13 * 16.0:
+			break
+		await physics_frame
+	Input.action_release("move_right")
+	Input.action_release("jump")
+	_check(pl.global_position.x > 364 * 16.0 and pl.is_on_floor() and pl.global_position.y < 13 * 16.0, "estación 7: las burbujas elevan hasta la repisa alta (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
+	await _end_lab(lvl)
+
+
+func _end_lab(lvl) -> void:
+	await _free_level(lvl)
+
+
 func _test_ww_mechanics() -> void:
 	_wipe_ww_files()
 	_ww.reset()
@@ -3119,5 +3390,6 @@ func _test_ww_mechanics() -> void:
 	await _test_ww_mech_switch()
 	await _test_ww_mech_water_hazards()
 	await _test_ww_tall_level()
+	await _test_ww_lab()
 	_ww.reset()
 	_wipe_ww_files()

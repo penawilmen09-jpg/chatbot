@@ -558,7 +558,8 @@ func _enter_current() -> void:
 
 func enter_level(id: int) -> void:
 	if WW.start_level(id):
-		WW.map_node = id
+		if id != WW.LAB:
+			WW.map_node = id
 		WW.save_game()
 		Audio.play_sfx("select")
 		Transition.change_scene("res://levels/ww_level.tscn")
@@ -646,6 +647,11 @@ func _toggle_menu() -> void:
 	var b1 := UiTheme.button("Continuar", Vector2(200, 30))
 	b1.pressed.connect(_toggle_menu)
 	v.add_child(b1)
+	var bl := UiTheme.button("Taller de mecánicas (pruebas)", Vector2(200, 30))
+	bl.pressed.connect(func():
+		_toggle_menu()
+		enter_level(WW.LAB))
+	v.add_child(bl)
 	var b2 := UiTheme.button("Volver al menú principal", Vector2(200, 30))
 	b2.pressed.connect(func():
 		WW.save_game()

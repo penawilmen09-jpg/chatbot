@@ -8,6 +8,7 @@ var level = null
 var group: int = 1
 var _sprite: Sprite2D
 var _cool: float = 0.0
+var _armed: bool = true  # se vuelve a armar cuando el jugador sale (pisarlo parado no lo hace parpadear)
 
 
 func _ready() -> void:
@@ -33,9 +34,14 @@ func _refresh(_g: int = 0) -> void:
 
 func _physics_process(delta: float) -> void:
 	_cool = maxf(0.0, _cool - delta)
-	if _cool > 0.0 or level == null or level.player == null or level.player.dead:
+	if level == null or level.player == null or level.player.dead:
 		return
-	if overlaps_body(level.player):
-		_cool = 0.7
+	var over: bool = overlaps_body(level.player)
+	if not over:
+		_armed = true
+		return
+	if _armed and _cool <= 0.0:
+		_armed = false
+		_cool = 0.4
 		level.toggle_switch(group)
 		Audio.play_sfx("click", 0.7)

@@ -3,9 +3,9 @@ extends StaticBody2D
 ## Cada una tiene su fase según su posición para que las cadenas se puedan cruzar con el ritmo adecuado.
 
 const A := preload("res://items/ww_atlas.gd")
-const VISIBLE := 2.0
-const WARN := 0.55
-const HIDDEN := 1.05
+const VISIBLE := 3.0
+const WARN := 0.6
+const HIDDEN := 1.2
 
 var cells: int = 3
 var offset: float = 0.0
