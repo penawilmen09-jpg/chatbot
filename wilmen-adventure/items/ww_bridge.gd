@@ -82,7 +82,7 @@ func _trigger(idx: int) -> void:
 	if _armed:
 		return
 	_armed = true
-	Audio.play_sfx("crumble", 0.9)
+	Audio.play_sfx("break", 0.8)
 	for i in range(_planks.size()):
 		_planks[i]["fall_at"] = _t + FIRST + absf(float(i - idx)) * STEP
 

@@ -2763,11 +2763,136 @@ func _test_ww_mech_logs() -> void:
 	await _end_mini(lvl)
 
 
+func _nodes_of(lvl, script: String) -> Array:
+	return lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == script)
+
+
+func _test_ww_mech_phase_bridge() -> void:
+	print("Mecánica: plataformas que desaparecen y puente que se derrumba")
+	var g := Grid.new(60, 20)
+	g.ground(0, 8, 15)
+	g.ground(52, 60, 15)
+	g.fill(12, 12, 15, 13, "-")
+	g.put(5, 14, "P")
+	var lvl = await _mini(g)
+	var ph = _nodes_of(lvl, "res://items/ww_phase.gd")[0]
+	_check(ph.cells == 3, "un tramo de '-' es una sola plataforma (%d celdas)" % ph.cells)
+	var seen_solid := false
+	var seen_ghost := false
+	var warned := false
+	for i in range(400):
+		await physics_frame
+		seen_solid = seen_solid or not ph._cs.disabled
+		seen_ghost = seen_ghost or ph._cs.disabled
+		warned = warned or (ph.solid and ph._t > 0 and fposmod(ph._t, 3.6) > 2.0)
+	_check(seen_solid and seen_ghost and warned, "alterna: sólida, parpadeo de aviso y oculta (sin colisión)")
+	# el jugador de pie sobre ella cae cuando desaparece
+	ph._t = 0.0
+	ph._apply()
+	lvl.player.global_position = Vector2(13 * 16 + 8, 12 * 16 - 10)
+	lvl.player.velocity = Vector2.ZERO
+	await _frames(20)
+	_check(lvl.player.is_on_floor() and lvl.player.global_position.y < 12 * 16, "se puede pisar mientras está sólida")
+	await _until(func(): return not lvl.player.is_on_floor(), 400)
+	_check(not lvl.player.is_on_floor() and ph._cs.disabled, "al desaparecer el jugador deja de estar apoyado y cae")
+	await _end_mini(lvl)
+	# puente
+	g = Grid.new(60, 22)
+	g.ground(0, 8, 15)
+	g.ground(40, 60, 15)
+	g.fill(8, 15, 40, 16, "_")
+	g.put(5, 14, "P")
+	lvl = await _mini(g)
+	var br = _nodes_of(lvl, "res://items/ww_bridge.gd")[0]
+	_check(br.cells == 32, "el puente tiene 32 tablas (%d)" % br.cells)
+	lvl.player.global_position = Vector2(9 * 16 + 8, 15 * 16 - 12)
+	lvl.player.velocity = Vector2.ZERO
+	await _frames(15)
+	_check(br.collapsed_count() == 0, "al principio todas las tablas están")
+	await _frames(70)
+	_check(br.collapsed_count() > 0, "al pisarlo se derrumba en cadena (%d caídas)" % br.collapsed_count())
+	# cruzar corriendo lo logra; quedarse quieto no
+	await _until(func(): return lvl.player.dead, 300)
+	await _until(func(): return not lvl.player.dead, 600)
+	await _frames(10)
+	_check(_nodes_of(lvl, "res://items/ww_bridge.gd")[0].collapsed_count() == 0, "al reaparecer el puente se reconstruye entero")
+	br = _nodes_of(lvl, "res://items/ww_bridge.gd")
+	br = br[br.size() - 1]
+	lvl.player.global_position = Vector2(9 * 16 + 8, 15 * 16 - 12)
+	lvl.player.velocity = Vector2.ZERO
+	await _frames(10)
+	var pl = lvl.player
+	var crossed := false
+	for i in range(400):
+		Input.action_press("move_right")
+		await physics_frame
+		if pl.global_position.x > 41 * 16 and pl.is_on_floor():
+			crossed = true
+			break
+		if pl.dead:
+			break
+	Input.action_release("move_right")
+	print("    (x=%.0f y=%.0f muerto=%s caídas=%d)" % [pl.global_position.x, pl.global_position.y, pl.dead, br.collapsed_count()])
+	_check(crossed, "corriendo sin parar se cruza antes de que caiga")
+	await _end_mini(lvl)
+
+
+func _test_ww_mech_switch() -> void:
+	print("Mecánica: interruptores que cambian el escenario de verdad")
+	var g := Grid.new(50, 20)
+	g.ground(0, 50, 15)
+	g.put(5, 14, "P")
+	g.put(10, 14, "/")
+	g.fill(20, 11, 21, 15, "(")
+	g.fill(30, 11, 31, 15, ")")
+	var lvl = await _mini(g)
+	var pl = lvl.player
+	var blks: Array = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_toggle.gd")
+	_check(blks.size() >= 2, "hay bloques conmutables (%d)" % blks.size())
+	var a = blks.filter(func(b): return b.global_position.x < 25 * 16)[0]
+	var b2 = blks.filter(func(b): return b.global_position.x > 25 * 16)[0]
+	_check(a._solid and not b2._solid, "con el interruptor apagado '(' es sólido y ')' fantasma")
+	_check(not a._cs.disabled and b2._cs.disabled, "colisión coherente con el estado")
+	pl.global_position = Vector2(10 * 16 + 8, 14 * 16)
+	await _frames(12)
+	_check(lvl.sw[0] == true, "tocar el interruptor lo enciende")
+	await _frames(3)
+	_check(not a._solid and b2._solid and a._cs.disabled and not b2._cs.disabled, "los bloques se invierten (escenario modificado)")
+	# el muro ')' ahora detiene al jugador; '(' ya no
+	pl.global_position = Vector2(26 * 16, 14 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(10)
+	for i in range(80):
+		Input.action_press("move_right")
+		await physics_frame
+	Input.action_release("move_right")
+	_check(pl.global_position.x < 30 * 16, "el bloque activo detiene al jugador (x=%.0f)" % pl.global_position.x)
+	pl.global_position = Vector2(14 * 16, 14 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(8)
+	for i in range(100):
+		Input.action_press("move_right")
+		await physics_frame
+	Input.action_release("move_right")
+	_check(pl.global_position.x > 22 * 16, "el bloque apagado se atraviesa (x=%.0f)" % pl.global_position.x)
+	# no se cierra encima del jugador
+	pl.global_position = Vector2(a.global_position.x, a.global_position.y)
+	pl.velocity = Vector2.ZERO
+	await _frames(2)
+	lvl.toggle_switch(1)
+	await _frames(6)
+	print("    (sw=%s a.solid=%s overlap=%s)" % [lvl.sw[0], a._solid, a._area.overlaps_body(pl)])
+	_check(not a._solid, "un bloque no se solidifica sobre el jugador")
+	await _end_mini(lvl)
+
+
 func _test_ww_mechanics() -> void:
 	_wipe_ww_files()
 	_ww.reset()
 	await _test_ww_mech_shrooms()
 	await _test_ww_mech_vine()
 	await _test_ww_mech_logs()
+	await _test_ww_mech_phase_bridge()
+	await _test_ww_mech_switch()
 	_ww.reset()
 	_wipe_ww_files()
