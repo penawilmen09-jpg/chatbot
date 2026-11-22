@@ -13,6 +13,21 @@ const GateScript := preload("res://items/ww_gate.gd")
 const WarpScript := preload("res://items/ww_warp.gd")
 const SecretGoalScript := preload("res://items/ww_secret_goal.gd")
 const WwBossScene := preload("res://enemies/ww_boss.tscn")
+const ShroomScript := preload("res://items/ww_shroom.gd")
+const VineScript := preload("res://items/ww_vine.gd")
+const ChuteScript := preload("res://items/ww_chute.gd")
+const PhaseScript := preload("res://items/ww_phase.gd")
+const BridgeScript := preload("res://items/ww_bridge.gd")
+const SwitchScript := preload("res://items/ww_switch.gd")
+const ToggleScript := preload("res://items/ww_toggle.gd")
+const CurrentScript := preload("res://items/ww_current.gd")
+const DartScript := preload("res://items/ww_dart.gd")
+const PendulumScript := preload("res://items/ww_pendulum.gd")
+const OrbitScript := preload("res://items/ww_orbit.gd")
+
+signal switch_changed(group: int)
+
+var sw: Array = [false, false]  # estado de los interruptores del grupo 1 y 2
 const RESPAWN_MIN := 60.0  # al reaparecer siempre quedan al menos estos segundos (evita bucles de muerte por tiempo)
 
 var meta: Dictionary = {}
@@ -34,7 +49,7 @@ var _times_up_t: float = 0.0
 func _ready() -> void:
 	number = WW.current_level
 	mode = "world"
-	var data: Dictionary = WW.parse_level(FileAccess.get_file_as_string(WW.level_path(number)))
+	var data: Dictionary = WW.parse_level(WW.test_text if WW.test_text != "" else FileAccess.get_file_as_string(WW.level_path(number)))
 	meta = data["meta"]
 	warps_def = data["warps"]
 	world = int(meta["theme"])
@@ -144,8 +159,136 @@ func _spawn_entities() -> void:
 						g.position = Vector2(x * TILE + 8, (y + n - 1) * TILE + 8)
 						add_child(g)
 	_spawn_warps()
+	_spawn_mechanics()
 	if is_boss and boss != null and is_instance_valid(boss):
 		_swap_boss()
+
+
+func _runs(chars: String) -> Array:
+	## Tramos horizontales contiguos de alguna de las letras: [{"x","y","w","c"}].
+	var out: Array = []
+	for y in range(nrows):
+		var x: int = 0
+		while x < cols:
+			var c: String = _cell(x, y)
+			if chars.contains(c):
+				var x0: int = x
+				while x < cols and _cell(x, y) == c:
+					x += 1
+				out.append({"x": x0, "y": y, "w": x - x0, "c": c})
+			else:
+				x += 1
+	return out
+
+
+func _zones(chars: String) -> Array:
+	## Rectángulos de celdas contiguas (agrupa filas iguales apiladas): [{"x","y","w","h","c"}].
+	var runs: Array = _runs(chars)
+	var out: Array = []
+	for r in runs:
+		var merged: bool = false
+		for z in out:
+			if z["c"] == r["c"] and z["x"] == r["x"] and z["w"] == r["w"] and int(z["y"]) + int(z["h"]) == int(r["y"]):
+				z["h"] = int(z["h"]) + 1
+				merged = true
+				break
+		if not merged:
+			out.append({"x": r["x"], "y": r["y"], "w": r["w"], "h": 1, "c": r["c"]})
+	return out
+
+
+func _stack_len(x: int, y: int, ch: String) -> int:
+	var n: int = 1
+	while _cell(x, y + n) == ch:
+		n += 1
+	return n
+
+
+func _spawn_mechanics() -> void:
+	## Mecánicas nuevas de WILMEN WORLD (tanda 0). Glifos: % { } setas · $ lianas · & ' tolvas de troncos · - plataformas que
+	## desaparecen · _ puentes que se derrumban · / \ interruptores · ( ) [ ] bloques conmutables · : . , corrientes ·
+	## " ` lanzadardos · ! péndulo · n plataforma orbital · b ascensor.
+	for y in range(nrows):
+		for x in range(cols):
+			var c: String = _cell(x, y)
+			var pos := Vector2(x * TILE + 8, y * TILE + 8)
+			match c:
+				"%", "{", "}":
+					var sh = ShroomScript.new()
+					sh.kind = {"%": "up", "{": "right", "}": "left"}[c]
+					sh.position = pos
+					add_child(sh)
+				"$":
+					if _cell(x, y - 1) != "$":
+						var v = VineScript.new()
+						v.level = self
+						v.length_px = float(_stack_len(x, y, "$")) * TILE
+						v.position = Vector2(x * TILE + 8, y * TILE + 4)
+						add_child(v)
+				"!":
+					if _cell(x, y - 1) != "!":
+						var pe = PendulumScript.new()
+						pe.level = self
+						pe.length_px = float(_stack_len(x, y, "!")) * TILE
+						pe.position = Vector2(x * TILE + 8, y * TILE + 4)
+						add_child(pe)
+				"&", "'":
+					var ch = ChuteScript.new()
+					ch.level = self
+					ch.dir = -1 if c == "&" else 1
+					ch.position = pos
+					add_child(ch)
+				"\"", "`":
+					var da = DartScript.new()
+					da.level = self
+					da.dir = -1 if c == "\"" else 1
+					da.position = pos
+					add_child(da)
+				"/", "\\":
+					var swt = SwitchScript.new()
+					swt.level = self
+					swt.group = 1 if c == "/" else 2
+					swt.position = pos
+					add_child(swt)
+				"n", "b":
+					var ob = OrbitScript.new()
+					ob.kind = "orbit" if c == "n" else "elevator"
+					ob.position = pos if c == "n" else Vector2(x * TILE + 16, y * TILE + 12)
+					add_child(ob)
+	for r in _runs("-"):
+		var ph = PhaseScript.new()
+		ph.cells = int(r["w"])
+		ph.offset = float(int(r["x"]) % 7) * 0.55
+		ph.position = Vector2(int(r["x"]) * TILE + 8, int(r["y"]) * TILE + 8)
+		add_child(ph)
+	for r in _runs("_"):
+		var br = BridgeScript.new()
+		br.level = self
+		br.cells = int(r["w"])
+		br.position = Vector2(int(r["x"]) * TILE + 8, int(r["y"]) * TILE + 8)
+		add_child(br)
+	for r in _runs("()[]"):
+		var tg = ToggleScript.new()
+		tg.level = self
+		tg.group = 1 if "()".contains(str(r["c"])) else 2
+		tg.solid_when_on = str(r["c"]) == ")" or str(r["c"]) == "]"
+		tg.cells = int(r["w"])
+		tg.position = Vector2(int(r["x"]) * TILE + 8, int(r["y"]) * TILE + 8)
+		add_child(tg)
+	for z in _zones(":.,"):
+		var cu = CurrentScript.new()
+		cu.level = self
+		cu.dir = {":": "right", ".": "left", ",": "up"}[str(z["c"])]
+		cu.w = int(z["w"])
+		cu.h = int(z["h"])
+		cu.position = Vector2(int(z["x"]) * TILE + 8, int(z["y"]) * TILE + 8)
+		add_child(cu)
+
+
+func toggle_switch(group: int) -> void:
+	sw[group - 1] = not bool(sw[group - 1])
+	switch_changed.emit(group)
+	popup("Interruptor %s" % ("ACTIVADO" if sw[group - 1] else "desactivado"), player.global_position + Vector2(0, -30))
 
 
 func _swap_boss() -> void:
@@ -287,6 +430,11 @@ func _on_player_died() -> void:
 
 func _respawn() -> void:
 	super()
+	get_tree().call_group("ww_reset", "reset_state")
+	if sw[0] or sw[1]:
+		sw = [false, false]
+		switch_changed.emit(1)
+		switch_changed.emit(2)
 	timed_out = false
 	time_left = maxf(_cp_time, minf(RESPAWN_MIN, time_total * 0.3))
 	_tick_stage = 0

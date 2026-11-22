@@ -84,6 +84,12 @@ func _run() -> void:
 	_scene = load("res://levels/level.tscn")
 	_check(_scene != null, "level.tscn carga")
 
+	if OS.get_cmdline_user_args().has("--mech"):
+		await _test_ww_mechanics()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
+
 	if OS.get_cmdline_user_args().has("--ww3"):
 		await _test_ww_content()
 		await _test_ww_map()
@@ -2516,3 +2522,252 @@ func _test_ww_levels() -> void:
 	_wipe_ww_files()
 	_ww.reset()
 	_reset_game()
+
+
+# ================= WILMEN WORLD (tanda 0): pruebas individuales de cada mecánica nueva =================
+class Grid:
+	var g: Array = []
+	var w: int = 0
+
+	func _init(w_: int, h_: int) -> void:
+		w = w_
+		for y in range(h_):
+			var row: Array = []
+			for x in range(w_):
+				row.append(" ")
+			g.append(row)
+
+	func put(x: int, y: int, ch: String) -> void:
+		if y >= 0 and y < g.size() and x >= 0 and x < w:
+			g[y][x] = ch
+
+	func fill(x0: int, y0: int, x1: int, y1: int, ch: String) -> void:
+		for y in range(y0, y1):
+			for x in range(x0, x1):
+				put(x, y, ch)
+
+	func ground(x0: int, x1: int, top: int) -> void:
+		fill(x0, top, x1, g.size(), "#")
+
+	func text(extra: String = "") -> String:
+		var lines: Array = []
+		for r in g:
+			lines.append("".join(r))
+		return "@title Prueba\n@region 1\n@theme 1\n@time 900\n@difficulty 1\n" + extra + "\n".join(lines) + "\n"
+
+
+func _mini(gr, extra: String = ""):
+	## Crea un nivel de prueba (en memoria) con la rejilla dada y lo carga como nivel 1 de WILMEN WORLD.
+	_ww.test_text = gr.text(extra)
+	_ww.start_level(1)
+	var lvl = load("res://levels/ww_level.tscn").instantiate()
+	root.add_child(lvl)
+	await process_frame
+	await _frames(4)
+	if is_instance_valid(lvl.hud._intro):
+		lvl.hud._intro.queue_free()
+		lvl.hud._intro = null
+	lvl.player._invuln_t = 0.0
+	return lvl
+
+
+func _end_mini(lvl) -> void:
+	_ww.test_text = ""
+	await _free_level(lvl)
+
+
+func _launch_vel(p) -> Vector2:
+	## Velocidad del jugador en el primer fotograma en que sale lanzado (o la última si no se lanza).
+	var v: Vector2 = p.velocity
+	for i in range(30):
+		await physics_frame
+		v = p.velocity
+		if v.y < -300.0:
+			break
+	return v
+
+
+func _test_ww_mech_shrooms() -> void:
+	print("Mecánica: setas lanzadoras (impulso vertical y diagonal con física)")
+	var g := Grid.new(120, 20)
+	g.ground(0, 120, 15)
+	g.put(3, 14, "P")
+	g.put(10, 14, "%")
+	g.fill(8, 8, 13, 9, "=")
+	g.put(30, 14, "{")
+	g.fill(44, 14, 50, 15, "#")  # plataforma de aterrizaje de la seta diagonal (a la misma altura que el suelo: se comprueba por distancia)
+	g.put(70, 14, "}")
+	var lvl = await _mini(g)
+	var p = lvl.player
+	# --- vertical
+	p.global_position = Vector2(10 * 16 + 8, 13 * 16 + 4)
+	p.velocity = Vector2(0, 80)
+	var lv: Vector2 = await _launch_vel(p)
+	_check(lv.y < -380.0, "la seta vertical lanza hacia arriba con fuerza (vy=%.0f)" % lv.y)
+	var y0: float = p.global_position.y
+	var top: float = y0
+	for i in range(70):
+		await physics_frame
+		top = minf(top, p.global_position.y)
+	_check(y0 - top > 95.0, "la trayectoria sube más de 95 px (subió %.0f)" % (y0 - top))
+	await _frames(60)
+	_check(p.is_on_floor() and p.global_position.y < 8 * 16 + 4, "y aterriza sobre la plataforma alta que está a su alcance (y=%.0f)" % p.global_position.y)
+	# --- diagonal derecha
+	p.global_position = Vector2(30 * 16 + 8, 13 * 16 + 4)
+	p.velocity = Vector2(0, 80)
+	var x0: float = p.global_position.x
+	lv = await _launch_vel(p)
+	_check(lv.x > 200.0 and lv.y < -380.0, "la seta diagonal da un impulso (%.0f, %.0f)" % [lv.x, lv.y])
+	await _until(func(): return p.is_on_floor(), 200)
+	var dx: float = p.global_position.x - x0
+	_check(dx > 190.0 and dx < 260.0, "sin tocar nada recorre unos 14 celdas hacia delante (%.0f px) y aterriza" % dx)
+	# --- el jugador puede frenar el impulso empujando en sentido contrario
+	p.global_position = Vector2(30 * 16 + 8, 13 * 16 + 4)
+	p.velocity = Vector2(0, 80)
+	x0 = p.global_position.x
+	lv = await _launch_vel(p)
+	Input.action_press("move_left")
+	await _until(func(): return p.is_on_floor(), 200)
+	Input.action_release("move_left")
+	_check(p.global_position.x - x0 < dx - 60.0, "empujar al contrario recorta el salto (%.0f < %.0f)" % [p.global_position.x - x0, dx])
+	# --- diagonal izquierda
+	p.global_position = Vector2(70 * 16 + 8, 13 * 16 + 4)
+	p.velocity = Vector2(0, 80)
+	lv = await _launch_vel(p)
+	_check(lv.x < -200.0, "la seta izquierda lanza hacia la izquierda (vx=%.0f)" % lv.x)
+	# --- no lanza si el jugador sube a través de ella
+	p.global_position = Vector2(10 * 16 + 8, 14 * 16 + 4)
+	p.velocity = Vector2(0, -300)
+	await _frames(2)
+	_check(p.velocity.y > -320.0 and p.velocity.y < -250.0, "no se activa mientras el jugador la atraviesa subiendo")
+	await _end_mini(lvl)
+
+
+func _test_ww_mech_vine() -> void:
+	print("Mecánica: liana (balanceo real: agarrar, ir con ella y soltar con velocidad)")
+	var g := Grid.new(80, 20)
+	g.ground(0, 14, 15)
+	g.ground(36, 80, 15)
+	g.put(5, 14, "P")
+	for k in range(7):
+		g.put(25, 3 + k, "$")  # liana de 7 celdas: anclaje en la fila 3
+	var lvl = await _mini(g)
+	var p = lvl.player
+	var vines: Array = _scripts_of(lvl, "res://items/ww_vine.gd")
+	_check(vines.size() == 1 and vines[0].length_px == 112.0, "se crea una liana de 7 celdas (112 px)")
+	var v = vines[0]
+	# el asa oscila de verdad
+	var minx: float = 1e9
+	var maxx: float = -1e9
+	for i in range(160):
+		await physics_frame
+		minx = minf(minx, v.handle_pos.x)
+		maxx = maxf(maxx, v.handle_pos.x)
+	_check(minx < -80.0 and maxx > 80.0, "el asa se balancea de %.0f a %.0f px" % [minx, maxx])
+	# agarrar: el jugador cae en el aire junto al asa
+	p.global_position = v.to_global(v.handle_pos) + Vector2(0, -4)
+	p.velocity = Vector2(0, 60)
+	await _frames(3)
+	_check(p.vehicle == v and v.rider == p, "al tocar el asa en el aire el jugador se agarra")
+	var d0: float = p.global_position.distance_to(v.to_global(v.handle_pos))
+	await _frames(40)
+	var d1: float = p.global_position.distance_to(v.to_global(v.handle_pos))
+	_check(absf(d1 - d0) < 3.0 and p.velocity == Vector2.ZERO, "y va con ella (se mueve con el asa)")
+	# soltar en el momento en que la trayectoria balística cae sobre la plataforma de la derecha
+	var released: bool = false
+	var landed_x: float = 0.0
+	for i in range(400):
+		await physics_frame
+		if not released:
+			var vel: Vector2 = v.handle_vel * 1.08 + Vector2(0, -150.0)
+			var pos: Vector2 = p.global_position
+			var t: float = 0.0
+			var x: float = pos.x
+			var y: float = pos.y
+			var vy: float = vel.y
+			var hit_x: float = -1.0
+			while t < 2.0:
+				vy = minf(vy + 900.0 * 0.01, 340.0)
+				x += vel.x * 0.01
+				y += vy * 0.01
+				t += 0.01
+				if y > 15 * 16 - 8 and vy > 0.0:
+					hit_x = x
+					break
+			if hit_x > 38 * 16 and hit_x < 44 * 16 and vel.x > 150.0:
+				Input.action_press("jump")
+				await physics_frame
+				Input.action_release("jump")
+				released = true
+		elif p.is_on_floor():
+			landed_x = p.global_position.x
+			break
+	_check(released and p.vehicle == null, "SALTO suelta la liana")
+	_check(landed_x > 36 * 16, "y la velocidad del balanceo lleva al jugador al otro lado del hueco (aterriza en x=%.0f, hueco de 14 a 36)" % landed_x)
+	await _end_mini(lvl)
+
+
+func _test_ww_mech_logs() -> void:
+	print("Mecánica: troncos rodantes (aviso, rodar por el suelo, daño y desaparición)")
+	var g := Grid.new(90, 20)
+	g.ground(0, 90, 15)
+	g.put(60, 14, "&")
+	g.put(70, 14, "#")
+	g.fill(6, 10, 7, 15, "#")
+	g.put(40, 14, "P")
+	var lvl = await _mini(g)
+	var p = lvl.player
+	var chute = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_chute.gd")[0]
+	var seen_warn: bool = false
+	var log_node = null
+	for i in range(520):
+		await physics_frame
+		seen_warn = seen_warn or chute._sprite.texture == load("res://items/ww_atlas.gd").tex("chute_warn")
+		var logs: Array = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_log.gd")
+		if not logs.is_empty():
+			log_node = logs[0]
+			break
+	_check(seen_warn, "la tolva avisa (tiembla) antes de soltar el tronco")
+	_check(log_node != null, "suelta un tronco")
+	var x0: float = log_node.position.x
+	await _frames(30)
+	_check(log_node.position.x < x0 - 30.0 and is_equal_approx(log_node.velocity.x, -log_node.speed), "el tronco rueda hacia la izquierda a su velocidad (%.0f px/s)" % absf(log_node.velocity.x))
+	_check(log_node.is_on_floor(), "y sigue el suelo")
+	# daño si el jugador se queda en su camino
+	var hp0: int = p.hp
+	p.global_position = Vector2(log_node.position.x - 70, 14 * 16 + 4)
+	p._invuln_t = 0.0
+	await _until(func(): return p.hp < hp0 or not is_instance_valid(log_node), 240)
+	_check(p.hp < hp0, "un tronco que alcanza al jugador le quita un corazón")
+	await _end_mini(lvl)
+	# el tronco desaparece al chocar con un muro
+	g = Grid.new(60, 20)
+	g.ground(0, 60, 15)
+	g.put(30, 14, "&")
+	g.fill(10, 9, 11, 15, "#")
+	g.put(20, 14, "P")
+	lvl = await _mini(g)
+	var gone: bool = false
+	var had: bool = false
+	for i in range(900):
+		await physics_frame
+		var l3: Array = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_log.gd")
+		if not l3.is_empty():
+			had = true
+		elif had:
+			gone = true
+			break
+		lvl.player.global_position = Vector2(20 * 16 + 8, 8 * 16)  # fuera del camino
+		lvl.player.velocity = Vector2.ZERO
+	_check(had and gone, "el tronco rueda hasta el muro y desaparece")
+	await _end_mini(lvl)
+
+
+func _test_ww_mechanics() -> void:
+	_wipe_ww_files()
+	_ww.reset()
+	await _test_ww_mech_shrooms()
+	await _test_ww_mech_vine()
+	await _test_ww_mech_logs()
+	_ww.reset()
+	_wipe_ww_files()

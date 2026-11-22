@@ -48,6 +48,8 @@ var barrier_t: float = 0.0
 var giant_t: float = 0.0
 var giant_hit_used: bool = false  # el gigante daña al jefe una sola vez por transformación (no lo derrota de golpe)
 var scale_mul: float = 1.0
+var launch_lock: float = 0.0  # tras un impulso (seta, liana) se conserva la velocidad horizontal (WILMEN WORLD)
+var env_current: float = 0.0  # corriente de agua horizontal (px/s) que arrastra al jugador (WILMEN WORLD)
 var vehicle = null  # vehículo que está conduciendo (carrito, barco, plataforma voladora o mecha)
 
 # efectos del entorno: los fija el nivel en cada paso de física
@@ -127,6 +129,7 @@ func _physics_process(delta: float) -> void:
 	skill_cd = maxf(0.0, skill_cd - delta)
 	shield_t = maxf(0.0, shield_t - delta)
 	dash_t = maxf(0.0, dash_t - delta)
+	launch_lock = maxf(0.0, launch_lock - delta)
 	_tick_powers(delta)
 	if vehicle != null:
 		# conduciendo: el vehículo mueve al jugador; aquí solo se animan sus efectos
@@ -187,12 +190,15 @@ func _physics_process(delta: float) -> void:
 	if on_floor and env_conveyor != 0.0:
 		move_and_collide(Vector2(env_conveyor * delta, 0.0))
 	last_vy = velocity.y
+	if env_current != 0.0:
+		move_and_collide(Vector2(env_current * delta, 0.0))
 	move_and_slide()
 	_handle_collisions()
 	_update_visuals(dir, on_floor, delta)
 	_update_cosmetics()
 	_juice(on_floor, delta)
 	env_conveyor = 0.0
+	env_current = 0.0
 	env_slow = false
 	env_wind = false
 
@@ -205,6 +211,8 @@ func _move_horizontal(dir: float, on_floor: bool, delta: float) -> void:
 		fric = ICE_FRICTION
 	if _hurt_t > 0.0:
 		return
+	if launch_lock > 0.0 and not on_floor and (dir == 0.0 or signf(dir) == signf(velocity.x)):
+		return  # impulso en el aire: se conserva la velocidad horizontal
 	if dir != 0.0:
 		velocity.x = move_toward(velocity.x, dir * RUN_SPEED * (0.55 if env_slow else 1.0), accel * delta)
 		facing = 1 if dir > 0.0 else -1
@@ -540,6 +548,14 @@ func bounce(strong: bool = false) -> void:
 	_air_jumps = 1
 	_in_jump = false
 	_buffer_t = 0.0
+
+
+func launch_vec(v: Vector2) -> void:
+	## Setas lanzadoras de WILMEN WORLD: impulso con trayectoria (vertical o en diagonal).
+	velocity = v
+	launch_lock = 1.2 if absf(v.x) > 1.0 else 0.0
+	_air_jumps = 1
+	_in_jump = false
 
 
 func launch(v: float) -> void:

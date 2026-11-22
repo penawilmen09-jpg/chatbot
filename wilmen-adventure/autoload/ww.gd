@@ -36,6 +36,7 @@ var levels: Dictionary = {}  # "n" -> {"done": bool, "gems": [bool x3], "best_ti
 var nodes: Dictionary = {}  # nodos del mapa descubiertos/desbloqueados (hitos siguientes)
 var secrets: Dictionary = {}
 var stats: Dictionary = {}
+var test_text: String = ""  # (pruebas) texto de nivel que sustituye al archivo del nivel actual
 var current_level: int = 1  # nivel de WILMEN WORLD que se va a jugar (1..120)
 var map_node: int = 1  # dónde está el héroe en el mapa
 var _map: Dictionary = {}
