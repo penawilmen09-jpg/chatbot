@@ -3433,7 +3433,7 @@ func _test_ww_lab() -> void:
 		if pl.dead:
 			break
 		if not on_el:
-			if pl.is_on_floor() and pl.global_position.y > 23 * 16.0 and elev.position.y > 24 * 16.0 and absf(elev.position.x - pl.global_position.x) < 80.0:
+			if pl.is_on_floor() and pl.global_position.y > 23 * 16.0 and elev.position.y > 25 * 16.0 + 10.0 and absf(elev.position.x - pl.global_position.x) < 80.0:
 				Input.action_press("move_right")
 			if pl.is_on_floor() and absf(pl.global_position.x - elev.position.x) < 12.0 and absf(pl.global_position.y - (elev.position.y - 14.0)) < 10.0:
 				on_el = true
