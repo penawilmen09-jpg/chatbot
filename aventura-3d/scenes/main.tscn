@@ -1,0 +1,24 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://scripts/main.gd" id="1_main"]
+[ext_resource type="PackedScene" path="res://scenes/levels/level_01.tscn" id="2_level"]
+[ext_resource type="PackedScene" path="res://scenes/player/player.tscn" id="3_player"]
+[ext_resource type="Script" path="res://scripts/camera/side_camera.gd" id="4_camera"]
+[ext_resource type="PackedScene" path="res://scenes/ui/touch_controls.tscn" id="5_touch"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hud.tscn" id="6_hud"]
+
+[node name="Main" type="Node"]
+script = ExtResource("1_main")
+
+[node name="Level" parent="." instance=ExtResource("2_level")]
+
+[node name="Player" parent="." instance=ExtResource("3_player")]
+
+[node name="SideCamera" type="Camera3D" parent="."]
+current = true
+script = ExtResource("4_camera")
+target_path = NodePath("../Player")
+
+[node name="TouchControls" parent="." instance=ExtResource("5_touch")]
+
+[node name="Hud" parent="." instance=ExtResource("6_hud")]

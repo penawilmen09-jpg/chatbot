@@ -1,0 +1,97 @@
+name: Aventura 3D - APK de depuración
+
+# Construye un APK de depuración instalable de Aventura 3D (carpeta aventura-3d/).
+# Resultado: artefacto "aventura-3d-debug-apk" descargable desde la página del run.
+
+on:
+  push:
+    paths:
+      - "aventura-3d/**"
+      - ".github/workflows/aventura-3d-apk.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  GODOT_VERSION: "4.4.1"
+  BUILD_TOOLS: "35.0.1"
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Instalar Godot y plantillas de exportación
+        run: |
+          set -euo pipefail
+          BASE="https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable"
+          mkdir -p "$HOME/godot" "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          curl -fsSL -o "$HOME/godot/godot.zip" "$BASE/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q "$HOME/godot/godot.zip" -d "$HOME/godot"
+          mv "$HOME/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64" "$HOME/godot/godot"
+          chmod +x "$HOME/godot/godot"
+          curl -fsSL -o "$HOME/godot/templates.tpz" "$BASE/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          unzip -q -j "$HOME/godot/templates.tpz" "templates/android_debug.apk" "templates/version.txt" \
+            -d "$HOME/.local/share/godot/export_templates/${GODOT_VERSION}.stable"
+          rm "$HOME/godot/templates.tpz"
+          echo "$HOME/godot" >> "$GITHUB_PATH"
+
+      - name: Instalar componentes del SDK de Android
+        run: |
+          set -euo pipefail
+          SDK="${ANDROID_HOME:-${ANDROID_SDK_ROOT:-/usr/local/lib/android/sdk}}"
+          echo "ANDROID_SDK=$SDK" >> "$GITHUB_ENV"
+          yes | "$SDK/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$SDK/cmdline-tools/latest/bin/sdkmanager" "platform-tools" "build-tools;${BUILD_TOOLS}" "platforms;android-35"
+
+      - name: Prueba automática del juego (física y colisiones)
+        working-directory: aventura-3d
+        run: |
+          godot --headless --import || true
+          godot --headless --fixed-fps 60 -s res://scripts/tests/smoke_test.gd
+
+      - name: Configurar firma de depuración y Godot
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android" "$HOME/.config/godot"
+          keytool -genkey -v -keystore "$HOME/.android/debug.keystore" -storepass android \
+            -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 \
+            -dname "CN=Android Debug,O=Android,C=US"
+          {
+            echo '[gd_resource type="EditorSettings" format=3]'
+            echo
+            echo '[resource]'
+            echo "export/android/android_sdk_path = \"$ANDROID_SDK\""
+            echo "export/android/debug_keystore = \"$HOME/.android/debug.keystore\""
+            echo 'export/android/debug_keystore_user = "androiddebugkey"'
+            echo 'export/android/debug_keystore_pass = "android"'
+            echo "export/android/java_sdk_path = \"$JAVA_HOME\""
+          } > "$HOME/.config/godot/editor_settings-4.4.tres"
+
+      - name: Exportar APK
+        working-directory: aventura-3d
+        run: |
+          set -euo pipefail
+          mkdir -p builds
+          godot --headless --export-debug "Android (APK debug)" builds/aventura-3d-debug.apk
+          test -s builds/aventura-3d-debug.apk
+
+      - name: Verificar firma del APK
+        working-directory: aventura-3d
+        run: |
+          "$ANDROID_SDK/build-tools/${BUILD_TOOLS}/apksigner" verify --verbose builds/aventura-3d-debug.apk
+          ls -lh builds/aventura-3d-debug.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: aventura-3d-debug-apk
+          path: aventura-3d/builds/aventura-3d-debug.apk
+          retention-days: 30

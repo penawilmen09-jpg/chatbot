@@ -1,0 +1,7 @@
+# Godot
+.godot/
+*.translation
+export_credentials.cfg
+# Binarios generados (el APK se obtiene desde GitHub Actions o se exporta localmente)
+builds/*
+!builds/.gitkeep
