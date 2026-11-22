@@ -29,7 +29,7 @@ jobs:
         run: python3 tools/levelgen.py --check
 
       - name: Validar los niveles de WILMEN WORLD (llaves, túneles, puertas, reloj, variedad)
-        run: python3 tools/ww_check.py
+        run: python3 tools/ww_check.py && python3 tools/ww_mech_check.py
 
       - name: Validar el mapa de WILMEN WORLD (120 niveles, caminos, secretos)
         run: python3 tools/ww_map.py --check
@@ -57,6 +57,14 @@ jobs:
           grep "FALLO" /tmp/smoke.log || true
           if grep -E "SCRIPT ERROR|Parse Error|FALLO|ERROR:" /tmp/smoke.log | grep -v -E "resources still in use|RID allocations of type"; then echo "Errores detectados"; exit 1; fi
           grep -q "RESULTADO: TODO OK" /tmp/smoke.log
+
+      - name: Mecánicas de WILMEN WORLD (tanda 0) y taller de mecánicas
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/smoke_test.gd -- --mech 2>&1 | tee /tmp/mech.log
+          grep -c "  ok   " /tmp/mech.log | sed 's/^/comprobaciones ok: /'
+          if grep -E "SCRIPT ERROR|Parse Error|FALLO|ERROR:" /tmp/mech.log | grep -v -E "resources still in use|RID allocations of type"; then echo "Errores detectados"; exit 1; fi
+          grep -q "RESULTADO: TODO OK" /tmp/mech.log
 
       - name: Persistencia entre dos ejecuciones reales (cerrar y abrir el juego)
         run: |

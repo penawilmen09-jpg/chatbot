@@ -4,5 +4,6 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 godot --headless --path . --import
 godot --headless --path . --script res://tests/smoke_test.gd
+godot --headless --path . --script res://tests/smoke_test.gd -- --mech
 godot --headless --path . --script res://tests/persist_write.gd
 godot --headless --path . --script res://tests/persist_check.gd

@@ -406,7 +406,7 @@ def distinct(levels):
 
 
 def main():
-    files = sorted(glob.glob(os.path.join(WORLD_DIR, "ww_*.txt")))
+    files = [f for f in sorted(glob.glob(os.path.join(WORLD_DIR, "ww_*.txt"))) if not f.endswith("ww_950.txt")]  # el taller (950) se valida con ww_mech_check.py
     bad = 0
     levels = []
     for f in files:
@@ -422,6 +422,11 @@ def main():
     for e in distinct(levels):
         print("✗ " + e)
         bad += 1
+    import ww_mech_check as mc
+    for f in files + [os.path.join(WORLD_DIR, "ww_950.txt")]:
+        for e in mc.check(mc.load(f)):
+            print("%s: x %s" % (os.path.basename(f), e))
+            bad += 1
     print("niveles revisados: %d | errores: %d" % (len(files), bad))
     sys.exit(1 if bad else 0)
 

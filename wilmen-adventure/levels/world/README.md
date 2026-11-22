@@ -49,3 +49,24 @@ montañas y las condiciones que abren cada camino (nivel completado o salida sec
 ## Región 1: Bosque Esmeralda (20 niveles)
 `tools/ww_r1_defs.py`: un nivel por función, cada uno con su concepto y su secuencia de piezas (`tools/ww_pieces.py`).
 `python3 tools/ww_levels.py` los escribe en `ww_001.txt`..`ww_020.txt`; entre 700 y 1000 columnas cada uno.
+
+## Mecánicas nuevas (tanda 0)
+| Glifo | Mecánica |
+|---|---|
+| `%` `{` `}` | Setas: impulso vertical / diagonal derecha / diagonal izquierda (se puede dirigir en el aire) |
+| `$` | Liana: columna de 6-12 `$` con ancla sólida arriba. Se agarra en el aire; SALTO suelta con la velocidad del balanceo |
+| `&` `'` | Tolva de troncos que ruedan hacia la izquierda / derecha (avisa temblando) |
+| `-` | Plataforma que desaparece (tramos de 2-5 celdas; ritmo según su columna) |
+| `_` | Puente que se derrumba en cadena al pisarlo (>= 4 tablas, suelo firme a ambos lados) |
+| `/` `\` | Interruptor del grupo 1 / 2 |
+| `(` `)` `[` `]` | Bloques conmutables: `(` `[` sólidos con el interruptor apagado, `)` `]` con él encendido |
+| `:` `.` `,` | Corrientes de agua: hacia la derecha / izquierda / burbujas que elevan (zonas rectangulares) |
+| `"` `` ` `` | Lanzadardos hacia la izquierda / derecha |
+| `!` | Péndulo de cuchilla (columna con ancla sólida arriba) |
+| `n` `b` | Plataforma orbital (radio 3 celdas) / ascensor (sube 6 celdas) |
+
+Altura variable: los niveles pueden tener de 20 a 40 filas (p. ej. 450x32); la cámara, el fondo y la muerte por caída se adaptan.
+`levels/world/ww_950.txt` es el **Taller de mecánicas** (Menú del mapa > Taller de mecánicas): nivel de pruebas con una
+estación por mecánica; no cuenta para el progreso ni se guarda. Se genera con `tools/ww_lab.py`.
+Validación: `python3 tools/ww_mech_check.py`; pruebas de motor: `godot --headless --script res://tests/smoke_test.gd -- --mech`;
+capturas: `tests/lab_shots.gd` (ver `docs/ww_tanda0/`).
