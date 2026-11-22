@@ -6,6 +6,7 @@ signal died
 
 const SpriteUtil := preload("res://characters/sprite_util.gd")
 const ProjectileScene := preload("res://items/projectile.tscn")
+const FireballScript := preload("res://items/fireball.gd")
 
 const RUN_SPEED := 125.0
 const ACCEL := 950.0
@@ -311,7 +312,10 @@ func _use_skill() -> void:
 			_squash(Vector2(0.8, 1.3))
 			_fx(Color("#5adf7a"), 10)
 		"pulse":
-			_pulse()
+			if temp_power == "pulse":
+				_pulse()  # poder temporal «Electricidad»: sin cambios (rayos)
+			else:
+				_fireball_pulse()  # Pulso Eléctrico del Mundo 9: bolas de fuego
 		"nova":
 			shield_t = 3.0
 			Audio.play_sfx("shield", 0.8)
@@ -332,6 +336,28 @@ func _shoot(kind: String, vel: Vector2, grav: float, bouncy: bool, pierce: bool 
 	p.life = 1.8 if not pierce else 1.2
 	p.position = position + Vector2(facing * 12.0, -2.0)
 	get_parent().add_child(p)
+
+
+func _fireball_pulse() -> void:
+	## Pulso Eléctrico del Mundo 9 (poder base): en vez de rayos, una bola de fuego por cada enemigo cercano (mismo radio
+	## de detección y mismo daño que la descarga). Si no hay ninguno, sale una hacia delante hasta ese mismo alcance.
+	Audio.play_sfx("fire", 0.9)
+	_fx(Color("#ff7a1a"), 6)
+	var count: int = 0
+	for e in get_tree().get_nodes_in_group("enemies"):
+		if is_instance_valid(e) and not bool(e.get("dead")) and e.global_position.distance_to(global_position) < 64.0:
+			_spawn_fireball(e)
+			count += 1
+	if count == 0:
+		_spawn_fireball(null)
+
+
+func _spawn_fireball(tgt) -> void:
+	var f = FireballScript.new()
+	f.target = tgt
+	f.dir = Vector2(float(facing), 0.0)
+	f.position = position + Vector2(facing * 12.0, -2.0)
+	get_parent().add_child(f)
 
 
 func _pulse() -> void:

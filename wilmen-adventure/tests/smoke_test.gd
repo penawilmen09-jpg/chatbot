@@ -81,6 +81,12 @@ func _run() -> void:
 	_scene = load("res://levels/level.tscn")
 	_check(_scene != null, "level.tscn carga")
 
+	if OS.get_cmdline_user_args().has("--fireball"):
+		await _test_fireball_pulse()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
+
 	if OS.get_cmdline_user_args().has("--ads"):
 		await _test_ads()
 		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
@@ -128,6 +134,7 @@ func _run() -> void:
 	await _test_mechanics()
 	await _test_entities()
 	await _test_powers()
+	await _test_fireball_pulse()
 	await _test_bosses()
 	await _test_golem_combat()
 	await _test_expansion()
@@ -1741,4 +1748,125 @@ func _test_ads() -> void:
 	_check(not _ads.banner_visible() and txts.has("v2.1 - 100 niveles - sin anuncios"), "desactivado: sin banner y el menú sigue igual")
 	title.queue_free()
 	await _pf(3)
+	_reset_game()
+
+
+# ============================================ Pulso Eléctrico (Mundo 9): bola de fuego ===
+class FakeEnemy extends Node2D:
+	var dead: bool = false
+	var hits: Array = []
+
+	func take_hit(shot: String) -> void:
+		hits.append(shot)
+
+
+func _fireballs(lvl) -> Array:
+	return lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/fireball.gd")
+
+
+func _bolt_lines(lvl) -> int:
+	return lvl.get_children().filter(func(n): return n is Line2D).size()
+
+
+func _player_shots(lvl) -> int:
+	return lvl.get_children().filter(func(n): return n is Area2D and n.get("team") == "player").size()
+
+
+func _test_fireball_pulse() -> void:
+	print("Pulso Eléctrico (Mundo 9): bola de fuego en vez de rayos; Electricidad y Fuego no cambian")
+	_reset_game()
+	var lvl = await _load_level(81)
+	var p = lvl.player
+	_check(p.base_power == "pulse" and p.power == "pulse" and p.temp_power == "", "Mundo 9: el poder base es el Pulso Eléctrico")
+	_check(p.POWER_COOLDOWN["pulse"] == 1.3, "el enfriamiento sigue siendo 1.3 s")
+	var tex: Texture2D = load("res://assets/items/fireball.png")
+	var boom: Texture2D = load("res://assets/items/fireball_boom.png")
+	_check(tex != null and tex.get_width() == 64 and boom != null and boom.get_width() == 192, "arte de la bola de fuego y la explosión cargado")
+	for dir in [1, -1]:
+		var label: String = "derecha" if dir == 1 else "izquierda"
+		p.facing = dir
+		p.skill_cd = 0.0
+		p._invuln_t = 99.0
+		var enemy := FakeEnemy.new()
+		enemy.position = p.position + Vector2(40.0 * dir, 0.0)
+		enemy.add_to_group("enemies")
+		lvl.add_child(enemy)
+		var before_bolts: int = _bolt_lines(lvl)
+		var before_shots: int = _player_shots(lvl)
+		p._use_skill()
+		await process_frame
+		var fbs: Array = _fireballs(lvl)
+		_check(fbs.size() == 1, "[%s] sale una bola de fuego por el enemigo cercano" % label)
+		_check(_bolt_lines(lvl) == before_bolts, "[%s] ya no se dibujan los rayos" % label)
+		_check(_player_shots(lvl) == before_shots, "[%s] no usa los proyectiles de chispa" % label)
+		_check(p.skill_cd > 1.0, "[%s] arranca el enfriamiento (%.2f s)" % [label, p.skill_cd])
+		var fb = fbs[0]
+		var fb_ref: WeakRef = weakref(fb)
+		var start_x: float = fb.global_position.x
+		_check(signf(start_x - p.global_position.x) == float(dir) or absf(start_x - p.global_position.x) < 20.0, "[%s] sale del lado del personaje que mira (x=%.1f)" % [label, start_x - p.global_position.x])
+		_check(fb._ball.flip_h == (dir < 0), "[%s] la bola mira en la dirección del disparo" % label)
+		await _until(func(): return enemy.hits.size() > 0 or fb_ref.get_ref() == null, 120)
+		_check(enemy.hits == ["spark"], "[%s] impacta una vez con el daño de siempre %s" % [label, str(enemy.hits)])
+		var fb_now = fb_ref.get_ref()
+		_check(fb_now != null and fb_now.exploded and fb_now._boom != null, "[%s] se produce la explosión de fuego" % label)
+		fb_now = null
+		fb = null
+		await _until(func(): return fb_ref.get_ref() == null, 120)
+		_check(fb_ref.get_ref() == null, "[%s] la explosión termina y se limpia" % label)
+		enemy.queue_free()
+		# sin enemigos: sale hacia delante y estalla al llegar al alcance, sin dañar a nadie
+		p.skill_cd = 0.0
+		p._use_skill()
+		await process_frame
+		fbs = _fireballs(lvl)
+		_check(fbs.size() == 1, "[%s] sin enemigos también sale una bola hacia delante" % label)
+		var f2_ref: WeakRef = weakref(fbs[0])
+		var x0: float = fbs[0].global_position.x
+		await _frames(6)
+		var f2 = f2_ref.get_ref()
+		if f2 != null:
+			_check(signf(f2.global_position.x - x0) == float(dir), "[%s] avanza hacia donde mira el personaje" % label)
+		f2 = null
+		fbs = []
+		await _until(func(): return f2_ref.get_ref() == null, 180)
+		_check(f2_ref.get_ref() == null, "[%s] estalla al llegar a su alcance y desaparece" % label)
+	# enfriamiento: no se puede lanzar otra mientras dura
+	p.facing = 1
+	p.skill_cd = 0.0
+	p._use_skill()
+	p._use_skill()
+	await process_frame
+	_check(_fireballs(lvl).size() == 1, "durante el enfriamiento no salen más bolas")
+	await _until(func(): return _fireballs(lvl).is_empty(), 180)
+	# Electricidad (poder temporal): conserva los rayos, sin bola de fuego
+	p.grant_power("pulse")
+	p.skill_cd = 0.0
+	var e2 := FakeEnemy.new()
+	e2.position = p.position + Vector2(30.0, 0.0)
+	e2.add_to_group("enemies")
+	lvl.add_child(e2)
+	var b0: int = _bolt_lines(lvl)
+	p._use_skill()
+	await process_frame
+	_check(_bolt_lines(lvl) > b0 and _fireballs(lvl).is_empty(), "Electricidad (temporal) sigue con sus rayos y sin bola de fuego")
+	_check(e2.hits == ["spark"], "Electricidad conserva su daño instantáneo")
+	e2.queue_free()
+	# Fuego (poder temporal): sigue con sus tres llamas
+	p.grant_power("flame")
+	p.skill_cd = 0.0
+	var s0: int = _player_shots(lvl)
+	p._use_skill()
+	await process_frame
+	_check(_player_shots(lvl) == s0 + 3 and _fireballs(lvl).is_empty(), "Fuego (temporal) sigue lanzando sus 3 llamas y no la bola")
+	await _free_level(lvl)
+	# otros mundos: su poder base no cambia
+	_reset_game()
+	lvl = await _load_level(1)
+	p = lvl.player
+	p.skill_cd = 0.0
+	var s1: int = _player_shots(lvl)
+	p._use_skill()
+	await process_frame
+	_check(p.power == "spark" and _player_shots(lvl) == s1 + 1 and _fireballs(lvl).is_empty(), "Mundo 1: la Chispa Esmeralda no cambia")
+	await _free_level(lvl)
 	_reset_game()
