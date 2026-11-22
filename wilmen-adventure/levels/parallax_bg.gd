@@ -16,6 +16,7 @@ const AmbientData := preload("res://levels/ambient_data.gd")
 var world: int = 1
 var zone: int = 0
 var level_idx: int = 1  # 1-10 dentro del mundo (para tormentas y ventiscas concretas)
+var tall: bool = false  # niveles altos (WILMEN WORLD): el fondo también se desplaza en vertical con la cámara
 
 var _layers: Array = []
 var _sprites: Array = []  # nubes y engranajes con parallax propio: {node, factor, speed, base_x, spin}
@@ -144,12 +145,17 @@ func _process(delta: float) -> void:
 	if vs != _last_size:
 		_resize()  # Android puede cambiar el tamaño de la ventana después de crear el nivel
 	var left: float = 0.0
+	var vy: float = 0.0
 	var cam := get_viewport().get_camera_2d()
 	if cam != null:
 		left = cam.get_screen_center_position().x - vs.x * 0.5
+		if tall and TEX_H > vs.y:
+			var span_y: float = maxf(1.0, float(cam.limit_bottom) - vs.y)
+			var prog: float = clampf((cam.get_screen_center_position().y - vs.y * 0.5) / span_y, 0.0, 1.0)
+			vy = -prog * (TEX_H - vs.y)
 	for i in range(_layers.size()):
 		var tr: TextureRect = _layers[i]
-		tr.position = Vector2(-fposmod(left * float(FACTORS[i]), TEX_W), 0.0)
+		tr.position = Vector2(-fposmod(left * float(FACTORS[i]), TEX_W), vy)
 	var span: float = vs.x + TEX_W
 	for s in _sprites:
 		var n: Node2D = s["node"]

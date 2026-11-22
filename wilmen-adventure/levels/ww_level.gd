@@ -110,6 +110,7 @@ func _build_hud() -> void:
 func _build_background() -> void:
 	var bg = ParallaxBgScript.new()
 	bg.world = world
+	bg.tall = nrows > 20
 	bg.level_idx = 1 + (number % 9)  # variedad de fondo según el nivel
 	bg.zone = int(meta["zone"]) if int(meta["zone"]) >= 0 else (number - 1) % 3
 	add_child(bg)

@@ -3035,6 +3035,80 @@ func _test_ww_mech_water_hazards() -> void:
 	await _end_mini(lvl)
 
 
+func _test_ww_tall_level() -> void:
+	print("Altura variable: nivel de 450x32 (cámara, límites, caída, fondo y controles)")
+	var old_size: Vector2i = root.size
+	root.size = Vector2i(1170, 540)  # pantalla de móvil apaisada (2,17:1)
+	await _frames(3)
+	var g := Grid.new(450, 32)
+	g.ground(0, 450, 29)
+	g.put(4, 28, "P")
+	for i in range(5):
+		g.fill(10 + i * 4, 25 - i * 4, 13 + i * 4, 26 - i * 4, "#")
+	g.fill(0, 0, 450, 1, "#")
+	g.fill(100, 20, 104, 29, " ")
+	g.fill(100, 29, 104, 32, " ")
+	var lvl = await _mini(g)
+	var pl = lvl.player
+	var cam: Camera2D = lvl.camera
+	_check(lvl.nrows == 32 and lvl.cols == 450, "el nivel mide 450x32 (%dx%d)" % [lvl.cols, lvl.nrows])
+	_check(cam.limit_bottom == 32 * 16 and cam.limit_right == 450 * 16, "los límites de cámara cubren el mapa alto (%d, %d)" % [cam.limit_bottom, cam.limit_right])
+	# la vista nunca sale del mapa, ni abajo ni arriba, en distintas alturas del jugador
+	var vs: Vector2 = lvl.get_viewport_rect().size
+	var ok_view := true
+	for yy in [29 * 16, 20 * 16, 10 * 16, 2 * 16]:
+		pl.global_position = Vector2(30 * 16, yy)
+		pl.velocity = Vector2.ZERO
+		cam.reset_smoothing()
+		await _frames(10)
+		var c: Vector2 = cam.get_screen_center_position()
+		if c.y - vs.y * 0.5 < -0.5 or c.y + vs.y * 0.5 > 32 * 16 + 0.5:
+			ok_view = false
+		if absf(c.y - pl.global_position.y) > vs.y * 0.5 - 20.0:
+			ok_view = false  # el jugador siempre dentro de la pantalla
+	_check(ok_view, "la cámara sigue al jugador en vertical y nunca muestra fuera del mapa")
+	# la cámara sube de verdad al escalar
+	pl.global_position = Vector2(4 * 16, 28 * 16)
+	cam.reset_smoothing()
+	await _frames(10)
+	var cy0: float = cam.get_screen_center_position().y
+	pl.global_position = Vector2(27 * 16 + 8, 8 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(90)
+	_check(cam.get_screen_center_position().y < cy0 - 100.0, "al subir, la cámara sube con el jugador (%.0f -> %.0f)" % [cy0, cam.get_screen_center_position().y])
+	# caída libre: sin morir mientras hay suelo debajo; se muere sólo bajo el mapa
+	var hp0: int = pl.hp
+	pl.global_position = Vector2(60 * 16, 2 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(200)
+	_check(not pl.dead and pl.global_position.y > 27 * 16, "una caída larga acaba en el suelo, sin morir")
+	# foso: morir bajo el mapa (32*16+48)
+	pl.global_position = Vector2(102 * 16, 28 * 16)
+	pl.velocity = Vector2.ZERO
+	await _until(func(): return pl.dead, 400)
+	_check(pl.dead, "caer por el foso mata sólo bajo el mapa alto")
+	await _until(func(): return not pl.dead, 600)
+	# controles: salto y movimiento siguen igual
+	await _frames(20)
+	pl.global_position = Vector2(20 * 16, 28 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(10)
+	var y1: float = pl.global_position.y
+	var top: float = y1
+	Input.action_press("jump")
+	for i in range(30):
+		await physics_frame
+		top = minf(top, pl.global_position.y)
+	Input.action_release("jump")
+	_check(y1 - top > 40.0, "el salto funciona en un nivel alto (%.0f px)" % (y1 - top))
+	# fondo con desplazamiento vertical
+	var bgs: Array = lvl.get_children().filter(func(n): return n is CanvasLayer and "tall" in n)
+	_check(bgs.size() == 1 and bgs[0].tall, "el fondo del nivel alto se desplaza en vertical")
+	await _end_mini(lvl)
+	root.size = old_size
+	await _frames(3)
+
+
 func _test_ww_mechanics() -> void:
 	_wipe_ww_files()
 	_ww.reset()
@@ -3044,5 +3118,6 @@ func _test_ww_mechanics() -> void:
 	await _test_ww_mech_phase_bridge()
 	await _test_ww_mech_switch()
 	await _test_ww_mech_water_hazards()
+	await _test_ww_tall_level()
 	_ww.reset()
 	_wipe_ww_files()
