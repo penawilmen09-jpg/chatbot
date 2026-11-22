@@ -323,7 +323,7 @@ func _build_buttons() -> void:
 	_first = _big_button("CONTINUAR" if has_progress else "JUGAR", "green", "play", _on_play)
 	_menu.add_child(_first)
 	_menu.add_child(_big_button("MAPA DE NIVELES", "blue", "map", func(): Transition.change_scene("res://ui/level_select.tscn")))
-	_menu.add_child(_big_button("WILMEN WORLD", "teal", "world", func(): Transition.change_scene("res://ui/ww_hub.tscn")))
+	_menu.add_child(_big_button("WILMEN WORLD", "teal", "world", func(): Transition.change_scene("res://ui/ww_map.tscn")))
 	_menu.add_child(_big_button("EXTRAS", "purple", "star", func(): Transition.change_scene("res://ui/extras.tscn")))
 	_menu.add_child(_big_button("OPCIONES", "orange", "gear", _show_options))
 	_menu.add_child(_big_button("SALIR", "red", "door", func(): get_tree().quit()))

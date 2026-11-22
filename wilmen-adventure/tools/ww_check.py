@@ -25,9 +25,9 @@ def parse(path):
             continue
         if line.startswith("@"):
             k, _, v = line[1:].partition(" ")
-            if k in ("time", "difficulty", "region", "theme"):
+            if k in ("time", "difficulty", "region", "theme", "zone", "boss"):
                 meta[k] = int(v)
-            elif k == "title":
+            elif k in ("title", "kind"):
                 meta[k] = v
             elif k == "warp":
                 p = v.split()
@@ -136,6 +136,10 @@ def door_arrival(cell, side):
     return int(math.floor(cell[0] + 0.5 + side * 22.0 / 16.0))
 
 
+def kind_of(lv):
+    return lv.meta.get("kind", "normal")
+
+
 def analyse(lv):
     errs = lv.errors
     rows = lv.rows
@@ -147,11 +151,36 @@ def analyse(lv):
     gems = lv.cells("*")
     if len(gems) != 3:
         errs.append("debe haber 3 gemas (hay %d)" % len(gems))
-    if len(lv.cells("C")) < 3:
-        errs.append("faltan puntos de control (mínimo 3)")
-    if lv.w < 500:
-        errs.append("el nivel es demasiado corto: %d columnas (mínimo 500)" % lv.w)
-    if not lv.cells("U"):
+    if not (700 <= lv.w <= 1000):
+        errs.append("el nivel debe tener entre 700 y 1000 columnas (tiene %d)" % lv.w)
+    num = int(os.path.basename(lv.path)[3:6])
+    idx = (num - 1) % 20 + 1
+    secret_levels = {5, 9, 13, 19}
+    n_o = len(lv.cells("O"))
+    if (idx in secret_levels) != (n_o == 1) or n_o > 1:
+        errs.append("salida secreta: el nivel %d %s tener una 'O' (hay %d)" % (num, "debe" if idx in secret_levels else "no debe", n_o))
+    kind = lv.meta.get("kind", "normal")
+    boss = lv.meta.get("boss", 0)
+    exp_kind = {4: "cave", 13: "cave", 7: "house", 10: "fortress", 19: "secret", 20: "castle"}.get(idx, "normal")
+    if kind != exp_kind:
+        errs.append("el tipo del nivel %d debe ser %r (es %r)" % (num, exp_kind, kind))
+    flat_all = "".join(lv.rows)
+    top_rows = "".join(lv.rows[:3])
+    if kind == "cave" and top_rows.count("#") < 150:
+        errs.append("una cueva necesita techo (hay %d bloques en las 3 filas superiores)" % top_rows.count("#"))
+    if kind == "house" and flat_all.count("o") < 150:
+        errs.append("la casa de bonificación debe tener muchas monedas (%d)" % flat_all.count("o"))
+    if kind == "fortress" and flat_all.count("p") < 6:
+        errs.append("la fortaleza necesita prensas (hay %d)" % flat_all.count("p"))
+    if kind == "castle":
+        if boss < 1 or len(lv.cells("X")) != 1 or len(lv.cells("G")) != 1:
+            errs.append("el castillo necesita jefe (@boss), una 'X' y una 'G'")
+    elif len(lv.cells("X")) or len(lv.cells("G")):
+        errs.append("jefe o puerta de jefe en un nivel que no es castillo")
+    main_cols = lv.cells("F")[0][0] + 10 if lv.cells("F") else lv.w
+    if len(lv.cells("C")) < max(3, main_cols // 170):
+        errs.append("pocos puntos de control (%d) para %d columnas de recorrido" % (len(lv.cells("C")), main_cols))
+    if not lv.cells("U") and kind_of(lv) != "castle":
         errs.append("sin llaves")
     if not (lv.cells("I") or lv.cells("M")):
         errs.append("sin relojes de tiempo extra")
@@ -175,6 +204,8 @@ def analyse(lv):
     opened_doors = set()
     start = lv.cells("P")[0]
     goal = lv.cells("F")[0]
+    if kind == "castle":
+        goal = lv.cells("G")[0]  # en el castillo se comprueba que se llega a la arena; la meta aparece al vencer al jefe
 
     def build():
         ck = lg.Check(sim_rows(rows, open_gates))
@@ -269,7 +300,7 @@ def analyse(lv):
         ck, st = build()
     g0 = stand_near(st, goal[0], goal[1], 4)
     if g0 is None or g0 not in dist:
-        errs.append("la meta NO es alcanzable (llaves recogidas: %d)" % len(keys_seen))
+        errs.append("la meta NO es alcanzable (llaves recogidas: %d; se llega hasta la columna %d)" % (len(keys_seen), max([x for (x, y) in dist if x < goal[0]] or [0])))
         return
     lv.notes.append("meta alcanzable; verjas abiertas en la ruta: %d" % (len(open_gates) and sum(1 for g in lv.gates() if g[0] in open_gates)))
     # --- 100%: abrir puertas con llaves restantes
@@ -290,10 +321,14 @@ def analyse(lv):
             if (vx, vy) == (x, y) or (abs(vx - x) <= 1 and 0 <= vy - y <= 6 and lg.arc_ok(ck, vx, vy, x, y + 1, 5.6)) or (lg.arc_ok(ck, vx, vy, x, y + 1, 5.6) and abs(vx - x) <= 6 and vy - y <= 5):
                 return True
         return False
-    for ch, name in (("*", "gema"), ("U", "llave"), ("I", "reloj"), ("M", "reloj grande"), ("C", "punto de control")):
+    for ch, name in (("*", "gema"), ("U", "llave"), ("I", "reloj"), ("M", "reloj grande"), ("C", "punto de control"), ("O", "salida secreta")):
         for c in lv.cells(ch):
             if not cell_ok(c):
                 errs.append("%s inalcanzable en %s" % (name, c))
+    for wp in lv.warps:
+        sa, sb = stand_near(st, wp["a"][0], wp["a"][1], 1), stand_near(st, wp["b"][0], wp["b"][1], 1)
+        if sa not in dist:
+            errs.append("el extremo %s de %s no es alcanzable andando" % (wp["a"], wp["kind"]))
     gates_n = len(lv.gates())
     doors_n = sum(1 for wp in lv.warps if wp["kind"] == "door" and wp["key"] > 0)
     keys_n = len(lv.cells("U"))
@@ -330,18 +365,63 @@ def analyse(lv):
         errs.append("poca variedad de elementos (%d)" % len(present))
 
 
+def fingerprint(lv):
+    flat = "".join(lv.rows)
+    keys = "=^~aomvcgpWSwsjftTAQUIMB"  # lo que da carácter al nivel (sin suelo ni vacío)
+    v = [flat.count(k) for k in keys]
+    tot = float(sum(v)) or 1.0
+    return [x / tot for x in v]
+
+
+def cosine(a, b):
+    num = sum(x * y for x, y in zip(a, b))
+    da = math.sqrt(sum(x * x for x in a))
+    db = math.sqrt(sum(y * y for y in b))
+    return num / max(1e-9, da * db)
+
+
+def pieces_of(path):
+    for line in open(path):
+        if line.startswith("; piezas:"):
+            return line.split(":", 1)[1].strip().split(",")
+    return []
+
+
+def distinct(levels):
+    """Ningún par de niveles puede ser casi idéntico: se compara la secuencia de piezas (tríos consecutivos, sin contar
+    suelo plano ni puntos de control) y se exige que solapen poco."""
+    errs = []
+
+    def grams(seq, n=3):
+        return set(tuple(seq[i:i + n]) for i in range(len(seq) - n + 1))
+
+    P = [[x for x in pieces_of(lv.path) if x not in ("checkpoint", "flat")] for lv in levels]
+    for i in range(len(levels)):
+        for j in range(i + 1, len(levels)):
+            a, b = grams(P[i]), grams(P[j])
+            overlap = len(a & b) / max(1, min(len(a), len(b)))
+            if overlap > 0.35:
+                errs.append("%s y %s se parecen demasiado (comparten el %d%% de su secuencia de piezas)" % (os.path.basename(levels[i].path), os.path.basename(levels[j].path), int(overlap * 100)))
+    return errs
+
+
 def main():
     files = sorted(glob.glob(os.path.join(WORLD_DIR, "ww_*.txt")))
     bad = 0
+    levels = []
     for f in files:
         lv = Level(f)
         analyse(lv)
+        levels.append(lv)
         print("%s: %s" % (os.path.basename(f), "OK" if not lv.errors else "ERRORES"))
         for n in lv.notes:
             print("    " + n)
         for e in lv.errors:
             print("    ✗ " + e)
         bad += len(lv.errors)
+    for e in distinct(levels):
+        print("✗ " + e)
+        bad += 1
     print("niveles revisados: %d | errores: %d" % (len(files), bad))
     sys.exit(1 if bad else 0)
 

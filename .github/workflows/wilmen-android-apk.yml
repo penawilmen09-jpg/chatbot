@@ -28,8 +28,11 @@ jobs:
       - name: Validar los 100 niveles (alcanzabilidad, gemas, duplicados)
         run: python3 tools/levelgen.py --check
 
-      - name: Validar los niveles de WILMEN WORLD (llaves, túneles, puertas, reloj)
+      - name: Validar los niveles de WILMEN WORLD (llaves, túneles, puertas, reloj, variedad)
         run: python3 tools/ww_check.py
+
+      - name: Validar el mapa de WILMEN WORLD (120 niveles, caminos, secretos)
+        run: python3 tools/ww_map.py --check
 
       - name: Descargar Godot
         run: |
@@ -244,6 +247,8 @@ jobs:
           echo "== niveles incluidos (100 de WILMEN ADVENTURE + los de WILMEN WORLD) =="
           unzip -l build/WilmenAdventure.apk | grep -c "assets/levels/data/level_" | sed 's/^/niveles de WILMEN ADVENTURE: /'
           if ! unzip -l build/WilmenAdventure.apk | grep -q "assets/levels/world/ww_001.txt"; then echo "ERROR: faltan los niveles de WILMEN WORLD en el APK"; exit 1; fi
+          if ! unzip -l build/WilmenAdventure.apk | grep -q "assets/levels/world/map.json"; then echo "ERROR: falta el mapa de WILMEN WORLD en el APK"; exit 1; fi
+          echo "niveles de WILMEN WORLD: $(unzip -l build/WilmenAdventure.apk | grep -c 'assets/levels/world/ww_')"
           echo "== firma =="
           $BT/apksigner verify --verbose build/WilmenAdventure.apk | head -n 8
           echo "== datos =="

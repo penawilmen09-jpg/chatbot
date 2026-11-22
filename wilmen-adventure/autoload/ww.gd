@@ -7,7 +7,7 @@ extends Node
 ##
 ## Hito 1: modo independiente, guardado, acceso desde el menú y pantalla de inicio del modo.
 
-const SAVE_VERSION := 1
+const SAVE_VERSION := 2
 const REGION_COUNT := 6
 const LEVELS_PER_REGION := 20
 const LEVEL_COUNT := 120
@@ -15,7 +15,8 @@ const START_LIVES := 5
 const REGION_NAMES := ["Bosque Esmeralda", "Desierto Dorado", "Reino Volcánico", "Reino Congelado", "Océano Perdido",
 	"Reino de las Sombras"]
 const REGION_COLORS := [Color("#5adf7a"), Color("#ffd23a"), Color("#ff7a3a"), Color("#8fe0ff"), Color("#3a8ce6"), Color("#a06aff")]
-const KNOWN_KEYS := ["version", "lives", "coins", "gems", "score", "keys", "levels", "nodes", "secrets", "stats"]
+const KNOWN_KEYS := ["version", "lives", "coins", "gems", "score", "keys", "levels", "nodes", "secrets", "stats", "map_node"]
+const MAP_PATH := "res://levels/world/map.json"
 const LEVEL_DIR := "res://levels/world/"
 const KEY_TYPE := "bronce"
 ## Tema visual (arte de WILMEN ADVENTURE reutilizado) de cada región: Bosque, Desierto, Volcán, Hielo, Océano, Sombras.
@@ -36,6 +37,8 @@ var nodes: Dictionary = {}  # nodos del mapa descubiertos/desbloqueados (hitos s
 var secrets: Dictionary = {}
 var stats: Dictionary = {}
 var current_level: int = 1  # nivel de WILMEN WORLD que se va a jugar (1..120)
+var map_node: int = 1  # dónde está el héroe en el mapa
+var _map: Dictionary = {}
 var _extra: Dictionary = {}  # claves desconocidas (de versiones futuras): se conservan al guardar
 
 
@@ -90,6 +93,7 @@ func reset() -> void:
 	nodes = {}
 	secrets = {}
 	stats = {}
+	map_node = 1
 	_extra = {}
 	changed.emit()
 
@@ -106,21 +110,27 @@ func to_dict() -> Dictionary:
 	d["nodes"] = nodes.duplicate(true)
 	d["secrets"] = secrets.duplicate(true)
 	d["stats"] = stats.duplicate(true)
+	d["map_node"] = map_node
 	return d
 
 
 func from_dict(d: Dictionary) -> void:
 	## Lectura tolerante: tipos incorrectos o valores absurdos se corrigen sin fallar.
 	reset()
+	var version: int = int(d.get("version", 1))
 	lives = maxi(1, int(d.get("lives", START_LIVES)))
 	coins = maxi(0, int(d.get("coins", 0)))
 	gems = maxi(0, int(d.get("gems", 0)))
 	score = maxi(0, int(d.get("score", 0)))
 	var k = d.get("keys", {})
+	if version < 2:
+		k = {}  # v1 (hito 2): los niveles de prueba se sustituyeron por los del mapa real; no se arrastran llaves ni niveles
 	if typeof(k) == TYPE_DICTIONARY:
 		for id in k:
 			keys[str(id)] = maxi(0, int(k[id]))
 	var lv = d.get("levels", {})
+	if version < 2:
+		lv = {}  # nunca se marca nada como completado por migración
 	if typeof(lv) == TYPE_DICTIONARY:
 		for id in lv:
 			var n: int = int(str(id))
@@ -138,7 +148,9 @@ func from_dict(d: Dictionary) -> void:
 			for item in (rec.get("opened", []) if typeof(rec.get("opened", [])) == TYPE_ARRAY else []):
 				op.append(str(item))
 			levels[str(n)] = {"done": bool(rec.get("done", false)), "gems": gm, "best_time": float(rec.get("best_time", 0.0)),
-				"best_left": float(rec.get("best_left", 0.0)), "keys_taken": kt, "opened": op}
+				"best_left": float(rec.get("best_left", 0.0)), "keys_taken": kt, "opened": op,
+				"secret": bool(rec.get("secret", false))}
+	map_node = int(d.get("map_node", 1)) if version >= 2 else 1
 	for name in ["nodes", "secrets", "stats"]:
 		if typeof(d.get(name)) == TYPE_DICTIONARY:
 			set(name, d[name].duplicate(true))
@@ -240,7 +252,7 @@ func parse_level(text: String) -> Dictionary:
 	##   @warp x,y -> x,y tunnel|door [key=N] [dir=1|-1]   (conecta dos celdas: túnel o puerta; `key` solo en el extremo A)
 	## Las líneas que empiezan por `;` son comentarios.
 	var rows: Array = []
-	var meta: Dictionary = {"title": "Nivel", "region": 1, "theme": 1, "time": 300, "difficulty": 1}
+	var meta: Dictionary = {"title": "Nivel", "region": 1, "theme": 1, "time": 300, "difficulty": 1, "kind": "normal", "zone": -1, "boss": 0}
 	var warps: Array = []
 	for line in text.split("\n"):
 		var l: String = String(line).trim_suffix("\r")
@@ -253,7 +265,9 @@ func parse_level(text: String) -> Dictionary:
 			match key:
 				"title":
 					meta["title"] = val
-				"region", "theme", "time", "difficulty":
+				"kind":
+					meta["kind"] = val
+				"region", "theme", "time", "difficulty", "zone", "boss":
 					meta[key] = int(val)
 				"warp":
 					var w: Dictionary = _parse_warp(val)
@@ -298,12 +312,12 @@ func level_info(n: int) -> Dictionary:
 
 
 func record(n: int) -> Dictionary:
-	return levels.get(str(n), {"done": false, "gems": [false, false, false], "best_time": 0.0, "best_left": 0.0, "keys_taken": [], "opened": []})
+	return levels.get(str(n), {"done": false, "gems": [false, false, false], "best_time": 0.0, "best_left": 0.0, "keys_taken": [], "opened": [], "secret": false})
 
 
 func _rec_for_write(n: int) -> Dictionary:
 	if not levels.has(str(n)):
-		levels[str(n)] = {"done": false, "gems": [false, false, false], "best_time": 0.0, "best_left": 0.0, "keys_taken": [], "opened": []}
+		levels[str(n)] = {"done": false, "gems": [false, false, false], "best_time": 0.0, "best_left": 0.0, "keys_taken": [], "opened": [], "secret": false}
 	return levels[str(n)]
 
 
@@ -315,11 +329,13 @@ func gems_in(n: int) -> int:
 	return c
 
 
-func register_complete(n: int, gem_flags: Array, elapsed: float, time_left: float) -> Dictionary:
+func register_complete(n: int, gem_flags: Array, elapsed: float, time_left: float, secret_exit: bool = false) -> Dictionary:
 	## Al llegar a la meta. Devuelve {"first": bool, "new_best": bool}. Repetir un nivel fusiona gemas y mejora el récord.
 	var rec: Dictionary = _rec_for_write(n)
 	var first: bool = not bool(rec["done"])
 	rec["done"] = true
+	if secret_exit:
+		rec["secret"] = true
 	var merged: Array = []
 	for i in range(3):
 		merged.append(bool(rec["gems"][i]) or (i < gem_flags.size() and bool(gem_flags[i])))
@@ -329,7 +345,7 @@ func register_complete(n: int, gem_flags: Array, elapsed: float, time_left: floa
 		rec["best_time"] = elapsed
 		rec["best_left"] = time_left
 	changed.emit()
-	return {"first": first, "new_best": new_best}
+	return {"first": first, "new_best": new_best, "secret": secret_exit}
 
 
 # ------------------------------------------------- llaves y puertas -----
@@ -386,3 +402,127 @@ func _notification(what: int) -> void:
 			harvest()
 		elif has_progress():
 			save_game()
+
+
+# ------------------------------------------------------------- mapa -----
+func map_data() -> Dictionary:
+	if _map.is_empty():
+		var t: String = FileAccess.get_file_as_string(MAP_PATH)
+		var j := JSON.new()
+		if j.parse(t) == OK and typeof(j.data) == TYPE_DICTIONARY:
+			_map = j.data
+			var by: Dictionary = {}
+			for n in _map["nodes"]:
+				by[int(n["id"])] = n
+			_map["_by"] = by
+	return _map
+
+
+func map_node_data(id: int) -> Dictionary:
+	return map_data().get("_by", {}).get(id, {})
+
+
+func region_status(region: int) -> String:
+	for r in map_data().get("regions", []):
+		if int(r["id"]) == region:
+			return str(r["status"])
+	return "construction"
+
+
+func secret_done(n: int) -> bool:
+	return bool(record(n).get("secret", false))
+
+
+func edge_unlocked(e: Dictionary) -> bool:
+	## Un camino se abre al completar su nivel de origen (salida normal) o al encontrar su salida secreta.
+	var need: Dictionary = e["need"]
+	match str(need["type"]):
+		"done":
+			return is_done(int(need["node"]))
+		"secret":
+			return secret_done(int(need["node"]))
+	return false
+
+
+func node_state(id: int) -> String:
+	## hidden | construction | locked | available | done | sealed
+	var n: Dictionary = map_node_data(id)
+	if n.is_empty():
+		return "hidden"
+	var kind: String = str(n["kind"])
+	var reached: bool = id == int(map_data()["start"])
+	for e in map_data()["edges"]:
+		if (int(e["a"]) == id or int(e["b"]) == id) and edge_unlocked(e):
+			reached = true
+			break
+	if kind == "sealed":
+		return "sealed" if reached else "hidden"
+	if bool(n["hidden"]) and not reached:
+		return "hidden"
+	if region_status(int(n["region"])) != "playable":
+		return "construction"
+	if is_done(id):
+		return "done"
+	return "available" if reached else "locked"
+
+
+func is_walkable(id: int) -> bool:
+	return ["available", "done", "sealed"].has(node_state(id))
+
+
+func can_enter(id: int) -> bool:
+	var s: String = node_state(id)
+	return (s == "available" or s == "done") and has_level(id)
+
+
+func neighbors(id: int) -> Array:
+	## [{"to": id, "edge": e}] de los caminos abiertos desde un nivel hacia niveles donde se puede estar.
+	var out: Array = []
+	for e in map_data()["edges"]:
+		if not edge_unlocked(e):
+			continue
+		var other: int = -1
+		if int(e["a"]) == id:
+			other = int(e["b"])
+		elif int(e["b"]) == id:
+			other = int(e["a"])
+		if other >= 0 and is_walkable(other):
+			out.append({"to": other, "edge": e})
+	return out
+
+
+func route(from: int, to: int) -> Array:
+	## Camino más corto por caminos abiertos: lista de {"to", "edge"}; vacío si no hay.
+	if from == to:
+		return []
+	var prev: Dictionary = {from: null}
+	var q: Array = [from]
+	while not q.is_empty():
+		var cur: int = q.pop_front()
+		for nb in neighbors(cur):
+			var t: int = int(nb["to"])
+			if not prev.has(t):
+				prev[t] = {"from": cur, "edge": nb["edge"]}
+				if t == to:
+					var steps: Array = []
+					var at: int = to
+					while prev[at] != null:
+						steps.push_front({"to": at, "edge": prev[at]["edge"], "from": prev[at]["from"]})
+						at = int(prev[at]["from"])
+					return steps
+				q.append(t)
+	return []
+
+
+func map_snapshot() -> Dictionary:
+	## Estado visible del mapa (para animar lo que se acaba de desbloquear).
+	var nodes_open: Array = []
+	var edges_open: Array = []
+	for n in map_data()["nodes"]:
+		var s: String = node_state(int(n["id"]))
+		if s != "hidden" and s != "locked" and s != "construction":
+			nodes_open.append(int(n["id"]))
+	for i in range(map_data()["edges"].size()):
+		if edge_unlocked(map_data()["edges"][i]):
+			edges_open.append(i)
+	return {"nodes": nodes_open, "edges": edges_open}

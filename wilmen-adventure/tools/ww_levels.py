@@ -148,7 +148,7 @@ def tower(c, x, steps, gt=15, top_y=6, ledge=5, reward="o"):
     for (dx, y) in steps:
         for k in range(3):
             c.set(x + 3 + dx + k, y, "=")
-    lx = x + 3 + steps[-1][0] + 4
+    lx = x + 3 + max(d for d, _ in steps) + 4
     c.fill(lx, top_y, lx + ledge, R, "#")
     if reward == "o":
         coins(c, lx, lx + ledge, top_y - 2)
@@ -287,26 +287,30 @@ def warp(c, a, b, kind, key=0, d=1):
     c.set(b[0], b[1], glyph)
 
 
-def write(n, c, title, region, theme, time_s, diff, notes):
+def write(n, c, title, region, theme, time_s, diff, notes, kind="normal", zone=None, boss=0, pieces=()):
     rows = c.rows()
-    # el nivel debe medir exactamente R filas y todas la misma anchura
     w = c.w
     path = os.path.join(OUT, "ww_%03d.txt" % n)
     with open(path, "w") as f:
         f.write("; WILMEN WORLD - nivel %d: %s\n" % (n, title))
         for line in notes:
             f.write("; %s\n" % line)
-        f.write("@title %s\n@region %d\n@theme %d\n@time %d\n@difficulty %d\n" % (title, region, theme, time_s, diff))
-        for s in c.warps:
-            f.write(s + "\n")
+        if pieces:
+            f.write("; piezas: %s\n" % ",".join(pieces))
+        f.write("@title %s\n@region %d\n@theme %d\n@time %d\n@difficulty %d\n@kind %s\n" % (title, region, theme, time_s, diff, kind))
+        if zone is not None:
+            f.write("@zone %d\n" % zone)
+        if boss:
+            f.write("@boss %d\n" % boss)
+        for s_ in c.warps:
+            f.write(s_ + "\n")
         for r in rows:
             f.write(r.ljust(w) + "\n")
-    print("ww_%03d.txt: %d columnas" % (n, w))
+    return w
 
 
 # ===================================================================== NIVELES ==
-exec(open(os.path.join(os.path.dirname(__file__), "ww_level_defs.py")).read())
-
 if __name__ == "__main__":
     os.makedirs(OUT, exist_ok=True)
-    build_all()
+    import ww_r1_defs
+    ww_r1_defs.build_all()

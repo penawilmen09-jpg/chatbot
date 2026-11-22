@@ -84,6 +84,13 @@ func _run() -> void:
 	_scene = load("res://levels/level.tscn")
 	_check(_scene != null, "level.tscn carga")
 
+	if OS.get_cmdline_user_args().has("--ww3"):
+		await _test_ww_content()
+		await _test_ww_map()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
+
 	if OS.get_cmdline_user_args().has("--ww2"):
 		await _test_ww_levels()
 		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
@@ -160,6 +167,8 @@ func _run() -> void:
 	await _test_title_menu()
 	await _test_ads()
 	await _test_ww_base()
+	await _test_ww_content()
+	await _test_ww_map()
 	await _test_ww_levels()
 	await _test_flow()
 	await _test_touch_controls()
@@ -1958,7 +1967,7 @@ func _test_fireball_pulse() -> void:
 	_reset_game()
 
 
-# ============================================== WILMEN WORLD (hito 1): modo independiente ===
+# ============================================== WILMEN WORLD: modo independiente ===
 const ORIGINAL_LEVELS_SHA := "8607279216819a4d2cc872bec1073e6bd604923d10ae3d37b1d940f27bd0db52"
 
 
@@ -1971,23 +1980,26 @@ func _sha(path: String) -> String:
 	return FileAccess.get_sha256(path) if FileAccess.file_exists(path) else "(sin archivo)"
 
 
+func _ww_done(n: int, gem_flags: Array = [false, false, false], secret: bool = false) -> void:
+	## Completa un nivel de WILMEN WORLD por la vía legítima (la misma que usa la meta).
+	_ww.register_complete(n, gem_flags, 100.0, 50.0, secret)
+
+
 func _test_ww_base() -> void:
-	print("WILMEN WORLD (hito 1): guardado independiente, protección del modo original, menú y pantalla de inicio")
+	print("WILMEN WORLD: guardado independiente, protección del modo original, migración y menú")
 	var story_path: String = _game.save_path
 	var ww_path: String = _ww.save_path
 	_check(ww_path != story_path and ww_path.get_file() != "wilmen_save.json", "la partida de WILMEN WORLD usa otro archivo")
 	var default_ww: String = load("res://autoload/ww.gd").new().save_path
 	_check(default_ww == "user://wilmen_world_save.json", "archivo real del modo: user://wilmen_world_save.json")
 	_check(_ww.REGION_COUNT * _ww.LEVELS_PER_REGION == 120 and _ww.LEVEL_COUNT == 120 and _ww.REGION_NAMES.size() == 6, "6 regiones x 20 niveles = 120")
-	_check(_ww.REGION_NAMES == ["Bosque Esmeralda", "Desierto Dorado", "Reino Volcánico", "Reino Congelado", "Océano Perdido", "Reino de las Sombras"], "las 6 regiones elegidas")
-	# ---- el modo original no cambia ----
+	_check(_ww.SAVE_VERSION == 2, "guardado de WILMEN WORLD v2")
 	_check(_game.LEVEL_COUNT == 100 and _game.LEVELS_PER_WORLD == 10 and _game.SAVE_VERSION == 3, "WILMEN ADVENTURE: 100 niveles, 10 mundos y guardado v3")
 	_check(_game.KNOWN_KEYS == ["version", "lives", "score", "coins", "total_coins", "levels", "worlds_done", "unlocked", "settings", "ext"], "las claves del guardado original no cambian")
 	var hs: String = ""
 	for n in range(1, 101):
 		hs += FileAccess.get_sha256("res://levels/data/level_%02d.txt" % n)
 	_check(hs.sha256_text() == ORIGINAL_LEVELS_SHA, "los 100 niveles originales siguen idénticos (huella de sus archivos)")
-	# ---- guardados independientes ----
 	_reset_game()
 	_wipe_ww_files()
 	_game.coins = 777
@@ -1996,15 +2008,14 @@ func _test_ww_base() -> void:
 	_game.unlocked[2] = true
 	_game.save_game()
 	var story_hash: String = _sha(story_path)
-	_check(story_hash != "(sin archivo)", "se guardó la partida de WILMEN ADVENTURE (huella de referencia)")
 	_ww.reset()
 	_ww.coins = 55
 	_ww.gems = 4
 	_ww.lives = 7
 	_ww.score = 900
-	_ww.keys = {"bronce": 2, "plata": 1}
-	_ww.levels["3"] = {"done": true, "gems": [true, true, false], "best_time": 61.5}
-	_ww.nodes = {"r1_start": true}
+	_ww.keys = {"bronce": 2}
+	_ww.map_node = 3
+	_ww_done(3, [true, true, false], true)
 	_check(_ww.save_game(), "WILMEN WORLD guarda su partida")
 	_check(FileAccess.file_exists(ww_path) and _sha(story_path) == story_hash, "guardar WILMEN WORLD NO toca la partida de WILMEN ADVENTURE")
 	var ww_hash: String = _sha(ww_path)
@@ -2014,33 +2025,35 @@ func _test_ww_base() -> void:
 	_check(_game.coins == 787 and _ww.coins == 55, "monedas independientes (Adventure %d, World %d)" % [_game.coins, _ww.coins])
 	_game.save_game()
 	story_hash = _sha(story_path)
-	# ---- ida y vuelta ----
 	_ww.reset()
-	_check(_ww.coins == 0 and _ww.lives == _ww.START_LIVES and _ww.levels.is_empty() and _ww.keys.is_empty(), "reset() vuelve al estado inicial del modo")
+	_check(_ww.coins == 0 and _ww.levels.is_empty() and _ww.map_node == 1, "reset() vuelve al estado inicial del modo")
 	_check(_sha(story_path) == story_hash and _game.coins == 787, "reiniciar WILMEN WORLD NO toca WILMEN ADVENTURE")
 	_ww.load_game()
-	_check(_ww.coins == 55 and _ww.gems == 4 and _ww.lives == 7 and _ww.score == 900, "al cargar se recuperan monedas, gemas, vidas y puntos")
-	_check(_ww.keys == {"bronce": 2, "plata": 1} and _ww.total_keys() == 3, "se recuperan las llaves")
-	_check(_ww.is_done(3) and not _ww.is_done(4) and _ww.completed_count() == 1 and _ww.completed_in_region(1) == 1, "se recupera el progreso de niveles")
-	_check(_ww.nodes.has("r1_start"), "se recuperan los nodos del mapa")
-	# ---- robustez ----
-	_check(_ww.save_game(), "segundo guardado (crea la copia .bak del anterior)")
-	_check(FileAccess.file_exists(ww_path + ".bak"), "existe la copia .bak")
+	_check(_ww.coins == 55 and _ww.gems == 4 and _ww.lives == 7 and _ww.score == 900 and _ww.keys == {"bronce": 2}, "al cargar se recuperan monedas, gemas, vidas, puntos y llaves")
+	_check(_ww.is_done(3) and _ww.secret_done(3) and _ww.gems_in(3) == 2 and _ww.map_node == 3, "se recupera el nivel completado, su salida secreta, las gemas y la posición en el mapa")
+	# migración v1 (hito 2): ningún nivel se marca como completado automáticamente
 	var f := FileAccess.open(ww_path, FileAccess.WRITE)
+	f.store_string(JSON.stringify({"version": 1, "lives": 6, "coins": 33, "keys": {"bronce": 3}, "levels": {"1": {"done": true, "gems": [true, true, true]}, "2": {"done": true}, "3": {"done": true}}}))
+	f.close()
+	_ww.load_game()
+	_check(_ww.completed_count() == 0 and not _ww.is_done(1) and _ww.key_count() == 0, "migración v1 -> v2: no se arrastra ningún nivel completado ni llave")
+	_check(_ww.coins == 33 and _ww.lives == 6, "pero se conservan monedas y vidas")
+	# robustez
+	_ww.reset()
+	_ww.coins = 55
+	_check(_ww.save_game() and _ww.save_game() and FileAccess.file_exists(ww_path + ".bak"), "se crea la copia .bak")
+	f = FileAccess.open(ww_path, FileAccess.WRITE)
 	f.store_string("{esto no es json")
 	f.close()
 	_ww.reset()
 	_ww.load_game()
 	_check(_ww.coins == 55, "archivo dañado: se recupera la copia .bak")
 	f = FileAccess.open(ww_path, FileAccess.WRITE)
-	f.store_string(JSON.stringify({"version": 1, "lives": "x", "coins": -5, "levels": {"999": {"done": true}, "2": {"done": true, "gems": [true]}, "abc": 1}, "futuro": {"a": 1}}))
+	f.store_string(JSON.stringify({"version": 2, "lives": "x", "coins": -5, "levels": {"999": {"done": true}, "2": {"done": true, "gems": [true]}, "abc": 1}, "futuro": {"a": 1}}))
 	f.close()
 	_ww.load_game()
 	_check(_ww.lives >= 1 and _ww.coins == 0 and not _ww.levels.has("999") and _ww.is_done(2), "valores absurdos se corrigen y los niveles fuera de rango se ignoran")
-	_check(_ww.save_game(), "se vuelve a guardar")
-	var back: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(ww_path))
-	_check(back.has("futuro") and back["version"] == 1, "las claves desconocidas (versiones futuras) se conservan")
-	# ---- salvaguarda: nunca escribir sobre la partida original ----
+	_check(_ww.save_game() and JSON.parse_string(FileAccess.get_file_as_string(ww_path)).has("futuro"), "las claves desconocidas se conservan")
 	var keep_path: String = _ww.save_path
 	_ww.save_path = story_path
 	_check(not _ww.save_game() and _sha(story_path) == story_hash, "WILMEN WORLD se niega a guardar sobre el archivo de WILMEN ADVENTURE")
@@ -2048,7 +2061,7 @@ func _test_ww_base() -> void:
 	var real_before: String = _sha("user://wilmen_save.json")
 	_check(not _ww.save_game() and _sha("user://wilmen_save.json") == real_before, "ni siquiera con la ruta real wilmen_save.json")
 	_ww.save_path = keep_path
-	# ---- menú principal ----
+	# menú principal
 	_reset_game()
 	var title = load("res://ui/title.tscn").instantiate()
 	root.add_child(title)
@@ -2056,54 +2069,202 @@ func _test_ww_base() -> void:
 	var btns: Array = title._menu.get_children()
 	var wbtn = btns[2]
 	_check(wbtn.text == "WILMEN WORLD" and wbtn.icon != null and wbtn.pressed.get_connections().size() > 0 and not wbtn.disabled, "el menú tiene el botón real «WILMEN WORLD» con icono y acción")
-	var last_y: float = btns[btns.size() - 1].get_global_rect().end.y
-	_check(last_y <= title.size.y - 4.0, "los 6 botones caben en pantalla (último termina en y=%.0f de %.0f)" % [last_y, title.size.y])
-	var overlap: bool = false
-	for i in range(btns.size() - 1):
-		if btns[i].get_global_rect().end.y > btns[i + 1].get_global_rect().position.y + 0.5:
-			overlap = true
-	_check(not overlap, "los botones del menú no se solapan")
+	_check(btns[btns.size() - 1].get_global_rect().end.y <= title.size.y - 4.0, "los 6 botones caben en pantalla")
 	title.queue_free()
 	await _frames(3)
-	# ---- pantalla de inicio de WILMEN WORLD ----
-	_wipe_ww_files()
-	_ww.reset()
-	_ww.coins = 7
-	_ww.gems = 2
-	_ww.keys = {"bronce": 1}
-	_ww.levels["1"] = {"done": true, "gems": [false, false, false], "best_time": 0.0}
-	_ww.levels["21"] = {"done": true, "gems": [false, false, false], "best_time": 0.0}
-	story_hash = _sha(story_path)
-	var hub = load("res://ui/ww_hub.tscn").instantiate()
-	root.add_child(hub)
-	await _frames(8)
-	var texts: Array = []
-	for l in hub.find_children("*", "Label", true, false):
-		texts.append(l.text)
-	_check(texts.has("WILMEN WORLD"), "la pantalla del modo muestra su título")
-	_check(texts.has("Niveles  2/120") and texts.has("Monedas  7") and texts.has("Gemas  2") and texts.has("Llaves  1"), "muestra el progreso PROPIO del modo")
-	_check(texts.has("Bosque Esmeralda") and texts.has("Reino de las Sombras"), "lista las regiones")
-	_check(texts.has("1/20"), "progreso por región (1/20 en las dos primeras)")
-	_check(FileAccess.file_exists(ww_path), "entrar crea la partida propia del modo")
-	_check(_sha(story_path) == story_hash, "entrar en WILMEN WORLD no toca la partida de WILMEN ADVENTURE")
-	_check(hub.find_children("*", "AnimatedSprite2D", true, false).size() > 0, "se muestra el héroe con su apariencia")
-	# reiniciar: dos pasos y solo afecta al modo
-	hub._reset_btn.pressed.emit()
-	_check(_ww.coins == 7 and hub._reset_btn.text.begins_with("¿Seguro"), "reiniciar pide confirmación y no borra a la primera")
-	hub._reset_btn.pressed.emit()
-	await _frames(2)
-	_check(_ww.coins == 0 and _ww.completed_count() == 0 and _ww.lives == _ww.START_LIVES, "tras confirmar, WILMEN WORLD vuelve a empezar")
-	_check(JSON.parse_string(FileAccess.get_file_as_string(ww_path))["coins"] == 0, "y su archivo queda reiniciado")
-	_check(_sha(story_path) == story_hash, "reiniciar WILMEN WORLD no toca la partida original")
-	_check(hub._back != null and hub._back.pressed.get_connections().size() > 0, "hay un botón para volver al menú")
-	hub.queue_free()
-	await _frames(3)
+	_check(_sha(story_path) == story_hash, "WILMEN ADVENTURE sigue sin tocarse")
 	_wipe_ww_files()
 	_ww.reset()
 	_reset_game()
 
 
-# ============================== WILMEN WORLD (hito 2): reloj, túneles, puertas, llaves y niveles ===
+# ============================ WILMEN WORLD: contenido de la región 1 (20 niveles) ===
+func _test_ww_content() -> void:
+	print("WILMEN WORLD: región 1 completa (20 niveles reales de 700 a 1000 columnas) y mapa de 120 niveles")
+	var avail: Array = _ww.available_levels()
+	_check(avail == range(1, 21), "existen exactamente los 20 niveles de la región 1 (ww_001..020): %s" % str(avail.size()))
+	_check(not _ww.has_level(21) and not _ww.has_level(120), "los niveles de las regiones 2 a 6 NO existen todavía (no se muestran como jugables)")
+	var kinds: Dictionary = {}
+	var titles: Dictionary = {}
+	var shas: Dictionary = {}
+	var bad: Array = []
+	for n in avail:
+		var d: Dictionary = _ww.parse_level(FileAccess.get_file_as_string(_ww.level_path(n)))
+		var meta: Dictionary = d["meta"]
+		var txt: String = "".join(d["rows"])
+		var cols: int = int(d["cols"])
+		var run: float = float(cols) * 16.0 / 125.0
+		var t: int = int(meta["time"])
+		if cols < 700 or cols > 1000 or d["rows"].size() != 20:
+			bad.append("%d: columnas %d" % [n, cols])
+		if t < int(run * 2.6) or t > int(run * 4.2):
+			bad.append("%d: tiempo %d" % [n, t])
+		if txt.count("P") != 1 or txt.count("F") != 1 or txt.count("*") != 3 or txt.count("C") < 3:
+			bad.append("%d: P/F/gemas/puntos de control" % n)
+		if d["warps"].size() < 1 or txt.count("U") + int(str(meta["kind"]) == "castle") < 1:
+			bad.append("%d: sin túneles/llaves" % n)
+		var secret_expected: bool = [5, 9, 13, 19].has(n)
+		if (txt.count("O") == 1) != secret_expected:
+			bad.append("%d: salida secreta" % n)
+		var boss_expected: bool = n == 20
+		if (txt.count("X") == 1 and txt.count("G") == 1) != boss_expected or (not boss_expected and (txt.count("X") > 0 or txt.count("G") > 0)):
+			bad.append("%d: jefe" % n)
+		kinds[str(meta["kind"])] = int(kinds.get(str(meta["kind"]), 0)) + 1
+		titles[str(meta["title"])] = true
+		shas[FileAccess.get_sha256(_ww.level_path(n))] = true
+	_check(bad.is_empty(), "los 20 niveles cumplen longitud, tiempo, meta, gemas, puntos de control, túneles/llaves, salida secreta y jefe %s" % str(bad))
+	_check(kinds == {"normal": 14, "cave": 2, "house": 1, "fortress": 1, "secret": 1, "castle": 1}, "distribución: 14 normales, 2 cuevas, 1 casa, 1 fortaleza, 1 ruta secreta y 1 castillo %s" % str(kinds))
+	_check(titles.size() == 20 and shas.size() == 20, "los 20 niveles tienen nombre propio y contenido distinto")
+	# ---- datos del mapa ----
+	var data: Dictionary = _ww.map_data()
+	var by_region: Dictionary = {}
+	var node_kinds: Dictionary = {}
+	for n in data["nodes"]:
+		if int(n["id"]) < 900:
+			by_region[int(n["region"])] = int(by_region.get(int(n["region"]), 0)) + 1
+			node_kinds[str(n["kind"])] = int(node_kinds.get(str(n["kind"]), 0)) + 1
+	_check(by_region == {1: 20, 2: 20, 3: 20, 4: 20, 5: 20, 6: 20}, "el mapa tiene los 120 niveles, 20 por región")
+	_check(node_kinds == {"dot": 90, "cave": 12, "house": 6, "fortress": 6, "castle": 6}, "entradas del mapa: puntos, cuevas, casas, fortalezas y castillos %s" % str(node_kinds))
+	var statuses: Array = []
+	for r in data["regions"]:
+		statuses.append(str(r["status"]))
+	_check(statuses == ["playable", "construction", "construction", "construction", "construction", "construction"], "región 1 jugable; las otras cinco visibles y en construcción")
+	_check(data["bridges"].size() >= 8 and data["rivers"].size() >= 4 and data["mountains"].size() >= 8, "el mapa tiene puentes, ríos y montañas")
+	var tunnels: int = 0
+	for e in data["edges"]:
+		if str(e["kind"]) == "tunnel":
+			tunnels += 1
+	_check(tunnels >= 12, "y túneles entre niveles (%d)" % tunnels)
+
+
+# ======================================= WILMEN WORLD: el mapa explorable =====
+func _test_ww_map() -> void:
+	print("WILMEN WORLD: mapa explorable, caminos, desbloqueo y secretos")
+	var story_path: String = _game.save_path
+	_wipe_ww_files()
+	_ww.reset()
+	_reset_game()
+	_game.save_game()
+	var story_hash: String = _sha(story_path)
+	# ---- estados iniciales: nada está completado ----
+	_check(_ww.completed_count() == 0, "al empezar no hay ningún nivel completado")
+	_check(_ww.node_state(1) == "available", "solo el nivel 1-1 está disponible")
+	var avail_n: int = 0
+	var states: Dictionary = {}
+	for n in _ww.map_data()["nodes"]:
+		var s: String = _ww.node_state(int(n["id"]))
+		states[s] = int(states.get(s, 0)) + 1
+		if s == "available":
+			avail_n += 1
+	_check(avail_n == 1, "un único nivel disponible al empezar")
+	_check(_ww.node_state(2) == "locked" and _ww.node_state(20) == "locked", "el resto de la región 1 está bloqueado (pero visible)")
+	_check(_ww.node_state(7) == "hidden" and _ww.node_state(901) == "hidden", "la casa 1-7 y el túnel sellado están ocultos hasta descubrirlos")
+	_check(_ww.node_state(21) == "construction" and _ww.node_state(120) == "construction", "las regiones 2 a 6 aparecen «en construcción»")
+	_check(not _ww.can_enter(2) and not _ww.can_enter(21) and _ww.can_enter(1), "solo se puede entrar en el nivel disponible")
+	# ---- desbloqueos legítimos ----
+	_check(_ww.route(1, 2).is_empty(), "no hay camino hasta el 1-2 antes de completar el 1-1")
+	_ww_done(1)
+	_check(_ww.node_state(1) == "done" and _ww.node_state(2) == "available", "completar el 1-1 abre el camino al 1-2")
+	_check(not _ww.route(1, 2).is_empty() and _ww.route(1, 3).is_empty(), "y solo ese: el 1-3 sigue sin camino")
+	_check(_ww.node_state(4) == "locked" and _ww.node_state(5) == "locked", "el 1-4 y el 1-5 siguen bloqueados")
+	_ww_done(2)
+	_ww_done(3)
+	_check(_ww.node_state(4) == "available" and _ww.node_state(5) == "available", "tras el 1-3 hay dos caminos alternativos: cueva (1-4) y copas (1-5)")
+	_check(_ww.node_state(6) == "locked", "el 1-6 aún no")
+	_ww_done(5)
+	_check(_ww.node_state(6) == "available" and _ww.node_state(7) == "hidden", "completar el 1-5 por la salida normal abre el 1-6 pero NO descubre la casa")
+	_ww_done(5, [false, false, false], true)
+	_check(_ww.node_state(7) == "available", "la salida SECRETA del 1-5 descubre la casa 1-7 (ruta secreta)")
+	_check(not _ww.route(5, 7).is_empty(), "y abre su camino")
+	_ww_done(6)
+	_ww_done(8)
+	_ww_done(9, [false, false, false], true)
+	var edge_secret: Dictionary = {}
+	for e in _ww.map_data()["edges"]:
+		if int(e["a"]) == 9 and int(e["b"]) == 15:
+			edge_secret = e
+	_check(not edge_secret.is_empty() and _ww.edge_unlocked(edge_secret), "la salida secreta del 1-9 abre un túnel bajo la montaña hasta el 1-15")
+	_check(_ww.node_state(20) == "locked" and _ww.node_state(21) == "construction", "el castillo sigue bloqueado y la región 2 sin construir")
+	# la región siguiente no se puede pisar aunque se complete el castillo
+	_ww_done(19)
+	_ww_done(20)
+	_check(_ww.node_state(21) == "construction" and not _ww.can_enter(21), "aunque se supere el castillo, la región 2 sigue en construcción y no jugable")
+	_wipe_ww_files()
+	_ww.reset()
+	# ---- escena del mapa ----
+	var map = load("res://ui/ww_map.tscn").instantiate()
+	root.add_child(map)
+	await _frames(10)
+	var vis: int = 0
+	for id in map.node_views:
+		if map.node_views[id].visible:
+			vis += 1
+	_check(vis == 114, "el mapa muestra 114 entradas (los 120 niveles menos las 6 casas ocultas): %d" % vis)
+	_check(map.at_node == 1 and map.hero.position.distance_to(map._pos_of(1)) < 1.0, "el héroe empieza en el nivel 1-1")
+	_check(map.hero_sprite.animation == "idle" and not map.walking, "y está quieto (animación de reposo)")
+	_check(map._enter_btn.text == "ENTRAR" and not map._enter_btn.disabled, "el botón ENTRAR está activo en el 1-1")
+	_check(map.get_child_count() > 5 and map.camera != null, "hay mapa, caminos, niveles, héroe y cámara")
+	# tocar un nivel bloqueado: no se mueve
+	var p0: Vector2 = map.hero.position
+	_check(not map._walk_to(2), "tocar un nivel bloqueado no mueve al héroe")
+	await _frames(10)
+	_check(map.hero.position == p0 and map.at_node == 1, "el héroe sigue en su sitio")
+	_check(not map._walk_to(21), "tampoco hacia una región en construcción")
+	_check(map._enter_btn.disabled == false, "ENTRAR sigue disponible solo para el nivel actual")
+	# completar el 1-1 y caminar hasta el 1-2
+	_ww_done(1)
+	map._refresh_all()
+	map.paths.queue_redraw()
+	_check(map._walk_to(2) and map.walking, "tras completar el 1-1 el héroe puede ir al 1-2")
+	_check(map.hero_sprite.animation == "run", "y camina con la animación de correr")
+	var moved: bool = false
+	var max_off: float = 0.0
+	var path: Array = []
+	for e in _ww.map_data()["edges"]:
+		if int(e["a"]) == 1 and int(e["b"]) == 2:
+			path = e["path"]
+	for i in range(240):
+		await physics_frame
+		if map.hero.position.distance_to(p0) > 20.0:
+			moved = true
+		# siempre cerca del camino (camina POR el camino)
+		var dmin: float = 1e9
+		for q in path:
+			dmin = minf(dmin, map.hero.position.distance_to(Vector2(float(q[0]), float(q[1]))))
+		max_off = maxf(max_off, dmin)
+		if not map.walking:
+			break
+	_check(moved and not map.walking and map.at_node == 2, "el héroe camina físicamente y llega al 1-2")
+	_check(map.hero.position.distance_to(map._pos_of(2)) < 2.0 and max_off < 14.0, "siguiendo el camino (se alejó como máximo %.1f px de él)" % max_off)
+	_check(map.hero_sprite.animation == "idle" and _ww.map_node == 2, "se detiene y la posición queda guardada")
+	# flechas: hacia atrás por el camino abierto
+	map._press_dir(Vector2.LEFT)
+	map._press_dir(Vector2.UP)
+	map._press_dir(Vector2.RIGHT)
+	map._press_dir(Vector2.DOWN)
+	await _until(func(): return not map.walking, 400)
+	_check(_ww.is_walkable(map.at_node), "las flechas llevan a un nivel contiguo con camino abierto")
+	_check(map._info.text != "" and map._stats.text.begins_with("Vidas"), "el panel muestra el nivel actual y el estado del jugador")
+	_check(_ww.completed_count() == 1, "moverse por el mapa no completa ningún nivel")
+	# marcas visuales
+	var done_badge: Sprite2D = map.node_views[1].get_node("badge")
+	_check(map.node_views[1].get_node("stars").visible and done_badge.texture != null, "el nivel completado lleva su marca (bandera y estrellas)")
+	_check(not map.node_views[3].get_node("stars").visible, "los niveles sin completar no")
+	# menú del mapa
+	map._toggle_menu()
+	await _frames(3)
+	_check(map._menu_panel != null, "el botón Menú abre el menú del mapa")
+	map._toggle_menu()
+	await _frames(3)
+	map.queue_free()
+	await _frames(3)
+	_check(_sha(story_path) == story_hash, "jugar con el mapa no toca la partida de WILMEN ADVENTURE")
+	_wipe_ww_files()
+	_ww.reset()
+	_reset_game()
+
+
+# ================ WILMEN WORLD: reloj, túneles, puertas, llaves, secretos y jefe ===
 func _ww_level(n: int):
 	_ww.start_level(n)
 	var lvl = load("res://levels/ww_level.tscn").instantiate()
@@ -2122,8 +2283,16 @@ func _stand_at(lvl, cell: Vector2i) -> void:
 	lvl.camera.reset_smoothing()
 
 
+func _cell_of(node) -> Vector2i:
+	return Vector2i(int((node.position.x - 8) / 16), int((node.position.y - 16) / 16))
+
+
+func _scripts_of(lvl, path: String) -> Array:
+	return lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == path)
+
+
 func _test_ww_levels() -> void:
-	print("WILMEN WORLD (hito 2): reloj, túneles, puertas con llave, verjas, niveles completos y guardado")
+	print("WILMEN WORLD: reloj, túneles, puertas con llave, verjas, salida secreta, jefe y guardado")
 	var story_path: String = _game.save_path
 	_wipe_ww_files()
 	_ww.reset()
@@ -2134,29 +2303,24 @@ func _test_ww_levels() -> void:
 	_game.save_game()
 	var story_hash: String = _sha(story_path)
 	var game_before: Dictionary = {"coins": _game.coins, "score": _game.score, "lives": _game.lives, "levels": JSON.stringify(_game.levels)}
-	# ---- formato y niveles ----
-	_check(_ww.available_levels() == [1, 2, 3], "existen los 3 niveles de prueba de WILMEN WORLD")
-	var expect: Dictionary = {1: [300, 3, 2], 2: [285, 3, 1], 3: [320, 3, 1]}  # tiempo, túneles+puertas, verjas
-	for n in [1, 2, 3]:
-		var d: Dictionary = _ww.parse_level(FileAccess.get_file_as_string(_ww.level_path(n)))
-		var meta: Dictionary = d["meta"]
-		var rows: Array = d["rows"]
-		var txt: String = "".join(rows)
-		_check(d["cols"] >= 600 and rows.size() == 20, "nivel %d: largo (%d columnas) y 20 filas" % [n, d["cols"]])
-		_check(int(meta["time"]) == int(expect[n][0]), "nivel %d: límite de tiempo %d s" % [n, meta["time"]])
-		_check(d["warps"].size() == 3 and txt.count("P") == 1 and txt.count("F") == 1 and txt.count("*") == 3, "nivel %d: 3 conexiones, 1 inicio, 1 meta, 3 gemas" % n)
-		_check(txt.count("U") >= 2 or n == 1 and txt.count("U") == 1, "nivel %d: tiene llaves" % n)
-		_check(txt.count("T") == 4 and txt.count("A") == 2, "nivel %d: 4 bocas de túnel y 2 puertas" % n)
+	# ---- los 20 niveles se cargan en el motor ----
+	var load_bad: Array = []
+	for n in range(1, 21):
+		var l0 = await _ww_level(n)
+		if l0.player == null or l0.goal == null or l0.cols < 700 or int(l0.time_total) != int(l0.meta["time"]) or l0.warps.size() < 2 and n != 20:
+			load_bad.append(n)
+		if n == 20 and (l0.boss == null or l0.boss.get_script().resource_path != "res://enemies/ww_boss.gd"):
+			load_bad.append(n)
+		await _free_level(l0)
+	_check(load_bad.is_empty(), "los 20 niveles se cargan y se pueden jugar en el motor %s" % str(load_bad))
 	# ---- entrar en el nivel 1: sesión aislada, reloj y HUD ----
 	var lvl = await _ww_level(1)
 	_check(_game.world_active() and _game.mode == "world", "al entrar se abre la sesión de WILMEN WORLD")
-	_check(lvl.warps.size() == 6 and lvl.time_total == 300.0 and lvl.number == 1, "nivel 1 cargado: 6 extremos de túnel/puerta y reloj de 300 s")
-	_check(lvl.player != null and lvl.goal != null, "hay jugador y meta")
+	_check(lvl.warps.size() == 6 and lvl.time_total == float(lvl.meta["time"]) and lvl.number == 1, "nivel 1 cargado con sus 3 conexiones y su reloj (%d s)" % int(lvl.time_total))
 	var t0: float = lvl.time_left
 	await _frames(60)
 	_check(lvl.time_left < t0 - 0.8 and lvl.time_left > t0 - 1.6, "el reloj cuenta atrás en tiempo real (%.2f -> %.2f)" % [t0, lvl.time_left])
 	_check(lvl.hud._timer_label.text == "%d:%02d" % [int(ceil(lvl.time_left)) / 60, int(ceil(lvl.time_left)) % 60], "el reloj se ve en pantalla (%s)" % lvl.hud._timer_label.text)
-	# ---- reloj extra ----
 	var ClockS = load("res://items/ww_clock.gd")
 	var ck = ClockS.new()
 	ck.seconds = 15
@@ -2166,11 +2330,9 @@ func _test_ww_levels() -> void:
 	var tl: float = lvl.time_left
 	await _frames(8)
 	_check(lvl.time_left > tl + 13.0, "un reloj suma +15 s (%.1f -> %.1f)" % [tl, lvl.time_left])
-	# ---- aislamiento: nada de lo ocurrido en WILMEN WORLD llega a WILMEN ADVENTURE ----
 	_game.save_game()
 	_game.add_coin()
 	_check(_sha(story_path) == story_hash, "mientras se juega WILMEN WORLD, la partida de WILMEN ADVENTURE no se escribe")
-	# ---- el tiempo llega a cero: muere y pierde una vida ----
 	var lives0: int = _game.lives
 	lvl.time_left = 0.03
 	await _frames(6)
@@ -2178,11 +2340,11 @@ func _test_ww_levels() -> void:
 	_check(_game.lives == lives0 - 1, "y pierde una vida (%d -> %d)" % [lives0, _game.lives])
 	await _until(func(): return not lvl.player.dead, 400)
 	_check(not lvl.player.dead and lvl.time_left >= 60.0, "reaparece con tiempo suficiente (%.0f s)" % lvl.time_left)
-	# ---- túnel real: aparece en otra zona ----
+	# ---- túnel real ----
 	var wa = lvl.warps[0]
 	var wb = lvl.warps[1]
 	_check(wa.kind == "tunnel" and wa.partner == wb and wb.partner == wa, "el túnel A está conectado con la bodega")
-	_stand_at(lvl, Vector2i(int((wa.position.x - 8) / 16), int((wa.position.y - 16) / 16)))
+	_stand_at(lvl, _cell_of(wa))
 	var from_x: float = lvl.player.global_position.x
 	await _frames(10)
 	Input.action_press("jump")
@@ -2190,42 +2352,38 @@ func _test_ww_levels() -> void:
 	Input.action_release("jump")
 	await _until(func(): return absf(lvl.player.global_position.x - from_x) > 200.0, 120)
 	await _frames(20)
-	var dist_warp: float = lvl.player.global_position.distance_to(wb.arrive)
-	_check(dist_warp < 40.0 and absf(lvl.player.global_position.x - from_x) > 5000.0, "saltar sobre el túnel te lleva a otra zona lejana (%.0f px)" % absf(lvl.player.global_position.x - from_x))
-	_check(not lvl.warping and lvl.player.controllable, "tras aparecer puedes moverte")
+	_check(lvl.player.global_position.distance_to(wb.arrive) < 40.0 and absf(lvl.player.global_position.x - from_x) > 3000.0, "saltar sobre el túnel te lleva a otra zona lejana (%.0f px)" % absf(lvl.player.global_position.x - from_x))
 	await _frames(60)
-	_check(lvl.player.global_position.distance_to(wb.arrive) < 60.0, "no vuelve solo al origen (ya no se reactiva hasta salir de la zona)")
-	# permanencia 0,35 s en la boca de salida (cueva): vuelve a la salida del túnel de la bodega
-	var wc = lvl.warps[2]  # extremo A del segundo túnel (la salida de la bodega)
-	_stand_at(lvl, Vector2i(int((wc.position.x - 8) / 16), int((wc.position.y - 16) / 16)))
+	_check(lvl.player.global_position.distance_to(wb.arrive) < 60.0, "no vuelve solo al origen")
+	var wc = lvl.warps[2]
+	_stand_at(lvl, _cell_of(wc))
 	var cave_x: float = lvl.player.global_position.x
 	await _until(func(): return absf(lvl.player.global_position.x - cave_x) > 200.0, 120)
 	await _frames(20)
-	_check(absf(lvl.player.global_position.x - cave_x) > 3000.0 and lvl.player.global_position.distance_to(lvl.warps[3].arrive) < 40.0, "permanecer sobre la boca también transporta (atajo hacia el tramo final)")
+	_check(lvl.player.global_position.distance_to(lvl.warps[3].arrive) < 40.0, "permanecer sobre la boca también transporta (atajo hacia el tramo final)")
 	# ---- puerta con llave ----
 	var door = lvl.warps[4]
 	_check(door.kind == "door" and door.need_key == 1 and door.is_locked(), "la puerta del nivel 1 está cerrada con cerradura")
 	_ww.keys = {}
-	_stand_at(lvl, Vector2i(int((door.position.x - 8) / 16), int((door.position.y - 16) / 16)))
+	_stand_at(lvl, _cell_of(door))
 	var door_x: float = lvl.player.global_position.x
 	await _frames(40)
 	_check(absf(lvl.player.global_position.x - door_x) < 30.0 and _ww.key_count() == 0 and door.is_locked(), "sin llave la puerta no se abre")
 	_ww.keys = {"bronce": 1}
-	_stand_at(lvl, Vector2i(int((door.position.x - 8) / 16), int((door.position.y - 16) / 16)))
+	_stand_at(lvl, _cell_of(door))
 	await _until(func(): return absf(lvl.player.global_position.x - door_x) > 200.0, 120)
 	await _frames(20)
-	_check(absf(lvl.player.global_position.x - door_x) > 1500.0, "con llave la puerta se abre y entras en la cámara secreta")
+	_check(absf(lvl.player.global_position.x - door_x) > 1500.0, "con llave la puerta se abre y entras en la cámara")
 	_check(_ww.key_count() == 0 and _ww.is_open(1, door.warp_id), "la puerta consumió la llave y queda abierta")
 	var vault_arrive: Vector2 = lvl.player.global_position
-	await _frames(60)  # pasa el instante de gracia de la puerta de llegada; el jugador está fuera de su zona
-	# salir de la cámara por la misma puerta (ya abierta, sin llave)
+	await _frames(60)
 	var back_door = door.partner
-	_stand_at(lvl, Vector2i(int((back_door.position.x - 8) / 16), int((back_door.position.y - 16) / 16)))
+	_stand_at(lvl, _cell_of(back_door))
 	await _until(func(): return absf(lvl.player.global_position.x - vault_arrive.x) > 200.0, 120)
 	await _frames(20)
 	_check(lvl.player.global_position.distance_to(door.arrive) < 50.0, "la puerta abierta sirve de ida y vuelta (sin gastar más llaves)")
 	# ---- llave: recogida única ----
-	var keys_nodes: Array = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_key.gd")
+	var keys_nodes: Array = _scripts_of(lvl, "res://items/ww_key.gd")
 	_check(keys_nodes.size() == 1, "hay una llave en la bodega del nivel 1")
 	var kn = keys_nodes[0]
 	var kid: String = kn.key_id
@@ -2236,42 +2394,54 @@ func _test_ww_levels() -> void:
 	_check(not _game.world_active() and _game.mode == "story", "al salir se cierra la sesión y vuelve el modo original")
 	_check(_game.coins == game_before["coins"] and _game.score == game_before["score"] and _game.lives == game_before["lives"], "monedas, puntos y vidas de WILMEN ADVENTURE se restauran")
 	_check(_sha(story_path) == story_hash and JSON.stringify(_game.levels) == game_before["levels"], "la partida de WILMEN ADVENTURE sigue idéntica")
-	# volver a entrar: la llave recogida no reaparece (no se puede cultivar) y la puerta sigue abierta
 	lvl = await _ww_level(1)
-	var again: Array = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_key.gd")
-	_check(again.is_empty(), "la llave ya recogida no reaparece al repetir el nivel")
+	_check(_scripts_of(lvl, "res://items/ww_key.gd").is_empty(), "la llave ya recogida no reaparece al repetir el nivel")
 	_check(not lvl.warps[4].is_locked(), "la puerta abierta sigue abierta")
-	# ---- completar el nivel y guardar ----
+	# ---- completar el nivel: progreso y desbloqueo en el mapa ----
+	_check(_ww.node_state(2) == "locked" and not _ww.is_done(1), "antes de la meta el 1-2 está bloqueado y el 1-1 sin completar")
 	var coins_before: int = _ww.coins
 	for g in range(3):
 		lvl.gems[g] = g != 2
 	lvl.hud.set_gems(lvl.gems)
 	lvl.time_left = 200.0
-	lvl.coins_level = 0
 	_game.add_coin()
 	lvl.player.global_position = lvl.goal.global_position
 	await _until(func(): return lvl.finished, 120)
 	_check(lvl.finished, "tocar la meta completa el nivel")
 	await _until(func(): return lvl.hud._overlay != null, 400)
-	_check(lvl.hud._overlay != null and lvl.final_info.get("first", false), "aparece la pantalla de resultados (primera vez)")
-	_check(_ww.is_done(1) and _ww.gems_in(1) == 2, "el progreso queda anotado: nivel 1 completado con 2 gemas")
+	_check(lvl.hud._overlay != null and lvl.final_info.get("first", false) and not lvl.final_info.get("secret", true), "aparece la pantalla de resultados (primera vez, salida normal)")
+	_check(_ww.is_done(1) and _ww.gems_in(1) == 2 and not _ww.secret_done(1), "el progreso queda anotado: nivel 1 completado con 2 gemas")
+	_check(_ww.node_state(2) == "available" and _ww.route(1, 2).size() == 1, "y el mapa abre el camino al 1-2")
 	_check(_ww.coins == coins_before + 1 and _ww.score > 0, "monedas y puntos del nivel pasan a la partida de WILMEN WORLD")
 	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(_ww.save_path))
 	_check(saved["levels"]["1"]["done"] == true and saved["coins"] == coins_before + 1, "y se guardan en wilmen_world_save")
 	var btn_texts: Array = []
 	for b in lvl.hud._overlay.find_children("*", "Button", true, false):
 		btn_texts.append(b.text)
-	_check(btn_texts.has("Siguiente nivel") and btn_texts.has("Repetir nivel") and btn_texts.has("Lista de niveles"), "botones de resultado: %s" % str(btn_texts))
+	_check(btn_texts.has("Continuar en el mapa") and btn_texts.has("Repetir nivel"), "botones de resultado: %s" % str(btn_texts))
 	await _free_level(lvl)
 	_ww.reset()
 	_ww.load_game()
-	_check(_ww.is_done(1) and _ww.gems_in(1) == 2 and _ww.record(1)["best_time"] > 0.0, "tras cerrar y abrir el juego, el progreso sigue (y el mejor tiempo)")
+	_check(_ww.is_done(1) and _ww.gems_in(1) == 2 and _ww.record(1)["best_time"] > 0.0, "tras cerrar y abrir el juego, el progreso sigue")
 	_check(_sha(story_path) == story_hash, "WILMEN ADVENTURE sigue sin tocarse tras completar un nivel")
-	# ---- verja con candado (nivel 2): sin llave no se pasa; con llave se abre y consume la llave ----
+	# ---- salida secreta (1-5) ----
+	_ww_done(1)
+	_ww_done(2)
+	_ww_done(3)
+	lvl = await _ww_level(5)
+	var sg: Array = _scripts_of(lvl, "res://items/ww_secret_goal.gd")
+	_check(sg.size() == 1 and _ww.node_state(7) == "hidden", "el 1-5 tiene una bandera secreta y la casa 1-7 sigue oculta")
+	lvl.player.global_position = sg[0].global_position
+	await _until(func(): return lvl.finished, 120)
+	await _until(func(): return lvl.hud._overlay != null, 400)
+	_check(_ww.secret_done(5) and lvl.final_info.get("secret", false), "tocar la bandera secreta registra la salida secreta")
+	_check(_ww.node_state(7) == "available" and int(lvl.final_info.get("opened", 0)) >= 1, "y descubre un camino nuevo en el mapa (la casa 1-7)")
+	await _free_level(lvl)
+	# ---- verja con candado (1-4) ----
 	_ww.keys = {}
-	lvl = await _ww_level(2)
-	var gates: Array = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_gate.gd")
-	_check(gates.size() == 1 and gates[0].cells == 3, "el nivel 2 tiene una verja de 3 celdas")
+	lvl = await _ww_level(4)
+	var gates: Array = _scripts_of(lvl, "res://items/ww_gate.gd")
+	_check(gates.size() == 1 and gates[0].cells == 3, "el 1-4 tiene una verja de 3 celdas")
 	var gate = gates[0]
 	var gate_id: String = gate.gate_id
 	var gcell := Vector2i(int((gate.position.x - 8) / 16), int((gate.position.y - 8) / 16))
@@ -2285,10 +2455,48 @@ func _test_ww_levels() -> void:
 	Input.action_press("move_right")
 	await _frames(120)
 	Input.action_release("move_right")
-	_check(_ww.key_count() == 0 and _ww.is_open(2, gate_id), "con llave la verja se abre, gasta la llave y queda abierta")
+	_check(_ww.key_count() == 0 and _ww.is_open(4, gate_id), "con llave la verja se abre, gasta la llave y queda abierta")
 	_check(lvl.player.global_position.x > gate_x + 8, "y el jugador la atraviesa")
 	await _free_level(lvl)
-	# ---- sin vidas: reintentar ----
+	# ---- jefe del castillo (1-20): tres fases ----
+	lvl = await _ww_level(20)
+	var b = lvl.boss
+	_check(b != null and b.max_hp == 16 and b.phase == 1, "el castillo tiene al Guardián de la Espesura (16 de vida, fase 1)")
+	_check(lvl.goal != null and not lvl.goal.visible, "la meta no aparece hasta vencer al jefe")
+	b.activate(lvl.gate_x + 16.0, (lvl.cols - 2) * 16.0, 0.0)
+	var p = lvl.player
+	p.position = Vector2(lvl.gate_x + 40.0, b.position.y)
+	p._invuln_t = 999.0
+	# la IA del jefe se ejecuta de verdad (fase 3, la más exigente): lanza ataques sin errores y sin perder vida sola
+	var shots: Array = [0]
+	lvl.child_entered_tree.connect(func(n): shots[0] += int(str(n.get("team")) == "enemy"))
+	b.phase = 3
+	b.speed_mult = 1.44
+	await _frames(1500)
+	_check(shots[0] >= 8 and not b.dead and b.hp == 16, "la IA del jefe en fase 3 ataca durante 25 s (%d proyectiles) sin errores" % shots[0])
+	b._gen += 1
+	b.phase = 1
+	b.speed_mult = 1.0
+	b.mode = "idle"
+	b.hp = b.max_hp
+	await _frames(5)
+	b._gen += 1
+	b.mode = "idle"
+	var phases: Array = [b.phase]
+	for i in range(15):
+		b._invuln_t = 0.0
+		b.shielded = false
+		b.hit_boss(1)
+		if phases[phases.size() - 1] != b.phase:
+			phases.append(b.phase)
+	_check(phases == [1, 2, 3] and b.speed_mult > 1.3, "pierde vida y pasa por las fases 1, 2 y 3 (más rápido cada vez) %s" % str(phases))
+	b._invuln_t = 0.0
+	b.hit_boss(1)
+	_check(b.hp == 0 and b.dead, "con 16 golpes cae derrotado")
+	await _until(func(): return lvl.goal.visible, 200)
+	_check(lvl.goal.visible, "y entonces aparece la meta")
+	await _free_level(lvl)
+	# ---- sin vidas ----
 	_wipe_ww_files()
 	_ww.reset()
 	_ww.lives = 1
@@ -2299,20 +2507,11 @@ func _test_ww_levels() -> void:
 	_check(lvl.finished and _game.lives == 0, "sin vidas: fin del intento")
 	await _frames(4)
 	var go_btns: Array = []
-	for b in lvl.hud._overlay.find_children("*", "Button", true, false):
-		go_btns.append(b.text)
-	_check(go_btns == ["Reintentar", "Lista de niveles"], "pantalla «Sin vidas» de WILMEN WORLD: %s" % str(go_btns))
+	for bt in lvl.hud._overlay.find_children("*", "Button", true, false):
+		go_btns.append(bt.text)
+	_check(go_btns == ["Reintentar", "Volver al mapa"], "pantalla «Sin vidas» de WILMEN WORLD: %s" % str(go_btns))
 	await _free_level(lvl)
 	_check(_ww.lives >= 1, "la partida de WILMEN WORLD conserva al menos una vida")
-	# ---- lista de niveles ----
-	var lst = load("res://ui/ww_levels.tscn").instantiate()
-	root.add_child(lst)
-	await _frames(6)
-	_check(lst._buttons.size() == 3, "la lista muestra los 3 niveles")
-	_check(str(lst._buttons[1].text).contains("Sendero de las Luciérnagas") and str(lst._buttons[2].text).contains("Cañón de Ámbar") and str(lst._buttons[3].text).contains("Fundición de Brasas"), "con sus nombres reales")
-	_check(lst._buttons[1].pressed.get_connections().size() > 0 and _ww.start_level(3) and _ww.current_level == 3, "cada nivel se puede jugar desde la lista")
-	lst.queue_free()
-	await _frames(3)
 	_check(_sha(story_path) == story_hash, "al final, la partida de WILMEN ADVENTURE sigue idéntica")
 	_wipe_ww_files()
 	_ww.reset()

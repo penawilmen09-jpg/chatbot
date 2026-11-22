@@ -50,7 +50,7 @@ func show_game_over() -> void:
 		Game.fail_level()
 		WW.harvest()
 		level.restart_level())
-	_menu_button(v, "Lista de niveles", func():
+	_menu_button(v, "Volver al mapa", func():
 		Game.fail_level()
 		level.go_menu())
 	first.grab_focus()
@@ -58,7 +58,7 @@ func show_game_over() -> void:
 
 func show_world_result(info: Dictionary) -> void:
 	var n: int = level.number
-	var v := _make_overlay("¡NIVEL COMPLETADO!", Color("#ffe97a"))
+	var v := _make_overlay("¡SALIDA SECRETA!" if bool(info.get("secret", false)) else "¡NIVEL COMPLETADO!", Color("#c08aff") if bool(info.get("secret", false)) else Color("#ffe97a"))
 	var sub := UiTheme.label("%d  %s" % [n, str(level.meta["title"])], 12, Color("#cfc6ff"))
 	sub.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(sub)
@@ -83,6 +83,8 @@ func show_world_result(info: Dictionary) -> void:
 		"Puntos %d  (total %d)" % [int(info["score"]), Game.score],
 		"Llaves %d" % int(info["keys"]),
 	]
+	if int(info.get("opened", 0)) > 0:
+		lines.append("¡Se ha abierto un camino nuevo en el mapa!")
 	if bool(info["first"]):
 		lines.append("¡Primera vez completado!")
 	elif bool(info["new_best"]):
@@ -92,10 +94,6 @@ func show_world_result(info: Dictionary) -> void:
 	var right := VBoxContainer.new()
 	right.add_theme_constant_override("separation", 6)
 	cols.add_child(right)
-	var has_next: bool = WW.has_level(n + 1)
-	var first: Button
-	if has_next:
-		first = _menu_button(right, "Siguiente nivel", func(): level.next_level(), 150.0)
+	var back := _menu_button(right, "Continuar en el mapa", func(): level.go_menu(), 150.0)
 	_menu_button(right, "Repetir nivel", func(): level.restart_level(), 150.0)
-	var back := _menu_button(right, "Lista de niveles", func(): level.go_menu(), 150.0)
-	(first if first != null else back).grab_focus()
+	back.grab_focus()

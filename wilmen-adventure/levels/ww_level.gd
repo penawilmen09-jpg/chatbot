@@ -11,6 +11,8 @@ const ClockScript := preload("res://items/ww_clock.gd")
 const KeyScript := preload("res://items/ww_key.gd")
 const GateScript := preload("res://items/ww_gate.gd")
 const WarpScript := preload("res://items/ww_warp.gd")
+const SecretGoalScript := preload("res://items/ww_secret_goal.gd")
+const WwBossScene := preload("res://enemies/ww_boss.tscn")
 const RESPAWN_MIN := 60.0  # al reaparecer siempre quedan al menos estos segundos (evita bucles de muerte por tiempo)
 
 var meta: Dictionary = {}
@@ -37,7 +39,7 @@ func _ready() -> void:
 	warps_def = data["warps"]
 	world = int(meta["theme"])
 	rep_level = (world - 1) * 10 + 5
-	is_boss = false
+	is_boss = int(meta.get("boss", 0)) > 0
 	slippery = world == 4
 	Game.world_enter(rep_level)
 	Game.begin_level(rep_level)
@@ -94,7 +96,7 @@ func _build_background() -> void:
 	var bg = ParallaxBgScript.new()
 	bg.world = world
 	bg.level_idx = 1 + (number % 9)  # variedad de fondo según el nivel
-	bg.zone = (number - 1) % 3
+	bg.zone = int(meta["zone"]) if int(meta["zone"]) >= 0 else (number - 1) % 3
 	add_child(bg)
 
 
@@ -106,6 +108,11 @@ func _spawn_entities() -> void:
 		for x in range(cols):
 			var c: String = _cell(x, y)
 			match c:
+				"O":
+					var sg = SecretGoalScript.new()
+					sg.level = self
+					sg.position = Vector2(x * TILE + 8, y * TILE + 16)
+					add_child(sg)
 				"I", "M":
 					var ck = ClockScript.new()
 					ck.seconds = 15 if c == "I" else 30
@@ -137,6 +144,22 @@ func _spawn_entities() -> void:
 						g.position = Vector2(x * TILE + 8, (y + n - 1) * TILE + 8)
 						add_child(g)
 	_spawn_warps()
+	if is_boss and boss != null and is_instance_valid(boss):
+		_swap_boss()
+
+
+func _swap_boss() -> void:
+	## El castillo tiene su propio jefe de varias fases (ww_boss.gd) en lugar del jefe de WILMEN ADVENTURE.
+	var pos: Vector2 = boss.position
+	boss.queue_free()
+	boss = WwBossScene.instantiate()
+	boss.world = 1
+	boss.level = self
+	boss.position = pos
+	boss_home_y = pos.y
+	add_child(boss)
+	boss.hp_changed.connect(_on_boss_hp)
+	boss.defeated.connect(_on_boss_defeated)
 
 
 func _spawn_warps() -> void:
@@ -276,7 +299,11 @@ func set_checkpoint(pos: Vector2) -> void:
 
 
 # -------------------------------------------------------------- final ------
-func complete_level() -> void:
+func complete_secret() -> void:
+	await complete_level(true)
+
+
+func complete_level(secret_exit: bool = false) -> void:
 	if finished:
 		return
 	finished = true
@@ -285,10 +312,13 @@ func complete_level() -> void:
 	var bonus: int = 1000 + int(time_left) * 10 + player.hp * 100
 	Game.add_score(bonus)
 	var level_score: int = Game.score - Game.score_at_level_start
-	var res: Dictionary = WW.register_complete(number, gems, time_total - time_left, time_left)
+	var before: Dictionary = WW.map_snapshot()
+	var res: Dictionary = WW.register_complete(number, gems, time_total - time_left, time_left, secret_exit)
+	var after: Dictionary = WW.map_snapshot()
+	var opened: int = after["edges"].size() - before["edges"].size()
 	WW.harvest()  # cartera del nivel -> partida de WILMEN WORLD (y se guarda)
 	Audio.play_music("victory", false, 0.3)
-	popup("¡Nivel completado!", player.global_position + Vector2(0, -34))
+	popup("¡SALIDA SECRETA!" if secret_exit else "¡Nivel completado!", player.global_position + Vector2(0, -34))
 	for i in range(8):
 		get_tree().create_timer(0.16 * i, false).timeout.connect(func():
 			if player != null and is_instance_valid(player):
@@ -297,7 +327,7 @@ func complete_level() -> void:
 	final_info = {
 		"gems": gems.duplicate(), "coins": coins_level, "score": level_score, "bonus": bonus, "hp": player.hp,
 		"time_used": time_total - time_left, "time_left": time_left, "first": bool(res["first"]), "new_best": bool(res["new_best"]),
-		"keys": WW.key_count(),
+		"keys": WW.key_count(), "secret": secret_exit, "opened": opened,
 	}
 	hud.show_world_result(final_info)
 
@@ -310,12 +340,8 @@ func restart_level() -> void:
 func go_menu() -> void:
 	get_tree().paused = false
 	WW.harvest()
-	Transition.change_scene("res://ui/ww_levels.tscn")
+	Transition.change_scene("res://ui/ww_map.tscn")
 
 
 func next_level() -> void:
-	get_tree().paused = false
-	if WW.start_level(number + 1):
-		Transition.change_scene("res://levels/ww_level.tscn")
-	else:
-		Transition.change_scene("res://ui/ww_levels.tscn")
+	go_menu()

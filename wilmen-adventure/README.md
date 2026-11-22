@@ -188,6 +188,7 @@ el botón «WILMEN WORLD». Plan: 6 regiones de 20 niveles (120), niveles largos
 llaves, 6 jefes principales y 3 secretos.
 
 - **Hito 1 (hecho):** modo independiente, guardado propio, botón del menú y pantalla de inicio del modo.
+- **Mapa explorable y región 1 (E1, hecha):** el botón del menú lleva a un mapa 2D con 6 regiones y los 120 niveles (`ui/ww_map.gd`, datos en `levels/world/map.json`): el héroe camina por los caminos, se abren rutas al completar niveles o encontrar salidas secretas, hay puentes, ríos, montañas, túneles, cuevas y castillos. La región 1 (Bosque Esmeralda) tiene sus 20 niveles reales (700-1000 columnas) y el jefe del castillo (`enemies/ww_boss.gd`, 3 fases); las regiones 2 a 6 se ven «en construcción».
 - **Hito 2 (hecho):** reloj con cuenta atrás (a cero el personaje muere y pierde una vida), relojes de tiempo extra, túneles y
   puertas que llevan a otra zona del nivel, llaves, verjas y puertas con cerradura, formato de nivel ampliado
   (`levels/world/README.md`) y tres niveles largos de prueba jugables desde «ELEGIR NIVEL» en la pantalla del modo. Nivel
