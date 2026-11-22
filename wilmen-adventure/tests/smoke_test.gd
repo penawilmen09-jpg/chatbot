@@ -2886,6 +2886,155 @@ func _test_ww_mech_switch() -> void:
 	await _end_mini(lvl)
 
 
+func _test_ww_mech_water_hazards() -> void:
+	print("Mecánica: corrientes de agua, dardos, péndulo, plataforma orbital y ascensor")
+	var g := Grid.new(80, 24)
+	g.ground(0, 80, 20)
+	g.fill(10, 17, 30, 20, ":")
+	g.fill(40, 17, 60, 20, ".")
+	g.fill(66, 10, 70, 20, ",")
+	g.put(8, 19, "P")
+	var lvl = await _mini(g)
+	var pl = lvl.player
+	# sin pulsar nada, la corriente a la derecha arrastra
+	pl.global_position = Vector2(11 * 16, 19 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(6)
+	var x0: float = pl.global_position.x
+	await _frames(60)
+	var dx: float = pl.global_position.x - x0
+	_check(dx > 50.0, "la corriente derecha arrastra al jugador parado (%.0f px en 1 s)" % dx)
+	# contra la corriente avanza más despacio que sin corriente
+	pl.global_position = Vector2(28 * 16, 19 * 16)
+	await _frames(6)
+	x0 = pl.global_position.x
+	for i in range(40):
+		Input.action_press("move_left")
+		await physics_frame
+	Input.action_release("move_left")
+	var against: float = x0 - pl.global_position.x
+	pl.global_position = Vector2(4 * 16, 19 * 16)
+	await _frames(6)
+	x0 = pl.global_position.x
+	for i in range(40):
+		Input.action_press("move_right")
+		await physics_frame
+	Input.action_release("move_right")
+	var free: float = pl.global_position.x - x0
+	_check(against < free * 0.75, "ir contra la corriente cuesta (%.0f contra %.0f libre)" % [against, free])
+	# corriente izquierda
+	pl.global_position = Vector2(55 * 16, 19 * 16)
+	await _frames(6)
+	x0 = pl.global_position.x
+	await _frames(60)
+	_check(pl.global_position.x < x0 - 50.0, "la corriente izquierda arrastra hacia atrás (%.0f px)" % (pl.global_position.x - x0))
+	# burbujas: elevan
+	pl.global_position = Vector2(68 * 16, 19 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(6)
+	var y0: float = pl.global_position.y
+	await _frames(50)
+	_check(pl.global_position.y < y0 - 40.0, "las burbujas elevan al jugador (%.0f px)" % (y0 - pl.global_position.y))
+	await _end_mini(lvl)
+	# dardos
+	g = Grid.new(60, 20)
+	g.ground(0, 60, 15)
+	g.put(50, 14, "\"")
+	g.put(10, 14, "P")
+	lvl = await _mini(g)
+	pl = lvl.player
+	var da = _nodes_of(lvl, "res://items/ww_dart.gd")
+	_check(da.size() == 1 and da[0].dir == -1, "el lanzadardos '\"' mira a la izquierda")
+	da[0]._t = da[0].PERIOD - 0.05
+	var dart = null
+	for i in range(30):
+		await physics_frame
+		var ds: Array = lvl.get_children().filter(func(n): return n is Area2D and n.get_script() != null and "dir" in n and "_life" in n)
+		if not ds.is_empty():
+			dart = ds[0]
+			break
+	_check(dart != null, "lanza un dardo")
+	var hp0: int = pl.hp
+	pl.global_position = Vector2(30 * 16, 14 * 16)
+	pl.velocity = Vector2.ZERO
+	pl._invuln_t = 0.0
+	await _until(func(): return pl.hp < hp0, 200)
+	_check(pl.hp < hp0, "el dardo hace daño")
+	await _end_mini(lvl)
+	# péndulo
+	g = Grid.new(60, 24)
+	g.ground(0, 60, 20)
+	g.fill(30, 12, 31, 16, "!")
+	g.put(5, 19, "P")
+	lvl = await _mini(g)
+	pl = lvl.player
+	var pe = _nodes_of(lvl, "res://items/ww_pendulum.gd")
+	_check(pe.size() == 1 and absf(pe[0].length_px - 64.0) < 1.0, "péndulo de 4 celdas")
+	pe = pe[0]
+	var minx := 1e9
+	var maxx := -1e9
+	for i in range(160):
+		await physics_frame
+		minx = minf(minx, pe.blade_pos.x)
+		maxx = maxf(maxx, pe.blade_pos.x)
+	_check(minx < -40.0 and maxx > 40.0, "oscila a ambos lados (%.0f..%.0f px)" % [minx, maxx])
+	hp0 = pl.hp
+	pl._invuln_t = 0.0
+	for i in range(200):
+		pl.global_position = pe.to_global(pe.blade_pos)
+		pl.velocity = Vector2.ZERO
+		await physics_frame
+		if pl.hp < hp0:
+			break
+	_check(pl.hp < hp0, "la cuchilla hace daño")
+	await _end_mini(lvl)
+	# plataforma orbital y ascensor: el jugador va con ellas
+	g = Grid.new(60, 30)
+	g.ground(0, 6, 26)
+	g.put(3, 25, "P")
+	g.put(30, 20, "n")
+	g.ground(40, 60, 26)
+	g.put(50, 25, "b")
+	lvl = await _mini(g)
+	pl = lvl.player
+	var obs = _nodes_of(lvl, "res://items/ww_orbit.gd")
+	var orb = obs.filter(func(o): return o.kind == "orbit")[0]
+	var elev = obs.filter(func(o): return o.kind == "elevator")[0]
+	var rmin := 1e9
+	var rmax := -1e9
+	for i in range(300):
+		await physics_frame
+		var d: float = (orb.position - orb._origin).length()
+		rmin = minf(rmin, d)
+		rmax = maxf(rmax, d)
+	_check(rmin > 47.0 and rmax < 49.0, "la orbital describe un círculo de radio 48 (%.1f..%.1f)" % [rmin, rmax])
+	# subir al ascensor: el jugador se mueve con él
+	elev._t = 0.0
+	elev._place()
+	await _frames(2)
+	pl.global_position = Vector2(elev.position.x, elev.position.y - 14)
+	pl.velocity = Vector2.ZERO
+	await _frames(20)
+	var ey0: float = elev.position.y
+	var py0: float = pl.global_position.y
+	await _frames(150)
+	var edy: float = elev.position.y - ey0
+	var pdy: float = pl.global_position.y - py0
+	_check(edy < -30.0 and absf(edy - pdy) < 6.0, "el ascensor sube y lleva al jugador (ascensor %.0f, jugador %.0f)" % [edy, pdy])
+	# sobre la orbital
+	var op0: Vector2 = orb.position
+	pl.global_position = Vector2(orb.position.x, orb.position.y - 14)
+	pl.velocity = Vector2.ZERO
+	await _frames(15)
+	var od0: Vector2 = orb.position
+	var pd0: Vector2 = pl.global_position
+	await _frames(90)
+	var o2: Vector2 = orb.position - od0
+	var p2: Vector2 = pl.global_position - pd0
+	_check(o2.length() > 30.0 and (o2 - p2).length() < 14.0, "la orbital arrastra al jugador (%.0f px, diferencia %.0f)" % [o2.length(), (o2 - p2).length()])
+	await _end_mini(lvl)
+
+
 func _test_ww_mechanics() -> void:
 	_wipe_ww_files()
 	_ww.reset()
@@ -2894,5 +3043,6 @@ func _test_ww_mechanics() -> void:
 	await _test_ww_mech_logs()
 	await _test_ww_mech_phase_bridge()
 	await _test_ww_mech_switch()
+	await _test_ww_mech_water_hazards()
 	_ww.reset()
 	_wipe_ww_files()
