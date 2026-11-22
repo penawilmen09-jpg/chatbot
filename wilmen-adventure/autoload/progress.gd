@@ -411,6 +411,8 @@ func stat_value(key: String) -> int:
 
 
 func check_achievements() -> Array:
+	if Game.world_active():
+		return []  # jugando WILMEN WORLD no se desbloquean logros de WILMEN ADVENTURE
 	var got: Array = []
 	for id in ACHIEVEMENTS:
 		if achievements.has(id):

@@ -1,0 +1,321 @@
+extends "res://levels/level.gd"
+## Nivel de WILMEN WORLD. Reutiliza TODO el nivel de WILMEN ADVENTURE (terreno, enemigos, peligros, jugador, cámara, HUD)
+## y añade: reloj con cuenta atrás, relojes de tiempo extra, llaves, verjas con candado, puertas y túneles que
+## llevan a otra zona del nivel, y el final con guardado propio (WW).
+##
+## La cartera del nivel (vidas, monedas, puntos) vive en las variables de `Game` mientras dura la sesión (ver
+## Game.world_enter / world_leave): al salir se pasa a la partida de WILMEN WORLD y se restaura la de WILMEN ADVENTURE.
+
+const WwHudScript := preload("res://ui/ww_hud.gd")
+const ClockScript := preload("res://items/ww_clock.gd")
+const KeyScript := preload("res://items/ww_key.gd")
+const GateScript := preload("res://items/ww_gate.gd")
+const WarpScript := preload("res://items/ww_warp.gd")
+const RESPAWN_MIN := 60.0  # al reaparecer siempre quedan al menos estos segundos (evita bucles de muerte por tiempo)
+
+var meta: Dictionary = {}
+var warps_def: Array = []
+var warps: Array = []
+var time_total: float = 300.0
+var time_left: float = 300.0
+var warping: bool = false
+var timed_out: bool = false
+var rep_level: int = 1  # nivel de la historia que da el poder y los colores del tema
+var final_info: Dictionary = {}
+
+var _cp_time: float = 300.0
+var _tick_stage: int = 0
+var _fade: ColorRect = null
+var _times_up_t: float = 0.0
+
+
+func _ready() -> void:
+	number = WW.current_level
+	mode = "world"
+	var data: Dictionary = WW.parse_level(FileAccess.get_file_as_string(WW.level_path(number)))
+	meta = data["meta"]
+	warps_def = data["warps"]
+	world = int(meta["theme"])
+	rep_level = (world - 1) * 10 + 5
+	is_boss = false
+	slippery = world == 4
+	Game.world_enter(rep_level)
+	Game.begin_level(rep_level)
+	Game.current_level = rep_level
+	Engine.set_meta("in_level", true)
+	rows = data["rows"]
+	cols = int(data["cols"])
+	nrows = rows.size()
+	time_total = float(meta["time"])
+	time_left = time_total
+	_cp_time = time_total
+	_tileset = load("res://assets/tiles/tiles_w%d.png" % world)
+	_build_background()
+	_build_terrain()
+	_spawn_entities()
+	_spawn_player()
+	_build_hud()
+	Audio.play_music(Game.music_for_level(rep_level))
+	hud.show_intro("%d  %s" % [number, str(meta["title"])], "%s · Tiempo %s" % [WW.REGION_NAMES[clampi(int(meta["region"]) - 1, 0, 5)], _fmt(time_total)])
+	_make_fade()
+
+
+func _exit_tree() -> void:
+	super()
+	Game.world_leave()
+
+
+func _fmt(sec: float) -> String:
+	var t: int = int(ceil(sec))
+	return "%d:%02d" % [t / 60, t % 60]
+
+
+func _make_fade() -> void:
+	var cl := CanvasLayer.new()
+	cl.layer = 50
+	_fade = ColorRect.new()
+	_fade.color = Color(0, 0, 0, 0)
+	_fade.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_fade.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	cl.add_child(_fade)
+	add_child(cl)
+
+
+func _build_hud() -> void:
+	hud = WwHudScript.new()
+	hud.level = self
+	add_child(hud)
+	player.hp_changed.connect(hud.set_hp)
+	hud.set_hp(player.hp, player.max_hp)
+	hud.set_gems(gems)
+
+
+func _build_background() -> void:
+	var bg = ParallaxBgScript.new()
+	bg.world = world
+	bg.level_idx = 1 + (number % 9)  # variedad de fondo según el nivel
+	bg.zone = (number - 1) % 3
+	add_child(bg)
+
+
+# ------------------------------------------------------- entidades nuevas --
+func _spawn_entities() -> void:
+	super()
+	var gate_done: Dictionary = {}
+	for y in range(nrows):
+		for x in range(cols):
+			var c: String = _cell(x, y)
+			match c:
+				"I", "M":
+					var ck = ClockScript.new()
+					ck.seconds = 15 if c == "I" else 30
+					ck.level = self
+					ck.position = Vector2(x * TILE + 8, y * TILE + 8)
+					add_child(ck)
+				"U":
+					var id: String = "%d,%d" % [x, y]
+					if not WW.key_taken(number, id):
+						var ky = KeyScript.new()
+						ky.level = self
+						ky.key_id = id
+						ky.position = Vector2(x * TILE + 8, y * TILE + 8)
+						add_child(ky)
+				"Q":
+					# una verja es una columna de celdas «Q»: se identifica por su celda superior
+					if _cell(x, y - 1) == "Q" or gate_done.has(Vector2i(x, y)):
+						continue
+					var n: int = 1
+					while _cell(x, y + n) == "Q":
+						gate_done[Vector2i(x, y + n)] = true
+						n += 1
+					var gid: String = "%d,%d" % [x, y]
+					if not WW.is_open(number, gid):
+						var g = GateScript.new()
+						g.level = self
+						g.gate_id = gid
+						g.cells = n
+						g.position = Vector2(x * TILE + 8, (y + n - 1) * TILE + 8)
+						add_child(g)
+	_spawn_warps()
+
+
+func _spawn_warps() -> void:
+	for d in warps_def:
+		var a: Vector2i = d["a"]
+		var b: Vector2i = d["b"]
+		var kind: String = str(d["kind"])
+		var dir: int = int(d["dir"])
+		var na = _make_warp(a, kind, "%d,%d" % [a.x, a.y], int(d["key"]))
+		var nb = _make_warp(b, kind, "%d,%d" % [a.x, a.y], 0)
+		# dónde aparece el jugador: encima de la boca del túnel, o delante de la puerta
+		na.arrive = _arrival(a, kind, -dir)
+		nb.arrive = _arrival(b, kind, dir)
+		na.partner = nb
+		nb.partner = na
+		warps.append(na)
+		warps.append(nb)
+
+
+func _make_warp(cell: Vector2i, kind: String, id: String, key_cost: int):
+	var w = WarpScript.new()
+	w.level = self
+	w.kind = kind
+	w.warp_id = id
+	w.need_key = key_cost
+	w.position = Vector2(cell.x * TILE + 8, cell.y * TILE + 16)
+	add_child(w)
+	return w
+
+
+func _arrival(cell: Vector2i, kind: String, side: int) -> Vector2:
+	var px: float = cell.x * TILE + 8
+	if kind == "door":
+		px += float(side) * 22.0  # delante de la puerta, no dentro de su zona
+	return Vector2(px, cell.y * TILE + 6)
+
+
+func warp_player(from_node, to_node) -> void:
+	## Transporta al jugador de verdad a la otra zona: fundido, cambio de posición, cámara y fundido de vuelta.
+	if warping or player == null or player.dead or finished:
+		return
+	warping = true
+	Audio.play_sfx("blink")
+	player.controllable = false
+	player._invuln_t = maxf(player._invuln_t, 1.2)
+	var tw := create_tween()
+	tw.tween_property(_fade, "color:a", 1.0, 0.16)
+	await tw.finished
+	if player == null or not is_instance_valid(player):
+		return
+	if not player.dead:
+		player.global_position = to_node.arrive
+		player.velocity = Vector2.ZERO
+		to_node.armed = false  # no se reactiva hasta que el jugador salga de su zona
+		to_node.grace = 0.5
+		camera.reset_smoothing()
+	var tw2 := create_tween()
+	tw2.tween_property(_fade, "color:a", 0.0, 0.2)
+	await tw2.finished
+	if player != null and is_instance_valid(player) and not player.dead:
+		player.controllable = true
+	warping = false
+
+
+# --------------------------------------------------------------- reloj ----
+func add_time(sec: float) -> void:
+	time_left = minf(time_left + sec, time_total + 120.0)
+	_tick_stage = 0
+	Audio.play_sfx("powerup", 1.3)
+
+
+func _physics_process(delta: float) -> void:
+	super(delta)
+	if blocked or player == null or player.dead or finished or warping:
+		return
+	if is_instance_valid(hud._intro):
+		return  # el reloj arranca cuando termina la presentación del nivel
+	time_left = maxf(0.0, time_left - delta)
+	_tick_sounds()
+	if time_left <= 0.0:
+		_time_up()
+
+
+func _tick_sounds() -> void:
+	var stage: int = 0
+	if time_left <= 10.0:
+		stage = 3
+	elif time_left <= 30.0:
+		stage = 2
+	elif time_left <= 100.0:
+		stage = 1
+	if stage > _tick_stage:
+		_tick_stage = stage
+		Audio.play_sfx("shield", 1.4)
+		popup("¡%d segundos!" % [100 if stage == 1 else (30 if stage == 2 else 10)], player.global_position + Vector2(0, -30))
+	if stage == 3 and int(time_left * 2.0) != int((time_left + 0.02) * 2.0):
+		Audio.play_sfx("select", 1.6)
+
+
+func _time_up() -> void:
+	## Al llegar a cero el personaje muere y pierde una vida (como cualquier otra muerte).
+	timed_out = true
+	popup("¡Se acabó el tiempo!", player.global_position + Vector2(0, -30))
+	player.die()
+
+
+# ------------------------------------------------------ vidas y reinicio ---
+func _on_player_died() -> void:
+	if _dying or finished:
+		return
+	_dying = true
+	Game.lose_life()
+	await get_tree().create_timer(1.4, false).timeout
+	_dying = false
+	if finished:
+		return
+	if Game.lives <= 0:
+		finished = true
+		Audio.play_music("defeat", false, 0.3)
+		Audio.play_sfx("gameover")
+		hud.show_game_over()
+		return
+	_respawn()
+
+
+func _respawn() -> void:
+	super()
+	timed_out = false
+	time_left = maxf(_cp_time, minf(RESPAWN_MIN, time_total * 0.3))
+	_tick_stage = 0
+	warping = false
+
+
+func set_checkpoint(pos: Vector2) -> void:
+	super(pos)
+	_cp_time = time_left  # el punto de control guarda el tiempo que queda
+
+
+# -------------------------------------------------------------- final ------
+func complete_level() -> void:
+	if finished:
+		return
+	finished = true
+	player.celebrate()
+	Audio.play_sfx("goal")
+	var bonus: int = 1000 + int(time_left) * 10 + player.hp * 100
+	Game.add_score(bonus)
+	var level_score: int = Game.score - Game.score_at_level_start
+	var res: Dictionary = WW.register_complete(number, gems, time_total - time_left, time_left)
+	WW.harvest()  # cartera del nivel -> partida de WILMEN WORLD (y se guarda)
+	Audio.play_music("victory", false, 0.3)
+	popup("¡Nivel completado!", player.global_position + Vector2(0, -34))
+	for i in range(8):
+		get_tree().create_timer(0.16 * i, false).timeout.connect(func():
+			if player != null and is_instance_valid(player):
+				spawn_burst(player.global_position + Vector2(randf_range(-50, 50), randf_range(-80, -20)), Color.from_hsv(randf(), 0.6, 1.0), 10))
+	await get_tree().create_timer(1.8, false).timeout
+	final_info = {
+		"gems": gems.duplicate(), "coins": coins_level, "score": level_score, "bonus": bonus, "hp": player.hp,
+		"time_used": time_total - time_left, "time_left": time_left, "first": bool(res["first"]), "new_best": bool(res["new_best"]),
+		"keys": WW.key_count(),
+	}
+	hud.show_world_result(final_info)
+
+
+func restart_level() -> void:
+	get_tree().paused = false
+	Transition.change_scene("res://levels/ww_level.tscn")
+
+
+func go_menu() -> void:
+	get_tree().paused = false
+	WW.harvest()
+	Transition.change_scene("res://ui/ww_levels.tscn")
+
+
+func next_level() -> void:
+	get_tree().paused = false
+	if WW.start_level(number + 1):
+		Transition.change_scene("res://levels/ww_level.tscn")
+	else:
+		Transition.change_scene("res://ui/ww_levels.tscn")

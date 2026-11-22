@@ -12,6 +12,7 @@ var _region_labels: Array = []
 var _reset_btn: Button
 var _reset_armed: bool = false
 var _back: Button
+var _play_btn: Button
 
 
 func _ready() -> void:
@@ -20,6 +21,7 @@ func _ready() -> void:
 	position = Vector2.ZERO
 	size = get_viewport_rect().size
 	get_viewport().size_changed.connect(func(): size = get_viewport_rect().size)
+	Game.world_leave()  # por si se vuelve desde un nivel
 	if not FileAccess.file_exists(WW.save_path):
 		WW.save_game()  # la partida de WILMEN WORLD nace aquí, en su propio archivo
 	_build_background()
@@ -116,7 +118,7 @@ func _build_regions() -> void:
 		var cnt := UiTheme.label("", 9, Color("#ffe97a"))
 		row.add_child(cnt)
 		_region_labels.append(cnt)
-	var note := UiTheme.label("El mapa llega en el siguiente hito", 8, Color("#8affb0"))
+	var note := UiTheme.label("Mapa general: hito 3 · por ahora, elige nivel", 8, Color("#8affb0"))
 	note.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(note)
 
@@ -152,15 +154,21 @@ func _build_buttons() -> void:
 	row.offset_top = -44.0
 	row.offset_bottom = -8.0
 	add_child(row)
-	_back = UiTheme.button("Volver al menú", Vector2(150, 32))
+	_back = UiTheme.button("Volver al menú", Vector2(120, 32))
 	_back.pressed.connect(func():
 		Audio.play_sfx("back")
 		Transition.change_scene("res://ui/title.tscn"))
 	row.add_child(_back)
-	_reset_btn = UiTheme.button("Reiniciar WILMEN WORLD", Vector2(170, 32))
+	_play_btn = UiTheme.button("ELEGIR NIVEL", Vector2(150, 32))
+	_play_btn.add_theme_color_override("font_color", Color("#ffd23a"))
+	_play_btn.pressed.connect(func():
+		Audio.play_sfx("select")
+		Transition.change_scene("res://ui/ww_levels.tscn"))
+	row.add_child(_play_btn)
+	_reset_btn = UiTheme.button("Reiniciar modo", Vector2(130, 32))
 	_reset_btn.pressed.connect(_on_reset)
 	row.add_child(_reset_btn)
-	_back.grab_focus()
+	_play_btn.grab_focus()
 
 
 func _on_reset() -> void:
@@ -171,10 +179,10 @@ func _on_reset() -> void:
 		get_tree().create_timer(3.0).timeout.connect(func():
 			if is_instance_valid(_reset_btn) and _reset_armed:
 				_reset_armed = false
-				_reset_btn.text = "Reiniciar WILMEN WORLD")
+				_reset_btn.text = "Reiniciar modo")
 		return
 	_reset_armed = false
-	_reset_btn.text = "Reiniciar WILMEN WORLD"
+	_reset_btn.text = "Reiniciar modo"
 	WW.reset()
 	WW.save_game()
 

@@ -462,7 +462,57 @@ func _parse_dict(text: String) -> Dictionary:
 	return {}
 
 
+# ------------------------------------------- sesión de WILMEN WORLD (aislada) ----
+## Mientras se juega un nivel de WILMEN WORLD, las variables de este autoload (vidas, monedas, puntos, estadísticas...) se
+## usan como «cartera» del nivel para reutilizar todo el HUD y los objetos. La partida de WILMEN ADVENTURE se copia en
+## memoria antes (world_enter) y se restaura entera al salir (world_leave); entretanto save_game() no escribe NADA, así que
+## nada de lo que ocurra en WILMEN WORLD puede llegar al archivo de WILMEN ADVENTURE.
+var _world_stash: Dictionary = {}
+var _world_back: Dictionary = {}
+
+
+func world_active() -> bool:
+	return not _world_stash.is_empty()
+
+
+func world_enter(rep_level: int) -> void:
+	## `rep_level`: nivel de la historia que se usa solo para elegir el poder y los colores del tema.
+	if world_active():
+		return
+	_world_stash = _save_dict().duplicate(true)
+	_world_back = {"current_level": current_level, "score_at_level_start": score_at_level_start,
+		"last_unlocked_level": last_unlocked_level, "last_reward": last_reward.duplicate(true), "mode": mode}
+	mode = "world"
+	lives = WW.lives
+	coins = WW.coins
+	score = WW.score
+	current_level = rep_level
+	stats_changed.emit()
+
+
+func world_leave() -> void:
+	if not world_active():
+		return
+	WW.harvest()  # la cartera del nivel vuelve a la partida de WILMEN WORLD
+	var keep_settings: Dictionary = settings.duplicate(true)  # los ajustes (sonido, controles) son de ambos modos
+	var stash: Dictionary = _world_stash
+	_world_stash = {}
+	_apply_save(stash, "")
+	settings = keep_settings
+	current_level = int(_world_back.get("current_level", 1))
+	score_at_level_start = int(_world_back.get("score_at_level_start", 0))
+	last_unlocked_level = int(_world_back.get("last_unlocked_level", 0))
+	last_reward = _world_back.get("last_reward", {})
+	mode = str(_world_back.get("mode", "story"))
+	if mode == "world":
+		mode = "story"
+	_world_back = {}
+	stats_changed.emit()
+
+
 func save_game() -> void:
+	if world_active():
+		return  # jugando WILMEN WORLD: la partida de WILMEN ADVENTURE no se toca
 	## Escritura segura: se escribe un archivo temporal, se conserva una copia ".bak" del último guardado
 	## válido y solo entonces se sustituye el archivo real. Un corte a mitad de escritura no destruye la partida.
 	var text: String = JSON.stringify(_save_dict())

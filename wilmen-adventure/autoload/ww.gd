@@ -16,6 +16,10 @@ const REGION_NAMES := ["Bosque Esmeralda", "Desierto Dorado", "Reino Volcánico"
 	"Reino de las Sombras"]
 const REGION_COLORS := [Color("#5adf7a"), Color("#ffd23a"), Color("#ff7a3a"), Color("#8fe0ff"), Color("#3a8ce6"), Color("#a06aff")]
 const KNOWN_KEYS := ["version", "lives", "coins", "gems", "score", "keys", "levels", "nodes", "secrets", "stats"]
+const LEVEL_DIR := "res://levels/world/"
+const KEY_TYPE := "bronce"
+## Tema visual (arte de WILMEN ADVENTURE reutilizado) de cada región: Bosque, Desierto, Volcán, Hielo, Océano, Sombras.
+const REGION_THEMES := [1, 3, 7, 4, 6, 5]
 
 signal changed
 
@@ -31,6 +35,7 @@ var levels: Dictionary = {}  # "n" -> {"done": bool, "gems": [bool x3], "best_ti
 var nodes: Dictionary = {}  # nodos del mapa descubiertos/desbloqueados (hitos siguientes)
 var secrets: Dictionary = {}
 var stats: Dictionary = {}
+var current_level: int = 1  # nivel de WILMEN WORLD que se va a jugar (1..120)
 var _extra: Dictionary = {}  # claves desconocidas (de versiones futuras): se conservan al guardar
 
 
@@ -126,7 +131,14 @@ func from_dict(d: Dictionary) -> void:
 			if typeof(rec.get("gems")) == TYPE_ARRAY:
 				for i in range(mini(3, rec["gems"].size())):
 					gm[i] = bool(rec["gems"][i])
-			levels[str(n)] = {"done": bool(rec.get("done", false)), "gems": gm, "best_time": float(rec.get("best_time", 0.0))}
+			var kt: Array = []
+			var op: Array = []
+			for item in (rec.get("keys_taken", []) if typeof(rec.get("keys_taken", [])) == TYPE_ARRAY else []):
+				kt.append(str(item))
+			for item in (rec.get("opened", []) if typeof(rec.get("opened", [])) == TYPE_ARRAY else []):
+				op.append(str(item))
+			levels[str(n)] = {"done": bool(rec.get("done", false)), "gems": gm, "best_time": float(rec.get("best_time", 0.0)),
+				"best_left": float(rec.get("best_left", 0.0)), "keys_taken": kt, "opened": op}
 	for name in ["nodes", "secrets", "stats"]:
 		if typeof(d.get(name)) == TYPE_DICTIONARY:
 			set(name, d[name].duplicate(true))
@@ -194,3 +206,183 @@ func load_game() -> void:
 			return
 		push_warning("Guardado de WILMEN WORLD ausente o dañado: se restauró la copia .bak")
 	from_dict(d)
+
+
+# ------------------------------------------------------------ niveles ---
+func level_path(n: int) -> String:
+	return LEVEL_DIR + "ww_%03d.txt" % n
+
+
+func has_level(n: int) -> bool:
+	return n >= 1 and n <= LEVEL_COUNT and FileAccess.file_exists(level_path(n))
+
+
+func available_levels() -> Array:
+	var out: Array = []
+	for n in range(1, LEVEL_COUNT + 1):
+		if has_level(n):
+			out.append(n)
+	return out
+
+
+func start_level(n: int) -> bool:
+	## Única puerta de entrada a un nivel de WILMEN WORLD (el nivel debe existir).
+	if not has_level(n):
+		push_warning("Nivel %d de WILMEN WORLD no disponible." % n)
+		return false
+	current_level = n
+	return true
+
+
+func parse_level(text: String) -> Dictionary:
+	## Formato: filas del mapa (mismos glifos que WILMEN ADVENTURE + glifos nuevos) y líneas `@clave valor`:
+	##   @title Nombre  ·  @region 1..6  ·  @theme 1..10  ·  @time segundos  ·  @difficulty 1..5
+	##   @warp x,y -> x,y tunnel|door [key=N] [dir=1|-1]   (conecta dos celdas: túnel o puerta; `key` solo en el extremo A)
+	## Las líneas que empiezan por `;` son comentarios.
+	var rows: Array = []
+	var meta: Dictionary = {"title": "Nivel", "region": 1, "theme": 1, "time": 300, "difficulty": 1}
+	var warps: Array = []
+	for line in text.split("\n"):
+		var l: String = String(line).trim_suffix("\r")
+		if l.begins_with(";"):
+			continue
+		if l.begins_with("@"):
+			var sp: int = l.find(" ")
+			var key: String = l.substr(1, sp - 1) if sp > 0 else l.substr(1)
+			var val: String = l.substr(sp + 1).strip_edges() if sp > 0 else ""
+			match key:
+				"title":
+					meta["title"] = val
+				"region", "theme", "time", "difficulty":
+					meta[key] = int(val)
+				"warp":
+					var w: Dictionary = _parse_warp(val)
+					if not w.is_empty():
+						warps.append(w)
+			continue
+		rows.append(l)
+	while rows.size() > 0 and String(rows[rows.size() - 1]) == "":
+		rows.pop_back()
+	while rows.size() < 20:
+		rows.append("")
+	var cols: int = 0
+	for r in rows:
+		cols = maxi(cols, String(r).length())
+	for i in range(rows.size()):
+		rows[i] = String(rows[i]).rpad(cols, " ")
+	meta["theme"] = clampi(int(meta["theme"]), 1, 10)
+	return {"rows": rows, "cols": cols, "meta": meta, "warps": warps}
+
+
+func _parse_warp(val: String) -> Dictionary:
+	var parts: PackedStringArray = val.split(" ", false)
+	if parts.size() < 4 or parts[1] != "->":
+		return {}
+	var a: PackedStringArray = parts[0].split(",")
+	var b: PackedStringArray = parts[2].split(",")
+	if a.size() != 2 or b.size() != 2:
+		return {}
+	var w: Dictionary = {"a": Vector2i(int(a[0]), int(a[1])), "b": Vector2i(int(b[0]), int(b[1])), "kind": parts[3], "key": 0, "dir": 1}
+	for i in range(4, parts.size()):
+		var kv: PackedStringArray = parts[i].split("=")
+		if kv.size() == 2 and (kv[0] == "key" or kv[0] == "dir"):
+			w[kv[0]] = int(kv[1])
+	return w
+
+
+func level_info(n: int) -> Dictionary:
+	if not has_level(n):
+		return {}
+	var d: Dictionary = parse_level(FileAccess.get_file_as_string(level_path(n)))
+	return d["meta"]
+
+
+func record(n: int) -> Dictionary:
+	return levels.get(str(n), {"done": false, "gems": [false, false, false], "best_time": 0.0, "best_left": 0.0, "keys_taken": [], "opened": []})
+
+
+func _rec_for_write(n: int) -> Dictionary:
+	if not levels.has(str(n)):
+		levels[str(n)] = {"done": false, "gems": [false, false, false], "best_time": 0.0, "best_left": 0.0, "keys_taken": [], "opened": []}
+	return levels[str(n)]
+
+
+func gems_in(n: int) -> int:
+	var c: int = 0
+	for g in record(n)["gems"]:
+		if bool(g):
+			c += 1
+	return c
+
+
+func register_complete(n: int, gem_flags: Array, elapsed: float, time_left: float) -> Dictionary:
+	## Al llegar a la meta. Devuelve {"first": bool, "new_best": bool}. Repetir un nivel fusiona gemas y mejora el récord.
+	var rec: Dictionary = _rec_for_write(n)
+	var first: bool = not bool(rec["done"])
+	rec["done"] = true
+	var merged: Array = []
+	for i in range(3):
+		merged.append(bool(rec["gems"][i]) or (i < gem_flags.size() and bool(gem_flags[i])))
+	rec["gems"] = merged
+	var new_best: bool = first or elapsed < float(rec["best_time"])
+	if new_best:
+		rec["best_time"] = elapsed
+		rec["best_left"] = time_left
+	changed.emit()
+	return {"first": first, "new_best": new_best}
+
+
+# ------------------------------------------------- llaves y puertas -----
+func key_taken(n: int, id: String) -> bool:
+	return record(n)["keys_taken"].has(id)
+
+
+func take_key(n: int, id: String) -> bool:
+	## Cada llave del nivel solo se puede recoger UNA vez (no se pueden «cultivar» repitiendo el nivel).
+	if key_taken(n, id):
+		return false
+	_rec_for_write(n)["keys_taken"].append(id)
+	keys[KEY_TYPE] = int(keys.get(KEY_TYPE, 0)) + 1
+	changed.emit()
+	return true
+
+
+func key_count() -> int:
+	return int(keys.get(KEY_TYPE, 0))
+
+
+func use_key(count: int = 1) -> bool:
+	if key_count() < count:
+		return false
+	keys[KEY_TYPE] = key_count() - count
+	changed.emit()
+	return true
+
+
+func is_open(n: int, id: String) -> bool:
+	return record(n)["opened"].has(id)
+
+
+func mark_open(n: int, id: String) -> void:
+	if not is_open(n, id):
+		_rec_for_write(n)["opened"].append(id)
+		changed.emit()
+
+
+# ------------------------------------------------- cartera del nivel -----
+func harvest() -> void:
+	## Pasa a la partida de WILMEN WORLD lo ganado en el nivel (vidas, monedas y puntos) y la guarda.
+	if not Game.world_active():
+		return
+	lives = maxi(1, Game.lives)
+	coins = maxi(0, Game.coins)
+	score = maxi(0, Game.score)
+	save_game()
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_APPLICATION_PAUSED or what == NOTIFICATION_WM_CLOSE_REQUEST:
+		if Game.world_active():
+			harvest()
+		elif has_progress():
+			save_game()

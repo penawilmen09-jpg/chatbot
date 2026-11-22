@@ -188,6 +188,11 @@ el botón «WILMEN WORLD». Plan: 6 regiones de 20 niveles (120), niveles largos
 llaves, 6 jefes principales y 3 secretos.
 
 - **Hito 1 (hecho):** modo independiente, guardado propio, botón del menú y pantalla de inicio del modo.
+- **Hito 2 (hecho):** reloj con cuenta atrás (a cero el personaje muere y pierde una vida), relojes de tiempo extra, túneles y
+  puertas que llevan a otra zona del nivel, llaves, verjas y puertas con cerradura, formato de nivel ampliado
+  (`levels/world/README.md`) y tres niveles largos de prueba jugables desde «ELEGIR NIVEL» en la pantalla del modo. Nivel
+  nuevo: `levels/ww_level.gd` (reutiliza el nivel de WILMEN ADVENTURE) y `ui/ww_hud.gd`. Mientras se juega, la partida de
+  WILMEN ADVENTURE se guarda en memoria y se restaura al salir (`Game.world_enter/world_leave`) y no se escribe nada en su archivo.
 - **Partida propia:** `user://wilmen_world_save.json` (autoload `WW`, `autoload/ww.gd`). Monedas, gemas, vidas, llaves y
   progreso son del modo; **no** se lee ni se escribe `wilmen_save.json`, y `Game.save_game()` nunca escribe en el archivo de
   WILMEN WORLD. Solo se comparte (en lectura) la apariencia del héroe. `WW.save_game()` se niega a escribir sobre el archivo

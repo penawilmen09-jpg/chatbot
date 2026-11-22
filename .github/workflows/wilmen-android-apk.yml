@@ -28,6 +28,9 @@ jobs:
       - name: Validar los 100 niveles (alcanzabilidad, gemas, duplicados)
         run: python3 tools/levelgen.py --check
 
+      - name: Validar los niveles de WILMEN WORLD (llaves, túneles, puertas, reloj)
+        run: python3 tools/ww_check.py
+
       - name: Descargar Godot
         run: |
           wget -q "https://github.com/godotengine/godot/releases/download/${GODOT_VERSION}-stable/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip" -O /tmp/godot.zip

@@ -84,6 +84,12 @@ func _run() -> void:
 	_scene = load("res://levels/level.tscn")
 	_check(_scene != null, "level.tscn carga")
 
+	if OS.get_cmdline_user_args().has("--ww2"):
+		await _test_ww_levels()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
+
 	if OS.get_cmdline_user_args().has("--ww"):
 		await _test_ww_base()
 		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
@@ -154,6 +160,7 @@ func _run() -> void:
 	await _test_title_menu()
 	await _test_ads()
 	await _test_ww_base()
+	await _test_ww_levels()
 	await _test_flow()
 	await _test_touch_controls()
 	await _test_menus()
@@ -2091,6 +2098,222 @@ func _test_ww_base() -> void:
 	_check(hub._back != null and hub._back.pressed.get_connections().size() > 0, "hay un botón para volver al menú")
 	hub.queue_free()
 	await _frames(3)
+	_wipe_ww_files()
+	_ww.reset()
+	_reset_game()
+
+
+# ============================== WILMEN WORLD (hito 2): reloj, túneles, puertas, llaves y niveles ===
+func _ww_level(n: int):
+	_ww.start_level(n)
+	var lvl = load("res://levels/ww_level.tscn").instantiate()
+	root.add_child(lvl)
+	await process_frame
+	await _frames(6)
+	if is_instance_valid(lvl.hud._intro):
+		lvl.hud._intro.queue_free()
+		lvl.hud._intro = null
+	return lvl
+
+
+func _stand_at(lvl, cell: Vector2i) -> void:
+	lvl.player.global_position = Vector2(cell.x * 16 + 8, cell.y * 16 + 6)
+	lvl.player.velocity = Vector2.ZERO
+	lvl.camera.reset_smoothing()
+
+
+func _test_ww_levels() -> void:
+	print("WILMEN WORLD (hito 2): reloj, túneles, puertas con llave, verjas, niveles completos y guardado")
+	var story_path: String = _game.save_path
+	_wipe_ww_files()
+	_ww.reset()
+	_reset_game()
+	_game.coins = 42
+	_game.score = 999
+	_game.lives = 6
+	_game.save_game()
+	var story_hash: String = _sha(story_path)
+	var game_before: Dictionary = {"coins": _game.coins, "score": _game.score, "lives": _game.lives, "levels": JSON.stringify(_game.levels)}
+	# ---- formato y niveles ----
+	_check(_ww.available_levels() == [1, 2, 3], "existen los 3 niveles de prueba de WILMEN WORLD")
+	var expect: Dictionary = {1: [300, 3, 2], 2: [285, 3, 1], 3: [320, 3, 1]}  # tiempo, túneles+puertas, verjas
+	for n in [1, 2, 3]:
+		var d: Dictionary = _ww.parse_level(FileAccess.get_file_as_string(_ww.level_path(n)))
+		var meta: Dictionary = d["meta"]
+		var rows: Array = d["rows"]
+		var txt: String = "".join(rows)
+		_check(d["cols"] >= 600 and rows.size() == 20, "nivel %d: largo (%d columnas) y 20 filas" % [n, d["cols"]])
+		_check(int(meta["time"]) == int(expect[n][0]), "nivel %d: límite de tiempo %d s" % [n, meta["time"]])
+		_check(d["warps"].size() == 3 and txt.count("P") == 1 and txt.count("F") == 1 and txt.count("*") == 3, "nivel %d: 3 conexiones, 1 inicio, 1 meta, 3 gemas" % n)
+		_check(txt.count("U") >= 2 or n == 1 and txt.count("U") == 1, "nivel %d: tiene llaves" % n)
+		_check(txt.count("T") == 4 and txt.count("A") == 2, "nivel %d: 4 bocas de túnel y 2 puertas" % n)
+	# ---- entrar en el nivel 1: sesión aislada, reloj y HUD ----
+	var lvl = await _ww_level(1)
+	_check(_game.world_active() and _game.mode == "world", "al entrar se abre la sesión de WILMEN WORLD")
+	_check(lvl.warps.size() == 6 and lvl.time_total == 300.0 and lvl.number == 1, "nivel 1 cargado: 6 extremos de túnel/puerta y reloj de 300 s")
+	_check(lvl.player != null and lvl.goal != null, "hay jugador y meta")
+	var t0: float = lvl.time_left
+	await _frames(60)
+	_check(lvl.time_left < t0 - 0.8 and lvl.time_left > t0 - 1.6, "el reloj cuenta atrás en tiempo real (%.2f -> %.2f)" % [t0, lvl.time_left])
+	_check(lvl.hud._timer_label.text == "%d:%02d" % [int(ceil(lvl.time_left)) / 60, int(ceil(lvl.time_left)) % 60], "el reloj se ve en pantalla (%s)" % lvl.hud._timer_label.text)
+	# ---- reloj extra ----
+	var ClockS = load("res://items/ww_clock.gd")
+	var ck = ClockS.new()
+	ck.seconds = 15
+	ck.level = lvl
+	ck.global_position = lvl.player.global_position
+	lvl.add_child(ck)
+	var tl: float = lvl.time_left
+	await _frames(8)
+	_check(lvl.time_left > tl + 13.0, "un reloj suma +15 s (%.1f -> %.1f)" % [tl, lvl.time_left])
+	# ---- aislamiento: nada de lo ocurrido en WILMEN WORLD llega a WILMEN ADVENTURE ----
+	_game.save_game()
+	_game.add_coin()
+	_check(_sha(story_path) == story_hash, "mientras se juega WILMEN WORLD, la partida de WILMEN ADVENTURE no se escribe")
+	# ---- el tiempo llega a cero: muere y pierde una vida ----
+	var lives0: int = _game.lives
+	lvl.time_left = 0.03
+	await _frames(6)
+	_check(lvl.player.dead and lvl.timed_out, "al llegar el reloj a cero el personaje muere")
+	_check(_game.lives == lives0 - 1, "y pierde una vida (%d -> %d)" % [lives0, _game.lives])
+	await _until(func(): return not lvl.player.dead, 400)
+	_check(not lvl.player.dead and lvl.time_left >= 60.0, "reaparece con tiempo suficiente (%.0f s)" % lvl.time_left)
+	# ---- túnel real: aparece en otra zona ----
+	var wa = lvl.warps[0]
+	var wb = lvl.warps[1]
+	_check(wa.kind == "tunnel" and wa.partner == wb and wb.partner == wa, "el túnel A está conectado con la bodega")
+	_stand_at(lvl, Vector2i(int((wa.position.x - 8) / 16), int((wa.position.y - 16) / 16)))
+	var from_x: float = lvl.player.global_position.x
+	await _frames(10)
+	Input.action_press("jump")
+	await _frames(2)
+	Input.action_release("jump")
+	await _until(func(): return absf(lvl.player.global_position.x - from_x) > 200.0, 120)
+	await _frames(20)
+	var dist_warp: float = lvl.player.global_position.distance_to(wb.arrive)
+	_check(dist_warp < 40.0 and absf(lvl.player.global_position.x - from_x) > 5000.0, "saltar sobre el túnel te lleva a otra zona lejana (%.0f px)" % absf(lvl.player.global_position.x - from_x))
+	_check(not lvl.warping and lvl.player.controllable, "tras aparecer puedes moverte")
+	await _frames(60)
+	_check(lvl.player.global_position.distance_to(wb.arrive) < 60.0, "no vuelve solo al origen (ya no se reactiva hasta salir de la zona)")
+	# permanencia 0,35 s en la boca de salida (cueva): vuelve a la salida del túnel de la bodega
+	var wc = lvl.warps[2]  # extremo A del segundo túnel (la salida de la bodega)
+	_stand_at(lvl, Vector2i(int((wc.position.x - 8) / 16), int((wc.position.y - 16) / 16)))
+	var cave_x: float = lvl.player.global_position.x
+	await _until(func(): return absf(lvl.player.global_position.x - cave_x) > 200.0, 120)
+	await _frames(20)
+	_check(absf(lvl.player.global_position.x - cave_x) > 3000.0 and lvl.player.global_position.distance_to(lvl.warps[3].arrive) < 40.0, "permanecer sobre la boca también transporta (atajo hacia el tramo final)")
+	# ---- puerta con llave ----
+	var door = lvl.warps[4]
+	_check(door.kind == "door" and door.need_key == 1 and door.is_locked(), "la puerta del nivel 1 está cerrada con cerradura")
+	_ww.keys = {}
+	_stand_at(lvl, Vector2i(int((door.position.x - 8) / 16), int((door.position.y - 16) / 16)))
+	var door_x: float = lvl.player.global_position.x
+	await _frames(40)
+	_check(absf(lvl.player.global_position.x - door_x) < 30.0 and _ww.key_count() == 0 and door.is_locked(), "sin llave la puerta no se abre")
+	_ww.keys = {"bronce": 1}
+	_stand_at(lvl, Vector2i(int((door.position.x - 8) / 16), int((door.position.y - 16) / 16)))
+	await _until(func(): return absf(lvl.player.global_position.x - door_x) > 200.0, 120)
+	await _frames(20)
+	_check(absf(lvl.player.global_position.x - door_x) > 1500.0, "con llave la puerta se abre y entras en la cámara secreta")
+	_check(_ww.key_count() == 0 and _ww.is_open(1, door.warp_id), "la puerta consumió la llave y queda abierta")
+	var vault_arrive: Vector2 = lvl.player.global_position
+	await _frames(60)  # pasa el instante de gracia de la puerta de llegada; el jugador está fuera de su zona
+	# salir de la cámara por la misma puerta (ya abierta, sin llave)
+	var back_door = door.partner
+	_stand_at(lvl, Vector2i(int((back_door.position.x - 8) / 16), int((back_door.position.y - 16) / 16)))
+	await _until(func(): return absf(lvl.player.global_position.x - vault_arrive.x) > 200.0, 120)
+	await _frames(20)
+	_check(lvl.player.global_position.distance_to(door.arrive) < 50.0, "la puerta abierta sirve de ida y vuelta (sin gastar más llaves)")
+	# ---- llave: recogida única ----
+	var keys_nodes: Array = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_key.gd")
+	_check(keys_nodes.size() == 1, "hay una llave en la bodega del nivel 1")
+	var kn = keys_nodes[0]
+	var kid: String = kn.key_id
+	lvl.player.global_position = kn.global_position
+	await _frames(6)
+	_check(_ww.key_count() == 1 and _ww.key_taken(1, kid), "recoger la llave la añade al inventario (y queda anotada)")
+	await _free_level(lvl)
+	_check(not _game.world_active() and _game.mode == "story", "al salir se cierra la sesión y vuelve el modo original")
+	_check(_game.coins == game_before["coins"] and _game.score == game_before["score"] and _game.lives == game_before["lives"], "monedas, puntos y vidas de WILMEN ADVENTURE se restauran")
+	_check(_sha(story_path) == story_hash and JSON.stringify(_game.levels) == game_before["levels"], "la partida de WILMEN ADVENTURE sigue idéntica")
+	# volver a entrar: la llave recogida no reaparece (no se puede cultivar) y la puerta sigue abierta
+	lvl = await _ww_level(1)
+	var again: Array = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_key.gd")
+	_check(again.is_empty(), "la llave ya recogida no reaparece al repetir el nivel")
+	_check(not lvl.warps[4].is_locked(), "la puerta abierta sigue abierta")
+	# ---- completar el nivel y guardar ----
+	var coins_before: int = _ww.coins
+	for g in range(3):
+		lvl.gems[g] = g != 2
+	lvl.hud.set_gems(lvl.gems)
+	lvl.time_left = 200.0
+	lvl.coins_level = 0
+	_game.add_coin()
+	lvl.player.global_position = lvl.goal.global_position
+	await _until(func(): return lvl.finished, 120)
+	_check(lvl.finished, "tocar la meta completa el nivel")
+	await _until(func(): return lvl.hud._overlay != null, 400)
+	_check(lvl.hud._overlay != null and lvl.final_info.get("first", false), "aparece la pantalla de resultados (primera vez)")
+	_check(_ww.is_done(1) and _ww.gems_in(1) == 2, "el progreso queda anotado: nivel 1 completado con 2 gemas")
+	_check(_ww.coins == coins_before + 1 and _ww.score > 0, "monedas y puntos del nivel pasan a la partida de WILMEN WORLD")
+	var saved: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(_ww.save_path))
+	_check(saved["levels"]["1"]["done"] == true and saved["coins"] == coins_before + 1, "y se guardan en wilmen_world_save")
+	var btn_texts: Array = []
+	for b in lvl.hud._overlay.find_children("*", "Button", true, false):
+		btn_texts.append(b.text)
+	_check(btn_texts.has("Siguiente nivel") and btn_texts.has("Repetir nivel") and btn_texts.has("Lista de niveles"), "botones de resultado: %s" % str(btn_texts))
+	await _free_level(lvl)
+	_ww.reset()
+	_ww.load_game()
+	_check(_ww.is_done(1) and _ww.gems_in(1) == 2 and _ww.record(1)["best_time"] > 0.0, "tras cerrar y abrir el juego, el progreso sigue (y el mejor tiempo)")
+	_check(_sha(story_path) == story_hash, "WILMEN ADVENTURE sigue sin tocarse tras completar un nivel")
+	# ---- verja con candado (nivel 2): sin llave no se pasa; con llave se abre y consume la llave ----
+	_ww.keys = {}
+	lvl = await _ww_level(2)
+	var gates: Array = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_gate.gd")
+	_check(gates.size() == 1 and gates[0].cells == 3, "el nivel 2 tiene una verja de 3 celdas")
+	var gate = gates[0]
+	var gate_id: String = gate.gate_id
+	var gcell := Vector2i(int((gate.position.x - 8) / 16), int((gate.position.y - 8) / 16))
+	_stand_at(lvl, Vector2i(gcell.x - 2, 14))
+	Input.action_press("move_right")
+	await _frames(90)
+	Input.action_release("move_right")
+	var gate_x: float = gate.position.x
+	_check(lvl.player.global_position.x < gate_x and is_instance_valid(gate) and _ww.key_count() == 0, "sin llave la verja bloquea el paso")
+	_ww.keys = {"bronce": 1}
+	Input.action_press("move_right")
+	await _frames(120)
+	Input.action_release("move_right")
+	_check(_ww.key_count() == 0 and _ww.is_open(2, gate_id), "con llave la verja se abre, gasta la llave y queda abierta")
+	_check(lvl.player.global_position.x > gate_x + 8, "y el jugador la atraviesa")
+	await _free_level(lvl)
+	# ---- sin vidas: reintentar ----
+	_wipe_ww_files()
+	_ww.reset()
+	_ww.lives = 1
+	lvl = await _ww_level(3)
+	_game.lives = 1
+	lvl.player.die()
+	await _until(func(): return lvl.finished, 400)
+	_check(lvl.finished and _game.lives == 0, "sin vidas: fin del intento")
+	await _frames(4)
+	var go_btns: Array = []
+	for b in lvl.hud._overlay.find_children("*", "Button", true, false):
+		go_btns.append(b.text)
+	_check(go_btns == ["Reintentar", "Lista de niveles"], "pantalla «Sin vidas» de WILMEN WORLD: %s" % str(go_btns))
+	await _free_level(lvl)
+	_check(_ww.lives >= 1, "la partida de WILMEN WORLD conserva al menos una vida")
+	# ---- lista de niveles ----
+	var lst = load("res://ui/ww_levels.tscn").instantiate()
+	root.add_child(lst)
+	await _frames(6)
+	_check(lst._buttons.size() == 3, "la lista muestra los 3 niveles")
+	_check(str(lst._buttons[1].text).contains("Sendero de las Luciérnagas") and str(lst._buttons[2].text).contains("Cañón de Ámbar") and str(lst._buttons[3].text).contains("Fundición de Brasas"), "con sus nombres reales")
+	_check(lst._buttons[1].pressed.get_connections().size() > 0 and _ww.start_level(3) and _ww.current_level == 3, "cada nivel se puede jugar desde la lista")
+	lst.queue_free()
+	await _frames(3)
+	_check(_sha(story_path) == story_hash, "al final, la partida de WILMEN ADVENTURE sigue idéntica")
 	_wipe_ww_files()
 	_ww.reset()
 	_reset_game()
