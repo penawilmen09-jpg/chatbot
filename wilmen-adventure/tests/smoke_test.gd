@@ -79,6 +79,12 @@ func _run() -> void:
 	_scene = load("res://levels/level.tscn")
 	_check(_scene != null, "level.tscn carga")
 
+	if OS.get_cmdline_user_args().has("--title"):
+		await _test_title_menu()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
+
 	if OS.get_cmdline_user_args().has("--exp2"):
 		await _test_secret_variants()
 		await _test_vehicles()
@@ -121,6 +127,7 @@ func _run() -> void:
 	await _test_vehicles()
 	await _test_modes()
 	await _test_extras_ui()
+	await _test_title_menu()
 	await _test_flow()
 	await _test_touch_controls()
 	await _test_menus()
@@ -1301,6 +1308,41 @@ func _test_secret_variants() -> void:
 		var left_b: int = bricks.filter(func(b): return is_instance_valid(b) and not b.is_queued_for_deletion()).size()
 		_check(left_b < bricks.size(), "el gigante rompe los ladrillos de la bóveda (%d -> %d)" % [bricks.size(), left_b])
 		await _free_level(l2)
+	_reset_game()
+
+
+func _test_title_menu() -> void:
+	print("Menú principal: botones reales, estadísticas, opciones y accesos")
+	_reset_game()
+	_mark_done(1)
+	_mark_done(2)
+	_game.score = 12345
+	var node = load("res://ui/title.tscn").instantiate()
+	root.add_child(node)
+	await _frames(10)
+	var texts: Array = []
+	for b in node._menu.get_children():
+		texts.append(b.text)
+		_check(b is Button and not b.disabled and b.pressed.get_connections().size() > 0 and b.icon != null, "botón «%s»: real, activo, con icono y acción" % b.text)
+	_check(texts == ["CONTINUAR", "MAPA DE NIVELES", "EXTRAS", "OPCIONES", "SALIR"], "los 5 botones del diseño: %s" % str(texts))
+	_check(node._menu.get_child(0).has_focus(), "el primer botón recibe el foco")
+	var found: Array = []
+	for l in node.find_children("*", "Label", true, false):
+		found.append(l.text)
+	_check(found.has("Niveles 2/100") and found.has("Gemas 0/300") and found.has("Puntos 12345"), "la barra inferior muestra los datos reales (%s)" % str(found.filter(func(t): return t.begins_with("Niveles") or t.begins_with("Gemas") or t.begins_with("Puntos"))))
+	_check(node.get_children().filter(func(c): return c is TextureButton).size() == 2, "botones redondos de logros y música")
+	node._menu.get_child(3).pressed.emit()
+	await _frames(3)
+	_check(node._options != null, "OPCIONES abre el panel de opciones")
+	node._close_options()
+	await _frames(3)
+	_check(node._options == null, "y se cierra")
+	node._show_audio()
+	await _frames(3)
+	_check(node._options != null, "el botón de música abre el control de volumen")
+	node._close_options()
+	node.queue_free()
+	await process_frame
 	_reset_game()
 
 
