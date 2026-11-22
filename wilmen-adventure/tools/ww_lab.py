@@ -33,9 +33,9 @@ def coins(x, y, n):
         put(x + i, y, "o")
 
 
-for a, b in [(0, 57), (67, 82), (91, 100), (109, 164), (197, 206), (237, 405), (418, 429)]:
+for a, b in [(0, 57), (67, 82), (91, 100), (109, 164), (197, 206), (237, 405), (416, 429)]:
     ground(a, b)
-fill(436, 19, 450, H, "#")
+fill(432, 20, 450, H, "#")
 
 put(3, GT - 1, "P")
 
@@ -103,10 +103,10 @@ for k in range(7):
     put(398, 17 + k, "!")
 
 # 9) PLATAFORMA ORBITAL y ASCENSOR
-put(412, 23, "n")
+put(410, 23, "n")
 put(420, GT - 1, "C")
-put(431, 24, "b")
-put(445, 18, "F")
+put(429, 25, "b")
+put(442, 19, "F")
 
 out = "; WILMEN WORLD - Taller de mecanicas (tanda 0). Nivel de pruebas: no cuenta para el progreso ni se guarda.\n"
 out += "; Generado por tools/ww_lab.py. Estaciones: setas, lianas, troncos, plataformas que desaparecen, puente, interruptores,\n"

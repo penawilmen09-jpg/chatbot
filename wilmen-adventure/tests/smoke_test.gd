@@ -3373,6 +3373,82 @@ func _test_ww_lab() -> void:
 	Input.action_release("move_right")
 	Input.action_release("jump")
 	_check(pl.global_position.x > 364 * 16.0 and pl.is_on_floor() and pl.global_position.y < 13 * 16.0, "estación 7: las burbujas elevan hasta la repisa alta (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
+	# 8) dardos y péndulo
+	await _lab_alive(lvl)
+	await _lab_put(lvl, 381, 24)
+	var hp8: int = pl.hp
+	var pend = _nodes_of(lvl, "res://items/ww_pendulum.gd")[0]
+	var hop_hazard := func():
+		for n in lvl.get_children():
+			if n is Area2D and n.get_script() != null and "_life" in n and "dir" in n:
+				var d: float = pl.global_position.x - n.global_position.x
+				if d > -50.0 and d < -6.0 and n.dir == 1:
+					return true
+				if n.dir == -1 and n.global_position.x - pl.global_position.x > 6.0 and n.global_position.x - pl.global_position.x < 50.0:
+					return true
+		var bx: float = pend.to_global(pend.blade_pos).x - pl.global_position.x
+		return bx > -30.0 and bx < 56.0 and pend.blade_pos.y > 80.0
+	var c8: bool = await _bot_run(lvl, 404 * 16.0, 1800, hop_hazard)
+	_check(c8, "estación 8: se pasa entre los dardos y el péndulo (x=%.0f, corazones %d/%d)" % [pl.global_position.x, pl.hp, hp8])
+	# 9) plataforma orbital y ascensor
+	await _lab_alive(lvl)
+	var obs: Array = _nodes_of(lvl, "res://items/ww_orbit.gd")
+	var orb = obs.filter(func(o): return o.kind == "orbit")[0]
+	var elev = obs.filter(func(o): return o.kind == "elevator")[0]
+	await _lab_put(lvl, 403, 24)
+	var on_orb: bool = false
+	for i in range(1200):
+		if pl.dead:
+			break
+		if not on_orb:
+			var fa: float = (orb._t + 0.38) * 0.9
+			var fp: Vector2 = orb._origin + Vector2(cos(fa), sin(fa)) * 48.0
+			if pl.is_on_floor() and pl.global_position.y > 23 * 16.0 and pl.global_position.x < 404 * 16.0 - 6.0:
+				Input.action_press("move_right")
+			elif pl.is_on_floor() and absf(fp.x - (pl.global_position.x + 40.0)) < 22.0 and fp.y < 395.0 and fp.y > 340.0:
+				Input.action_press("move_right")
+				Input.action_press("jump")
+			elif pl.is_on_floor() and pl.global_position.y < 23 * 16.0 and absf(pl.global_position.x - orb.position.x) < 14.0:
+				on_orb = true
+				Input.action_release("move_right")
+				Input.action_release("jump")
+			elif pl.is_on_floor():
+				Input.action_release("move_right")
+				Input.action_release("jump")
+		else:
+			if orb.position.x > 6568.0 + 38.0 and pl.is_on_floor():
+				Input.action_press("move_right")
+				Input.action_press("jump")
+			if pl.global_position.x > 416 * 16.0 and pl.is_on_floor() and pl.global_position.y > 23 * 16.0:
+				break
+		await physics_frame
+	Input.action_release("move_right")
+	Input.action_release("jump")
+	_check(on_orb and pl.global_position.x > 416 * 16.0 and pl.is_on_floor(), "estación 9: la orbital lleva de una orilla a la otra (x=%.0f)" % pl.global_position.x)
+	await _lab_alive(lvl)
+	await _lab_put(lvl, 428, 24)
+	var on_el: bool = false
+	var top: bool = false
+	for i in range(900):
+		if pl.dead:
+			break
+		if not on_el:
+			if pl.is_on_floor() and pl.global_position.y > 23 * 16.0 and elev.position.y > 24 * 16.0 and absf(elev.position.x - pl.global_position.x) < 80.0:
+				Input.action_press("move_right")
+			if pl.is_on_floor() and absf(pl.global_position.x - elev.position.x) < 12.0 and absf(pl.global_position.y - (elev.position.y - 14.0)) < 10.0:
+				on_el = true
+				Input.action_release("move_right")
+		else:
+			if elev.position.y < 20 * 16.0 and pl.is_on_floor():
+				Input.action_press("move_right")
+				Input.action_press("jump")
+			if pl.global_position.x > 433 * 16.0 and pl.is_on_floor() and pl.global_position.y < 20 * 16.0:
+				top = true
+				break
+		await physics_frame
+	Input.action_release("move_right")
+	Input.action_release("jump")
+	_check(on_el and top, "estación 9: el ascensor sube hasta la repisa de la meta (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
 	await _end_lab(lvl)
 
 
