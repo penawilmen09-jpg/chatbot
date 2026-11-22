@@ -241,6 +241,9 @@ jobs:
           echo "== permisos =="
           $BT/aapt dump permissions build/WilmenAdventure.apk | tee /tmp/perms.txt
           if grep -q "android.permission.INTERNET" /tmp/perms.txt; then echo "ERROR: el APK pide permiso de Internet"; exit 1; fi
+          echo "== niveles incluidos (100 de WILMEN ADVENTURE + los de WILMEN WORLD) =="
+          unzip -l build/WilmenAdventure.apk | grep -c "assets/levels/data/level_" | sed 's/^/niveles de WILMEN ADVENTURE: /'
+          if ! unzip -l build/WilmenAdventure.apk | grep -q "assets/levels/world/ww_001.txt"; then echo "ERROR: faltan los niveles de WILMEN WORLD en el APK"; exit 1; fi
           echo "== firma =="
           $BT/apksigner verify --verbose build/WilmenAdventure.apk | head -n 8
           echo "== datos =="
