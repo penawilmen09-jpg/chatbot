@@ -5,12 +5,14 @@ extends Node2D
 
 const TEX := preload("res://assets/items/fireball.png")
 const BOOM := preload("res://assets/items/fireball_boom.png")
-const SPEED := 260.0
+const SPEED := 340.0  # antes 260
+const RANGE := 192.0  # alcance máximo (antes 64: 3 veces más)
+const LIFE_MARGIN := 0.6  # segundos extra sobre el vuelo máximo; evita bolas perdidas, no recorta el alcance
 const FLAME := Color("#ff7a1a")
 
 var target = null  # enemigo al que se dirige (puede ser null)
 var dir: Vector2 = Vector2.RIGHT
-var travel: float = 64.0  # alcance sin objetivo (el mismo radio del poder)
+var travel: float = RANGE  # distancia que le queda por recorrer sin objetivo
 var exploded: bool = false
 
 var _ball: Sprite2D
@@ -18,6 +20,7 @@ var _glow: Sprite2D
 var _trail: CPUParticles2D
 var _boom: Sprite2D
 var _t: float = 0.0
+var _life: float = RANGE / SPEED + LIFE_MARGIN
 
 
 func _ready() -> void:
@@ -76,6 +79,10 @@ func _physics_process(delta: float) -> void:
 	if exploded:
 		return
 	_t += delta
+	_life -= delta
+	if _life <= 0.0 and not exploded:
+		_explode(false)  # seguridad: un objetivo que huye no la mantiene volando eternamente
+		return
 	_ball.frame = int(_t * 16.0) % 4
 	var pulse: float = 1.0 + 0.15 * sin(_t * 22.0)
 	_glow.scale = Vector2(pulse, pulse)
@@ -88,6 +95,10 @@ func _physics_process(delta: float) -> void:
 			return
 		dir = to.normalized()
 		_face()
+		var q2 := PhysicsRayQueryParameters2D.create(global_position, global_position + dir * (step + 3.0), 1)
+		if not get_world_2d().direct_space_state.intersect_ray(q2).is_empty():
+			_explode(false)  # un muro en medio: no atraviesa el terreno para llegar hasta enemigos lejanos
+			return
 		position += dir * step
 		return
 	if target != null:

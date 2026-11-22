@@ -1830,6 +1830,75 @@ func _test_fireball_pulse() -> void:
 		fbs = []
 		await _until(func(): return f2_ref.get_ref() == null, 180)
 		_check(f2_ref.get_ref() == null, "[%s] estalla al llegar a su alcance y desaparece" % label)
+	# alcance ampliado (3 veces): llega a enemigos lejanos delante, no a los que están detrás ni fuera de alcance
+	var FB = load("res://items/fireball.gd")
+	_check(FB.RANGE == 192.0 and FB.SPEED == 340.0 and FB.LIFE_MARGIN > 0.0, "alcance 192 px (3 x 64), velocidad 340 (antes 260) y vida suficiente para todo el vuelo")
+	for real in get_nodes_in_group("enemies"):
+		if not (real is FakeEnemy):
+			real.queue_free()  # solo en esta prueba: los enemigos reales del nivel no deben mezclarse con las medidas
+	await process_frame
+	# se busca un tramo del nivel despejado a ambos lados (sin muros en 240 px) para medir el alcance en las dos direcciones
+	var space: PhysicsDirectSpaceState2D = lvl.get_world_2d().direct_space_state
+	var found: bool = false
+	var base_y: float = p.position.y
+	for sx in range(120, int(lvl.cols) * 16 - 120, 8):
+		var pos := Vector2(float(sx), base_y)
+		var qa := PhysicsRayQueryParameters2D.create(pos, pos + Vector2(240.0, 0.0), 1)
+		var qb := PhysicsRayQueryParameters2D.create(pos, pos - Vector2(240.0, 0.0), 1)
+		var qd := PhysicsRayQueryParameters2D.create(pos, pos + Vector2(0.0, 24.0), 1)
+		var qu := PhysicsRayQueryParameters2D.create(pos, pos - Vector2(0.0, 24.0), 1)
+		if space.intersect_ray(qa).is_empty() and space.intersect_ray(qb).is_empty() and not space.intersect_ray(qd).is_empty() and space.intersect_ray(qu).is_empty():
+			p.position = pos
+			found = true
+			break
+	_check(found, "hay un tramo despejado en el nivel para medir el alcance")
+	p.velocity = Vector2.ZERO
+	await _until(func(): return _fireballs(lvl).is_empty(), 300)
+	await _frames(3)
+	for dir in [1, -1]:
+		var label2: String = "derecha" if dir == 1 else "izquierda"
+		p.facing = dir
+		p._invuln_t = 99.0
+		var far := FakeEnemy.new()
+		far.position = p.position + Vector2(170.0 * dir, 0.0)
+		far.add_to_group("enemies")
+		var behind := FakeEnemy.new()
+		behind.position = p.position + Vector2(-150.0 * dir, 0.0)
+		behind.add_to_group("enemies")
+		var too_far := FakeEnemy.new()
+		too_far.position = p.position + Vector2(230.0 * dir, -20.0)
+		too_far.add_to_group("enemies")
+		lvl.add_child(far)
+		lvl.add_child(behind)
+		lvl.add_child(too_far)
+		p.skill_cd = 0.0
+		p._use_skill()
+		await process_frame
+		_check(_fireballs(lvl).size() == 1, "[%s] solo se lanza hacia el enemigo lejano de delante (no al de atrás ni al que queda fuera de alcance)" % label2)
+		var t0: int = Time.get_ticks_msec()
+		await _until(func(): return far.hits.size() > 0 or _fireballs(lvl).is_empty(), 240)
+		_check(far.hits == ["spark"], "[%s] alcanza a un enemigo a 170 px con el daño de siempre" % label2)
+		_check(behind.hits.is_empty() and too_far.hits.is_empty(), "[%s] los de atrás y los fuera de alcance no reciben daño" % label2)
+		await _until(func(): return _fireballs(lvl).is_empty(), 120)
+		# sin objetivo: recorre ~192 px antes de estallar
+		far.queue_free()
+		behind.queue_free()
+		too_far.queue_free()
+		await process_frame
+		p.skill_cd = 0.0
+		p._use_skill()
+		await process_frame
+		var ff = _fireballs(lvl)[0]
+		var ff_ref: WeakRef = weakref(ff)
+		var sx: float = ff.global_position.x
+		var maxd: float = 0.0
+		while ff_ref.get_ref() != null and not ff_ref.get_ref().exploded:
+			maxd = maxf(maxd, absf(ff_ref.get_ref().global_position.x - sx))
+			await physics_frame
+		ff = null
+		_check(maxd > 150.0 and maxd < 200.0, "[%s] sin enemigos recorre ~%.0f px (3 veces los 64 de antes) antes de estallar" % [label2, maxd])
+		await _until(func(): return _fireballs(lvl).is_empty(), 120)
+		p.skill_cd = 0.0
 	# enfriamiento: no se puede lanzar otra mientras dura
 	p.facing = 1
 	p.skill_cd = 0.0

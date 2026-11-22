@@ -339,13 +339,19 @@ func _shoot(kind: String, vel: Vector2, grav: float, bouncy: bool, pierce: bool 
 
 
 func _fireball_pulse() -> void:
-	## Pulso Eléctrico del Mundo 9 (poder base): en vez de rayos, una bola de fuego por cada enemigo cercano (mismo radio
-	## de detección y mismo daño que la descarga). Si no hay ninguno, sale una hacia delante hasta ese mismo alcance.
+	## Pulso Eléctrico del Mundo 9 (poder base): en vez de rayos, una bola de fuego por cada enemigo al alcance. Se mantiene
+	## el radio de siempre alrededor del personaje (64 px, por cualquier lado) y, además, la bola llega a enemigos más
+	## lejanos DELANTE del personaje hasta FireballScript.RANGE (192 px). Mismo daño que la descarga original.
+	## Si no hay ninguno, sale una hacia delante hasta ese alcance.
 	Audio.play_sfx("fire", 0.9)
 	_fx(Color("#ff7a1a"), 6)
 	var count: int = 0
 	for e in get_tree().get_nodes_in_group("enemies"):
-		if is_instance_valid(e) and not bool(e.get("dead")) and e.global_position.distance_to(global_position) < 64.0:
+		if not is_instance_valid(e) or bool(e.get("dead")):
+			continue
+		var d: float = e.global_position.distance_to(global_position)
+		var in_front: bool = (e.global_position.x - global_position.x) * float(facing) > 0.0
+		if d < 64.0 or (in_front and d < FireballScript.RANGE):
 			_spawn_fireball(e)
 			count += 1
 	if count == 0:
