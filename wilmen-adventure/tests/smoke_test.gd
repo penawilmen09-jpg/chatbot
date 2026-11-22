@@ -15,6 +15,7 @@ var _scene: PackedScene
 var _game
 var _prog
 var _audio
+var _ads
 
 
 func _initialize() -> void:
@@ -74,10 +75,17 @@ func _run() -> void:
 	_game = root.get_node("Game")
 	_audio = root.get_node("Audio")
 	_prog = root.get_node("Progress")
+	_ads = root.get_node("Ads")
 	_game.save_path = "user://smoke_test_save.json"
 	_reset_game()
 	_scene = load("res://levels/level.tscn")
 	_check(_scene != null, "level.tscn carga")
+
+	if OS.get_cmdline_user_args().has("--ads"):
+		await _test_ads()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
 
 	if OS.get_cmdline_user_args().has("--title"):
 		await _test_title_menu()
@@ -128,6 +136,7 @@ func _run() -> void:
 	await _test_modes()
 	await _test_extras_ui()
 	await _test_title_menu()
+	await _test_ads()
 	await _test_flow()
 	await _test_touch_controls()
 	await _test_menus()
@@ -1515,3 +1524,221 @@ func _test_touch_controls() -> void:
 		_check(not paused, "y se reanuda")
 	_game.settings["touch"] = "auto"
 	await _free_level(lvl)
+
+
+# ===================================================== anuncios (proveedor falso) ===
+const MockAds := preload("res://ads/mock_provider.gd")
+
+
+func _pf(n: int) -> void:
+	for i in range(n):
+		await process_frame
+
+
+func _until(cond: Callable, max_frames: int = 900) -> void:
+	## Espera (fotogramas de proceso, como los temporizadores y las señales del juego) hasta que se cumpla la condición.
+	var n: int = 0
+	while not cond.call() and n < max_frames:
+		await process_frame
+		n += 1
+	await process_frame
+
+
+func _save_without_lives() -> String:
+	var d: Dictionary = _game._save_dict().duplicate(true)
+	d.erase("lives")
+	if d.has("ext") and typeof(d["ext"]) == TYPE_DICTIONARY and d["ext"].has("stats"):
+		d["ext"]["stats"].erase("play_time")  # el tiempo de juego avanza solo mientras se juega
+	return JSON.stringify(d)
+
+
+func _overlay_buttons(lvl) -> Array:
+	var out: Array = []
+	if lvl.hud._overlay != null:
+		for b in lvl.hud._overlay.find_children("*", "Button", true, false):
+			out.append(b)
+	return out
+
+
+func _button_with(lvl, text: String):
+	for b in _overlay_buttons(lvl):
+		if b.text == text:
+			return b
+	return null
+
+
+func _test_ads() -> void:
+	print("Anuncios recompensados (proveedor FALSO): recompensa, seguridad, interfaz y guardado intacto")
+	var AdsScript = load("res://autoload/ads.gd")
+	_check(AdsScript.ADS_ENABLED == false, "ADS_ENABLED es false por defecto")
+	_check(_ads.provider == null and not _ads.can_offer_reward() and not _ads.active(), "sin proveedor: anuncios desactivados")
+	_check(not _ads.request_reward(func(_r): pass), "desactivado: no se puede pedir un anuncio")
+	_check(_ads.banner_reserved() == 0.0 and not _ads.banner_visible(), "desactivado: sin banner")
+	var src: String = FileAccess.get_file_as_string("res://autoload/ads.gd") + FileAccess.get_file_as_string("res://ads/mock_provider.gd")
+	_check(not src.to_lower().contains("interstitial") and not src.contains("intersticial"), "no existe ningún intersticial en el código")
+
+	# ---- lógica de recompensa (sin nivel) ----
+	_reset_game()
+	var results: Array = []
+	var cb := func(r): results.append(r)
+	var cases := [["complete", 1, "rewarded"], ["close", 0, "closed"], ["fail", 0, "failed"], ["double", 1, "rewarded"], ["late", 1, "rewarded"]]
+	for c in cases:
+		_game.lives = 3
+		results.clear()
+		var m := MockAds.new(false)
+		m.behavior = c[0]
+		_ads.use_provider(m)
+		var snap: String = _save_without_lives()
+		_check(_ads.can_offer_reward(), "[%s] el anuncio está disponible" % c[0])
+		_check(_ads.request_reward(cb), "[%s] se pide el anuncio" % c[0])
+		_check(not _ads.can_offer_reward() and not _ads.request_reward(cb), "[%s] mientras hay uno en curso no se puede pedir otro" % c[0])
+		await _pf(4)
+		_check(_game.lives == 3 + int(c[1]), "[%s] vidas 3 -> %d (esperado +%d)" % [c[0], _game.lives, int(c[1])])
+		_check(results == [c[2]], "[%s] el resultado entregado es una sola vez: %s" % [c[0], str(results)])
+		if c[0] == "late":
+			m.replay(_ads, "rewarded")
+			m.replay(_ads, "rewarded")
+			_check(_game.lives == 4, "[late] eventos repetidos posteriores no dan más vidas")
+		_check(_save_without_lives() == snap, "[%s] el resto de la partida no cambia" % c[0])
+		_check(not _ads.busy(), "[%s] la petición queda cerrada" % c[0])
+	# anuncio sin respuesta: caduca sin recompensa
+	_game.lives = 3
+	results.clear()
+	var ms := MockAds.new(false)
+	ms.behavior = "silent"
+	_ads.use_provider(ms)
+	_ads.request_reward(cb)
+	await _pf(3)
+	_check(_ads.busy() and _game.lives == 3, "anuncio sin respuesta: sigue pendiente, sin vida")
+	_ads._started_ms -= AdsScript.REQUEST_TIMEOUT_MS + 1000
+	await _pf(3)
+	_check(not _ads.busy() and results == ["failed"] and _game.lives == 3, "anuncio sin respuesta: caduca sin dar vida")
+	ms.replay(_ads, "rewarded")
+	_check(_game.lives == 3, "una recompensa tardía de una petición caducada se ignora")
+	# anuncio no cargado
+	var mn := MockAds.new(false)
+	mn.ready = false
+	_ads.use_provider(mn)
+	_check(not _ads.can_offer_reward(), "anuncio no cargado: no se ofrece")
+	# evento sin petición activa
+	var mx := MockAds.new(false)
+	_ads.use_provider(mx)
+	_ads.on_ad_event(1, "rewarded")
+	_ads.on_ad_event(-1, "rewarded")
+	_check(_game.lives == 3, "evento de recompensa sin petición activa: se ignora")
+	# el que pidió el anuncio ya no existe: la vida solo se da si el anuncio se completó
+	_ads.use_provider(null)
+
+	# ---- interfaz «Sin vidas» desactivada: no hay botón ----
+	_reset_game()
+	var lvl = await _load_level(1)
+	_game.lives = 1
+	lvl.player.die()
+	await _until(func(): return lvl.finished)
+	_check(lvl.finished and _game.lives == 0, "sin vidas: aparece la pantalla «Sin vidas»")
+	_check(_button_with(lvl, "Ver anuncio y obtener +1 vida") == null, "anuncios desactivados: NO hay botón de anuncio")
+	_check(_button_with(lvl, "Reintentar") != null and _button_with(lvl, "Mapa de niveles") != null, "se mantienen Reintentar y Mapa de niveles")
+	await _free_level(lvl)
+
+	# ---- opción A con el proveedor falso ----
+	_reset_game()
+	_game.lives = 1
+	_game.coins = 7
+	_game.score = 1234
+	var mock := MockAds.new(false)
+	_ads.use_provider(mock)
+	lvl = await _load_level(1)
+	_game.lives = 1
+	_check(not _ads.banner_visible() and _ads.banner_reserved() == 0.0, "durante un nivel no hay banner")
+	lvl.respawn_pos = lvl.player.position + Vector2(48, 0)  # simula un punto de control
+	var cp: Vector2 = lvl.respawn_pos
+	lvl.player.die()
+	await _until(func(): return lvl.finished)
+	_check(lvl.finished and _game.lives == 0, "opción A: sin vidas")
+	var btn = _button_with(lvl, "Ver anuncio y obtener +1 vida")
+	_check(btn != null and not btn.disabled, "con anuncios activos aparece «Ver anuncio y obtener +1 vida»")
+	var before: String = _save_without_lives()
+	var lvls_before: String = JSON.stringify(_game.levels)
+	mock.behavior = "close"
+	btn.pressed.emit()
+	await _pf(6)
+	_check(_game.lives == 0 and lvl.finished, "cerrar el anuncio antes de completarlo: 0 vidas y sigue «Sin vidas»")
+	btn = _button_with(lvl, "Ver anuncio y obtener +1 vida")
+	_check(btn != null and not btn.disabled, "tras cerrarlo el botón vuelve a estar disponible (voluntario, sin límite)")
+	mock.behavior = "fail"
+	btn.pressed.emit()
+	await _pf(6)
+	_check(_game.lives == 0 and lvl.finished, "anuncio que falla: 0 vidas")
+	btn = _button_with(lvl, "Ver anuncio y obtener +1 vida")
+	mock.behavior = "double"
+	btn.pressed.emit()
+	btn.pressed.emit()  # doble toque: una sola petición
+	await _pf(8)
+	_check(mock.shown_count == 3, "un doble toque no pide dos anuncios (anuncios mostrados: %d)" % mock.shown_count)
+	_check(_game.lives == 1, "anuncio completo con callbacks repetidos: exactamente +1 vida (vidas=%d)" % _game.lives)
+	_check(not lvl.finished and not lvl.player.dead, "el nivel continúa: el jugador está vivo")
+	_check(lvl.player.position.distance_to(cp) < 4.0, "continúa desde el último punto de control")
+	_check(_overlay_buttons(lvl).is_empty(), "la pantalla «Sin vidas» se cierra")
+	_check(_game.coins == 7 and _game.score == 1234, "monedas y puntos intactos")
+	_check(JSON.stringify(_game.levels) == lvls_before and _save_without_lives() == before, "progreso, gemas, estadísticas y guardado intactos (solo cambia 'lives')")
+	# se puede volver a morir y ver otro anuncio: sin límite
+	lvl.player.die()
+	await _until(func(): return lvl.finished)
+	_check(lvl.finished and _game.lives == 0 and _button_with(lvl, "Ver anuncio y obtener +1 vida") != null, "puede volver a ofrecerse el anuncio (sin límite)")
+	mock.behavior = "complete"
+	_button_with(lvl, "Ver anuncio y obtener +1 vida").pressed.emit()
+	await _pf(8)
+	_check(_game.lives == 1 and not lvl.finished, "segundo anuncio: +1 vida y continúa")
+	# continue_after_ad no puede usarse fuera de «Sin vidas»
+	var l0: int = _game.lives
+	lvl.continue_after_ad()
+	_check(_game.lives == l0 and not lvl.finished, "continue_after_ad fuera de «Sin vidas» no hace nada")
+	# Reintentar sigue funcionando como siempre (vuelve a 3 vidas)
+	lvl.player.die()
+	await _until(func(): return lvl.finished)
+	_check(lvl.finished and _button_with(lvl, "Reintentar") != null, "Reintentar sigue ahí")
+	_game.fail_level()
+	_check(_game.lives == 3, "Reintentar mantiene su comportamiento (3 vidas)")
+	await _free_level(lvl)
+	# no se reparte la recompensa si el jugador sale de la escena con el anuncio abierto
+	_reset_game()
+	_game.lives = 1
+	var msil := MockAds.new(false)
+	msil.behavior = "silent"
+	_ads.use_provider(msil)
+	lvl = await _load_level(1)
+	_game.lives = 1
+	lvl.player.die()
+	await _until(func(): return lvl.finished)
+	_button_with(lvl, "Ver anuncio y obtener +1 vida").pressed.emit()
+	await _pf(3)
+	await _free_level(lvl)
+	msil.replay(_ads, "closed")
+	_check(_game.lives == 0 and not _ads.busy(), "salir con el anuncio abierto y cerrarlo sin completar: sin vida y sin errores")
+
+	# ---- banner solo en el menú ----
+	_reset_game()
+	var mb := MockAds.new(false)
+	_ads.use_provider(mb)
+	var title = load("res://ui/title.tscn").instantiate()
+	root.add_child(title)
+	await _pf(6)
+	_check(_ads.banner_visible() and mb.banner_shown and _ads.banner_reserved() > 0.0, "menú principal: banner visible")
+	var txts: Array = []
+	for l in title.find_children("*", "Label", true, false):
+		txts.append(l.text)
+	_check(not txts.has("v2.1 - 100 niveles - sin anuncios"), "con anuncios activos el menú ya no dice «sin anuncios»")
+	title.queue_free()
+	await _pf(4)
+	_check(not _ads.banner_visible() and not mb.banner_shown, "al salir del menú el banner se oculta")
+	_ads.use_provider(null)
+	title = load("res://ui/title.tscn").instantiate()
+	root.add_child(title)
+	await _pf(6)
+	txts.clear()
+	for l in title.find_children("*", "Label", true, false):
+		txts.append(l.text)
+	_check(not _ads.banner_visible() and txts.has("v2.1 - 100 niveles - sin anuncios"), "desactivado: sin banner y el menú sigue igual")
+	title.queue_free()
+	await _pf(3)
+	_reset_game()

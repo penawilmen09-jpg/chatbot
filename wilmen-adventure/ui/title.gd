@@ -22,6 +22,7 @@ var _logo: TextureRect
 
 func _ready() -> void:
 	theme = UiTheme.make()
+	Ads.set_banner(true)  # el banner (si hay anuncios activos) vive solo en el menú principal
 	# el nodo raíz ocupa siempre toda la vista lógica (se actualiza al girar o redimensionar la ventana)
 	set_anchors_preset(Control.PRESET_TOP_LEFT)
 	position = Vector2.ZERO
@@ -377,7 +378,7 @@ func _build_stats_bar() -> void:
 	bar.size = Vector2(298, 24)
 	bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(bar)
-	_place(bar, Vector2(4, -30), "bl")
+	_place(bar, Vector2(4, -30 - Ads.banner_reserved()), "bl")
 	var row := HBoxContainer.new()
 	row.set_anchors_preset(Control.PRESET_FULL_RECT)
 	row.offset_left = 10
@@ -414,16 +415,21 @@ func _build_stats_bar() -> void:
 
 
 func _build_notices() -> void:
-	var ver := UiTheme.label("v2.1 - 100 niveles - sin anuncios", 8, Color("#ffffff"))
-	add_child(ver)
-	ver.size = Vector2(170, 12)
-	ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_place(ver, Vector2(-180, -14), "br")
+	if Ads.banner_reserved() <= 0.0:  # con banner visible la franja inferior es suya y no hay sitio para la versión
+		var ver := UiTheme.label("v2.1 - 100 niveles" + ("" if Ads.active() else " - sin anuncios"), 8, Color("#ffffff"))
+		add_child(ver)
+		ver.size = Vector2(170, 12)
+		ver.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		_place(ver, Vector2(-180, -14), "br")
 	if Game.migrated_from_v1:
 		var mig := UiTheme.label("Progreso de la versión anterior migrado a los 100 niveles", 9, Color("#8affb0"))
 		add_child(mig)
 		mig.size = Vector2(300, 12)
-		_place(mig, Vector2(10, -46), "bl")
+		_place(mig, Vector2(10, -46 - Ads.banner_reserved()), "bl")
+
+
+func _exit_tree() -> void:
+	Ads.set_banner(false)
 
 
 func _notification(what: int) -> void:

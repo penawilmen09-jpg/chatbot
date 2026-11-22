@@ -164,3 +164,18 @@ del mismo guardado (`autoload/progress.gd`); una partida anterior (sin `ext`) ca
 
 Herramientas: `gen_expansion.py` (arte), `gen_sfx2.py` (sonidos), `secrets_pass.py` / `vehicles_pass.py` (niveles).
 Pruebas rápidas: `godot --headless --script res://tests/smoke_test.gd -- --exp` y `-- --exp2`.
+
+## Anuncios recompensados (preparación, etapas 1-2: solo proveedor falso)
+
+Estado: **desactivados**. `autoload/ads.gd` tiene `ADS_ENABLED = false`, no hay SDK, ni red, ni anuncios reales, y la
+interfaz no muestra ningún botón de anuncios mientras no haya un proveedor activo.
+
+- Opción A: en la pantalla «Sin vidas» (solo historia) aparece «Ver anuncio y obtener +1 vida». Si el anuncio se completa,
+  el jugador recibe exactamente 1 vida y continúa desde el último punto de control. Es voluntario y sin límite.
+  Cerrar el anuncio antes, un fallo, falta de carga o de confirmación no dan nada. Un identificador por petición impide
+  que un callback repetido dé más de una vida.
+- Banner: solo en el menú principal (lo enciende `title.gd` al entrar y lo apaga al salir). No hay intersticiales.
+- No toca el guardado: lo único que cambia es `lives`, con `Game.add_life()`. Formato y claves de `wilmen_save.json` iguales.
+- Proveedor de pruebas: `ads/mock_provider.gd`. En escritorio: `godot --path . -- --ads-mock` (o `WILMEN_ADS_MOCK=1`)
+  muestra un cuadro «ANUNCIO DE PRUEBA» con «Ver completo», «Cerrar antes» y «Simular fallo», y un banner simulado.
+- Pruebas: `godot --headless --path . --script res://tests/smoke_test.gd -- --ads` (también dentro de la batería completa).

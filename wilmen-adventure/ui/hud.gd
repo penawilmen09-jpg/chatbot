@@ -552,6 +552,15 @@ func show_game_over() -> void:
 	var l := UiTheme.label("No se desbloquea el siguiente nivel hasta completar este.", 11)
 	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	v.add_child(l)
+	# Anuncio recompensado VOLUNTARIO: solo aparece si hay un proveedor de anuncios activo y listo.
+	var ad_btn: Button = null
+	var ad_msg: Label = null
+	if Ads.can_offer_reward():
+		ad_btn = _menu_button(v, "Ver anuncio y obtener +1 vida", func(): pass)
+		ad_msg = UiTheme.label("", 10, Color("#ffd27a"))
+		ad_msg.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		v.add_child(ad_msg)
+		ad_btn.pressed.connect(func(): _watch_ad(ad_btn, ad_msg))
 	var first := _menu_button(v, "Reintentar", func():
 		Game.fail_level()
 		level.restart_level())
@@ -560,3 +569,18 @@ func show_game_over() -> void:
 		Game.save_game()
 		level.go_menu())
 	first.grab_focus()
+
+
+func _watch_ad(btn: Button, msg: Label) -> void:
+	btn.disabled = true  # un toque = una petición
+	var started: bool = Ads.request_reward(func(result: String):
+		if result == "rewarded":
+			level.continue_after_ad()
+			return
+		if not is_instance_valid(btn):
+			return
+		msg.text = "El anuncio no se completó: no se ha dado la vida." if result == "closed" else "No se pudo mostrar el anuncio."
+		btn.disabled = not Ads.can_offer_reward())
+	if not started:
+		msg.text = "No hay anuncio disponible ahora."
+		btn.disabled = true

@@ -662,6 +662,19 @@ func _respawn() -> void:
 	player.respawn(respawn_pos)
 
 
+func continue_after_ad() -> void:
+	## Opción A: tras ver un anuncio recompensado completo (+1 vida) se continúa desde el último punto de control.
+	## Solo es válido desde la pantalla «Sin vidas» de la historia y con al menos 1 vida.
+	if not finished or mode != "story" or Game.lives <= 0 or player == null or not player.dead:
+		return
+	finished = false
+	hud.hide_pause()  # cierra la pantalla «Sin vidas»
+	var was_fight: bool = is_boss and fight_started and boss != null and is_instance_valid(boss) and not boss.dead
+	_respawn()
+	if not was_fight:  # si había combate, _respawn() ya restablece la música del nivel
+		Audio.play_music(Game.music_for_level(number))
+
+
 func set_checkpoint(pos: Vector2) -> void:
 	respawn_pos = pos
 	popup("¡Punto de control!", pos + Vector2(0, -24))
