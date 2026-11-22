@@ -283,7 +283,7 @@ func _btn_style(color: String, tint: Color) -> StyleBoxTexture:
 func _big_button(text: String, color: String, icon_name: String, cb: Callable) -> Button:
 	var b := Button.new()
 	b.text = text
-	b.custom_minimum_size = Vector2(166, 29)
+	b.custom_minimum_size = Vector2(166, 26)
 	b.focus_mode = Control.FOCUS_ALL
 	b.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	b.add_theme_stylebox_override("normal", _btn_style(color, Color(1, 1, 1)))
@@ -309,7 +309,7 @@ func _big_button(text: String, color: String, icon_name: String, cb: Callable) -
 func _build_buttons() -> void:
 	_menu = VBoxContainer.new()
 	_menu.add_theme_constant_override("separation", 3)
-	_menu.size = Vector2(166, 150)
+	_menu.size = Vector2(166, 171)
 	add_child(_menu)
 	_menu.anchor_left = 1.0
 	_menu.anchor_right = 1.0
@@ -317,12 +317,13 @@ func _build_buttons() -> void:
 	_menu.anchor_bottom = 0.0
 	_menu.offset_left = -176.0
 	_menu.offset_right = -10.0
-	_menu.offset_top = 94.0
-	_menu.offset_bottom = 246.0
+	_menu.offset_top = 76.0
+	_menu.offset_bottom = 247.0
 	var has_progress: bool = Game.continue_level() > 1 or Game.levels.size() > 0
 	_first = _big_button("CONTINUAR" if has_progress else "JUGAR", "green", "play", _on_play)
 	_menu.add_child(_first)
 	_menu.add_child(_big_button("MAPA DE NIVELES", "blue", "map", func(): Transition.change_scene("res://ui/level_select.tscn")))
+	_menu.add_child(_big_button("WILMEN WORLD", "teal", "world", func(): Transition.change_scene("res://ui/ww_hub.tscn")))
 	_menu.add_child(_big_button("EXTRAS", "purple", "star", func(): Transition.change_scene("res://ui/extras.tscn")))
 	_menu.add_child(_big_button("OPCIONES", "orange", "gear", _show_options))
 	_menu.add_child(_big_button("SALIR", "red", "door", func(): get_tree().quit()))

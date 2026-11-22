@@ -19,6 +19,7 @@ config/quit_on_go_back=false
 Progress="*res://autoload/progress.gd"
 Game="*res://autoload/game.gd"
 Ads="*res://autoload/ads.gd"
+WW="*res://autoload/ww.gd"
 Audio="*res://autoload/audio.gd"
 Transition="*res://autoload/transition.gd"
 

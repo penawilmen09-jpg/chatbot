@@ -179,3 +179,19 @@ interfaz no muestra ningún botón de anuncios mientras no haya un proveedor act
 - Proveedor de pruebas: `ads/mock_provider.gd`. En escritorio: `godot --path . -- --ads-mock` (o `WILMEN_ADS_MOCK=1`)
   muestra un cuadro «ANUNCIO DE PRUEBA» con «Ver completo», «Cerrar antes» y «Simular fallo», y un banner simulado.
 - Pruebas: `godot --headless --path . --script res://tests/smoke_test.gd -- --ads` (también dentro de la batería completa).
+
+## WILMEN WORLD (segundo modo, en desarrollo por hitos)
+
+Un modo nuevo e **independiente** de WILMEN ADVENTURE, inspirado en la estructura de exploración de los juegos de plataformas
+con mapa general (regiones, caminos, túneles, puertas, secretos y castillos), todo original. Se elige en el menú principal con
+el botón «WILMEN WORLD». Plan: 6 regiones de 20 niveles (120), niveles largos, reloj con cuenta atrás, túneles y puertas con
+llaves, 6 jefes principales y 3 secretos.
+
+- **Hito 1 (hecho):** modo independiente, guardado propio, botón del menú y pantalla de inicio del modo.
+- **Partida propia:** `user://wilmen_world_save.json` (autoload `WW`, `autoload/ww.gd`). Monedas, gemas, vidas, llaves y
+  progreso son del modo; **no** se lee ni se escribe `wilmen_save.json`, y `Game.save_game()` nunca escribe en el archivo de
+  WILMEN WORLD. Solo se comparte (en lectura) la apariencia del héroe. `WW.save_game()` se niega a escribir sobre el archivo
+  de WILMEN ADVENTURE.
+- **Regiones:** Bosque Esmeralda, Desierto Dorado, Reino Volcánico, Reino Congelado, Océano Perdido, Reino de las Sombras.
+- **Pruebas:** `godot --headless --path . --script res://tests/smoke_test.gd -- --ww` (también en la batería completa). Incluye una
+  huella de los 100 niveles originales para detectar cualquier cambio accidental.

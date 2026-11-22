@@ -16,6 +16,7 @@ var _game
 var _prog
 var _audio
 var _ads
+var _ww
 
 
 func _initialize() -> void:
@@ -76,10 +77,18 @@ func _run() -> void:
 	_audio = root.get_node("Audio")
 	_prog = root.get_node("Progress")
 	_ads = root.get_node("Ads")
+	_ww = root.get_node("WW")
+	_ww.save_path = "user://smoke_ww_save.json"
 	_game.save_path = "user://smoke_test_save.json"
 	_reset_game()
 	_scene = load("res://levels/level.tscn")
 	_check(_scene != null, "level.tscn carga")
+
+	if OS.get_cmdline_user_args().has("--ww"):
+		await _test_ww_base()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
 
 	if OS.get_cmdline_user_args().has("--fireball"):
 		await _test_fireball_pulse()
@@ -144,6 +153,7 @@ func _run() -> void:
 	await _test_extras_ui()
 	await _test_title_menu()
 	await _test_ads()
+	await _test_ww_base()
 	await _test_flow()
 	await _test_touch_controls()
 	await _test_menus()
@@ -1340,14 +1350,14 @@ func _test_title_menu() -> void:
 	for b in node._menu.get_children():
 		texts.append(b.text)
 		_check(b is Button and not b.disabled and b.pressed.get_connections().size() > 0 and b.icon != null, "botón «%s»: real, activo, con icono y acción" % b.text)
-	_check(texts == ["CONTINUAR", "MAPA DE NIVELES", "EXTRAS", "OPCIONES", "SALIR"], "los 5 botones del diseño: %s" % str(texts))
+	_check(texts == ["CONTINUAR", "MAPA DE NIVELES", "WILMEN WORLD", "EXTRAS", "OPCIONES", "SALIR"], "los 6 botones del diseño (con WILMEN WORLD): %s" % str(texts))
 	_check(node._menu.get_child(0).has_focus(), "el primer botón recibe el foco")
 	var found: Array = []
 	for l in node.find_children("*", "Label", true, false):
 		found.append(l.text)
 	_check(found.has("Niveles 2/100") and found.has("Gemas 0/300") and found.has("Puntos 12345"), "la barra inferior muestra los datos reales (%s)" % str(found.filter(func(t): return t.begins_with("Niveles") or t.begins_with("Gemas") or t.begins_with("Puntos"))))
 	_check(node.get_children().filter(func(c): return c is TextureButton).size() == 2, "botones redondos de logros y música")
-	node._menu.get_child(3).pressed.emit()
+	node._menu.get_child(4).pressed.emit()
 	await _frames(3)
 	_check(node._options != null, "OPCIONES abre el panel de opciones")
 	node._close_options()
@@ -1938,4 +1948,149 @@ func _test_fireball_pulse() -> void:
 	await process_frame
 	_check(p.power == "spark" and _player_shots(lvl) == s1 + 1 and _fireballs(lvl).is_empty(), "Mundo 1: la Chispa Esmeralda no cambia")
 	await _free_level(lvl)
+	_reset_game()
+
+
+# ============================================== WILMEN WORLD (hito 1): modo independiente ===
+const ORIGINAL_LEVELS_SHA := "8607279216819a4d2cc872bec1073e6bd604923d10ae3d37b1d940f27bd0db52"
+
+
+func _wipe_ww_files() -> void:
+	for suffix in ["", ".bak", ".tmp"]:
+		DirAccess.remove_absolute(_ww.save_path + suffix)
+
+
+func _sha(path: String) -> String:
+	return FileAccess.get_sha256(path) if FileAccess.file_exists(path) else "(sin archivo)"
+
+
+func _test_ww_base() -> void:
+	print("WILMEN WORLD (hito 1): guardado independiente, protección del modo original, menú y pantalla de inicio")
+	var story_path: String = _game.save_path
+	var ww_path: String = _ww.save_path
+	_check(ww_path != story_path and ww_path.get_file() != "wilmen_save.json", "la partida de WILMEN WORLD usa otro archivo")
+	var default_ww: String = load("res://autoload/ww.gd").new().save_path
+	_check(default_ww == "user://wilmen_world_save.json", "archivo real del modo: user://wilmen_world_save.json")
+	_check(_ww.REGION_COUNT * _ww.LEVELS_PER_REGION == 120 and _ww.LEVEL_COUNT == 120 and _ww.REGION_NAMES.size() == 6, "6 regiones x 20 niveles = 120")
+	_check(_ww.REGION_NAMES == ["Bosque Esmeralda", "Desierto Dorado", "Reino Volcánico", "Reino Congelado", "Océano Perdido", "Reino de las Sombras"], "las 6 regiones elegidas")
+	# ---- el modo original no cambia ----
+	_check(_game.LEVEL_COUNT == 100 and _game.LEVELS_PER_WORLD == 10 and _game.SAVE_VERSION == 3, "WILMEN ADVENTURE: 100 niveles, 10 mundos y guardado v3")
+	_check(_game.KNOWN_KEYS == ["version", "lives", "score", "coins", "total_coins", "levels", "worlds_done", "unlocked", "settings", "ext"], "las claves del guardado original no cambian")
+	var hs: String = ""
+	for n in range(1, 101):
+		hs += FileAccess.get_sha256("res://levels/data/level_%02d.txt" % n)
+	_check(hs.sha256_text() == ORIGINAL_LEVELS_SHA, "los 100 niveles originales siguen idénticos (huella de sus archivos)")
+	# ---- guardados independientes ----
+	_reset_game()
+	_wipe_ww_files()
+	_game.coins = 777
+	_game.score = 4321
+	_game.levels["1"] = {"done": true, "gems": [true, false, false], "best": 900}
+	_game.unlocked[2] = true
+	_game.save_game()
+	var story_hash: String = _sha(story_path)
+	_check(story_hash != "(sin archivo)", "se guardó la partida de WILMEN ADVENTURE (huella de referencia)")
+	_ww.reset()
+	_ww.coins = 55
+	_ww.gems = 4
+	_ww.lives = 7
+	_ww.score = 900
+	_ww.keys = {"bronce": 2, "plata": 1}
+	_ww.levels["3"] = {"done": true, "gems": [true, true, false], "best_time": 61.5}
+	_ww.nodes = {"r1_start": true}
+	_check(_ww.save_game(), "WILMEN WORLD guarda su partida")
+	_check(FileAccess.file_exists(ww_path) and _sha(story_path) == story_hash, "guardar WILMEN WORLD NO toca la partida de WILMEN ADVENTURE")
+	var ww_hash: String = _sha(ww_path)
+	_game.coins += 10
+	_game.save_game()
+	_check(_sha(ww_path) == ww_hash and _sha(story_path) != story_hash, "guardar WILMEN ADVENTURE NO toca la partida de WILMEN WORLD")
+	_check(_game.coins == 787 and _ww.coins == 55, "monedas independientes (Adventure %d, World %d)" % [_game.coins, _ww.coins])
+	_game.save_game()
+	story_hash = _sha(story_path)
+	# ---- ida y vuelta ----
+	_ww.reset()
+	_check(_ww.coins == 0 and _ww.lives == _ww.START_LIVES and _ww.levels.is_empty() and _ww.keys.is_empty(), "reset() vuelve al estado inicial del modo")
+	_check(_sha(story_path) == story_hash and _game.coins == 787, "reiniciar WILMEN WORLD NO toca WILMEN ADVENTURE")
+	_ww.load_game()
+	_check(_ww.coins == 55 and _ww.gems == 4 and _ww.lives == 7 and _ww.score == 900, "al cargar se recuperan monedas, gemas, vidas y puntos")
+	_check(_ww.keys == {"bronce": 2, "plata": 1} and _ww.total_keys() == 3, "se recuperan las llaves")
+	_check(_ww.is_done(3) and not _ww.is_done(4) and _ww.completed_count() == 1 and _ww.completed_in_region(1) == 1, "se recupera el progreso de niveles")
+	_check(_ww.nodes.has("r1_start"), "se recuperan los nodos del mapa")
+	# ---- robustez ----
+	_check(_ww.save_game(), "segundo guardado (crea la copia .bak del anterior)")
+	_check(FileAccess.file_exists(ww_path + ".bak"), "existe la copia .bak")
+	var f := FileAccess.open(ww_path, FileAccess.WRITE)
+	f.store_string("{esto no es json")
+	f.close()
+	_ww.reset()
+	_ww.load_game()
+	_check(_ww.coins == 55, "archivo dañado: se recupera la copia .bak")
+	f = FileAccess.open(ww_path, FileAccess.WRITE)
+	f.store_string(JSON.stringify({"version": 1, "lives": "x", "coins": -5, "levels": {"999": {"done": true}, "2": {"done": true, "gems": [true]}, "abc": 1}, "futuro": {"a": 1}}))
+	f.close()
+	_ww.load_game()
+	_check(_ww.lives >= 1 and _ww.coins == 0 and not _ww.levels.has("999") and _ww.is_done(2), "valores absurdos se corrigen y los niveles fuera de rango se ignoran")
+	_check(_ww.save_game(), "se vuelve a guardar")
+	var back: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(ww_path))
+	_check(back.has("futuro") and back["version"] == 1, "las claves desconocidas (versiones futuras) se conservan")
+	# ---- salvaguarda: nunca escribir sobre la partida original ----
+	var keep_path: String = _ww.save_path
+	_ww.save_path = story_path
+	_check(not _ww.save_game() and _sha(story_path) == story_hash, "WILMEN WORLD se niega a guardar sobre el archivo de WILMEN ADVENTURE")
+	_ww.save_path = "user://wilmen_save.json"
+	var real_before: String = _sha("user://wilmen_save.json")
+	_check(not _ww.save_game() and _sha("user://wilmen_save.json") == real_before, "ni siquiera con la ruta real wilmen_save.json")
+	_ww.save_path = keep_path
+	# ---- menú principal ----
+	_reset_game()
+	var title = load("res://ui/title.tscn").instantiate()
+	root.add_child(title)
+	await _frames(8)
+	var btns: Array = title._menu.get_children()
+	var wbtn = btns[2]
+	_check(wbtn.text == "WILMEN WORLD" and wbtn.icon != null and wbtn.pressed.get_connections().size() > 0 and not wbtn.disabled, "el menú tiene el botón real «WILMEN WORLD» con icono y acción")
+	var last_y: float = btns[btns.size() - 1].get_global_rect().end.y
+	_check(last_y <= title.size.y - 4.0, "los 6 botones caben en pantalla (último termina en y=%.0f de %.0f)" % [last_y, title.size.y])
+	var overlap: bool = false
+	for i in range(btns.size() - 1):
+		if btns[i].get_global_rect().end.y > btns[i + 1].get_global_rect().position.y + 0.5:
+			overlap = true
+	_check(not overlap, "los botones del menú no se solapan")
+	title.queue_free()
+	await _frames(3)
+	# ---- pantalla de inicio de WILMEN WORLD ----
+	_wipe_ww_files()
+	_ww.reset()
+	_ww.coins = 7
+	_ww.gems = 2
+	_ww.keys = {"bronce": 1}
+	_ww.levels["1"] = {"done": true, "gems": [false, false, false], "best_time": 0.0}
+	_ww.levels["21"] = {"done": true, "gems": [false, false, false], "best_time": 0.0}
+	story_hash = _sha(story_path)
+	var hub = load("res://ui/ww_hub.tscn").instantiate()
+	root.add_child(hub)
+	await _frames(8)
+	var texts: Array = []
+	for l in hub.find_children("*", "Label", true, false):
+		texts.append(l.text)
+	_check(texts.has("WILMEN WORLD"), "la pantalla del modo muestra su título")
+	_check(texts.has("Niveles  2/120") and texts.has("Monedas  7") and texts.has("Gemas  2") and texts.has("Llaves  1"), "muestra el progreso PROPIO del modo")
+	_check(texts.has("Bosque Esmeralda") and texts.has("Reino de las Sombras"), "lista las regiones")
+	_check(texts.has("1/20"), "progreso por región (1/20 en las dos primeras)")
+	_check(FileAccess.file_exists(ww_path), "entrar crea la partida propia del modo")
+	_check(_sha(story_path) == story_hash, "entrar en WILMEN WORLD no toca la partida de WILMEN ADVENTURE")
+	_check(hub.find_children("*", "AnimatedSprite2D", true, false).size() > 0, "se muestra el héroe con su apariencia")
+	# reiniciar: dos pasos y solo afecta al modo
+	hub._reset_btn.pressed.emit()
+	_check(_ww.coins == 7 and hub._reset_btn.text.begins_with("¿Seguro"), "reiniciar pide confirmación y no borra a la primera")
+	hub._reset_btn.pressed.emit()
+	await _frames(2)
+	_check(_ww.coins == 0 and _ww.completed_count() == 0 and _ww.lives == _ww.START_LIVES, "tras confirmar, WILMEN WORLD vuelve a empezar")
+	_check(JSON.parse_string(FileAccess.get_file_as_string(ww_path))["coins"] == 0, "y su archivo queda reiniciado")
+	_check(_sha(story_path) == story_hash, "reiniciar WILMEN WORLD no toca la partida original")
+	_check(hub._back != null and hub._back.pressed.get_connections().size() > 0, "hay un botón para volver al menú")
+	hub.queue_free()
+	await _frames(3)
+	_wipe_ww_files()
+	_ww.reset()
 	_reset_game()
