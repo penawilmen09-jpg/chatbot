@@ -282,9 +282,21 @@ def analyse(path):
     reach0 = {n for (n, s) in d0}
     gnode = wc.stand_near(sm.st[s0], F[0][0], F[0][1], 6)
     goal_states = [(gnode, s) for s in sm.states if (gnode, s) in d0]
-    if not goal_states:
+    mandatory = meta.get("kind") == "fortress"   # la fortaleza tiene cerraduras OBLIGATORIAS (con sus llaves libres y suficientes)
+    if not goal_states and not mandatory:
         errs.append("la meta NO es alcanzable sin abrir puertas (se llega hasta la columna %d)" % max([x for (x, y) in reach0 if x < F[0][0]] or [0]))
         return sm
+    if not goal_states:
+        dm = sm.dijkstra((start, s0), True)
+        goal_states = [(gnode, s) for s in sm.states if (gnode, s) in dm]
+        if not goal_states:
+            errs.append("la meta NO es alcanzable ni con todas las puertas abiertas")
+            return sm
+        d0 = dm
+        need = sum(w["key"] for w in doors)
+        free = [k for k in keys if sm.near_reach(k, reach0)]
+        if len(free) < need:
+            errs.append("la meta exige %d llaves libres y solo hay %d" % (need, len(free)))
     p_est = min(d0[g] for g in goal_states)
     for k in keys:
         if not sm.near_reach(k, reach0):

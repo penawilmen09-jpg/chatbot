@@ -66,6 +66,14 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|FALLO|ERROR:" /tmp/fire.log | grep -v -E "resources still in use|RID allocations of type"; then echo "Errores detectados"; exit 1; fi
           grep -q "RESULTADO: TODO OK" /tmp/fire.log
 
+      - name: Niveles nuevos de WILMEN WORLD (tanda 2): recorrido de cada mecánica en el motor
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/smoke_test.gd -- --t2 2>&1 | tee /tmp/t2.log
+          grep -c "  ok   " /tmp/t2.log | sed 's/^/comprobaciones ok: /'
+          if grep -E "SCRIPT ERROR|Parse Error|FALLO|ERROR:" /tmp/t2.log | grep -v -E "resources still in use|RID allocations of type"; then echo "Errores detectados"; exit 1; fi
+          grep -q "RESULTADO: TODO OK" /tmp/t2.log
+
       - name: Niveles nuevos de WILMEN WORLD (tanda 1): recorrido de cada mecánica en el motor
         run: |
           set -o pipefail

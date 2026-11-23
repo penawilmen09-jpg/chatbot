@@ -111,6 +111,12 @@ func _run() -> void:
 		quit(0 if _failed == 0 else 1)
 		return
 
+	if OS.get_cmdline_user_args().has("--t2"):
+		await _test_ww_tanda2()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
+
 	if OS.get_cmdline_user_args().has("--t1"):
 		await _test_ww_tanda1()
 		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
@@ -4417,6 +4423,211 @@ func _test_ww_fireball() -> void:
 	await _frames(240)
 	_check(int(boss.hp) < hp_b, "la bola daña al jefe (%d -> %d)" % [hp_b, int(boss.hp)])
 	await _end_mini(lvl)
+
+
+# ============ WILMEN WORLD (tanda 2): pruebas de motor sobre los niveles reales 1-6 a 1-10 ============
+func _t2_count(lvl, path: String) -> int:
+	return lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == path).size()
+
+
+func _t2_enemies(lvl) -> Dictionary:
+	var kinds := {}
+	for e in lvl.get_children():
+		if e.get_script() != null and e.get("kind") != null and e.is_in_group("enemies") or (e.get_script() != null and str(e.get_script().resource_path).ends_with("ww_enemy.gd")):
+			var k: String = str(e.get("kind"))
+			kinds[k] = int(kinds.get(k, 0)) + 1
+	return kinds
+
+
+func _test_ww_t2_l6() -> void:
+	print("Nivel 1-6 Pantano Hundido: corrientes, troncos, topos y tubería hundida")
+	var lvl = await _t1_open(6)
+	var pl = lvl.player
+	_check(lvl.cols == 680 and lvl.nrows == 24, "1-6 mide 680x24 (%dx%d)" % [lvl.cols, lvl.nrows])
+	var k: Dictionary = _t2_enemies(lvl)
+	_check(k.get("mole", 0) == 5 and k.get("jumper", 0) == 4 and k.get("shooter", 0) == 2, "1-6: 5 topos, 4 saltarines y 2 disparadores (%s)" % str(k))
+	await _t1_at(lvl, Vector2i(80, 17))
+	var x0: float = pl.global_position.x
+	await _frames(40)
+	_check(pl.global_position.x > x0 + 20.0, "1-6: la corriente del lecho arrastra a la derecha (%.0f px)" % (pl.global_position.x - x0))
+	await _t1_at(lvl, Vector2i(164, 17))
+	x0 = pl.global_position.x
+	await _frames(40)
+	_check(pl.global_position.x < x0 - 20.0, "1-6: la corriente contraria empuja hacia atrás (%.0f px)" % (pl.global_position.x - x0))
+	var chutes: Array = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_chute.gd")
+	_check(chutes.size() == 3, "1-6: 3 tolvas de troncos en la capa alta (%d)" % chutes.size())
+	await _t1_at(lvl, Vector2i(8, 8))
+	_check(await _t1_run(lvl, 150 * 16.0, 2400), "1-6: la capa alta se recorre por los troncos (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
+	await _t1_at(lvl, Vector2i(150, 8))
+	_check(await _t1_run(lvl, 300 * 16.0, 2800), "1-6: segundo tramo de troncos con tolva (x=%.0f)" % pl.global_position.x)
+	await _t1_pick_key(lvl, Vector2i(272, 22), "1-6 llave de la tubería")
+	await _t1_door_roundtrip(lvl, Vector2i(600, 7), Vector2i(34, 22), "1-6 choza hundida")
+	await _free_level(lvl)
+
+
+func _test_ww_t2_l7() -> void:
+	print("Nivel 1-7 Aserradero: ascensores, prensas, sierras, interruptor y puertas")
+	var lvl = await _t1_open(7)
+	var pl = lvl.player
+	_check(lvl.cols == 380 and lvl.nrows == 30 and str(lvl.meta["kind"]) == "house", "1-7 es la casa de 380x30 (%dx%d)" % [lvl.cols, lvl.nrows])
+	_check(_t2_count(lvl, "res://items/ww_orbit.gd") == 2 and _t2_count(lvl, "res://items/ww_press.gd") == 4 and _t2_count(lvl, "res://items/ww_pendulum.gd") == 2, "1-7: 2 ascensores, 4 prensas y 2 sierras")
+	_check(_t2_enemies(lvl).get("guard", 0) == 2 + 0, "1-7: guardianes en el patio (%s)" % str(_t2_enemies(lvl)))
+	var els: Array = _nodes_of(lvl, "res://items/ww_orbit.gd")
+	els.sort_custom(func(a, b): return a.position.x < b.position.x)
+	var e1 = els[0]
+	e1._t = 0.0
+	e1._place()
+	await _frames(3)
+	await _t1_at(lvl, Vector2i(int(e1.position.x / 16.0), 28))
+	var y0: float = pl.global_position.y
+	var rose: bool = false
+	for i in range(420):
+		await physics_frame
+		if pl.global_position.y < y0 - 70.0:
+			rose = true
+			break
+	_check(rose, "1-7: el ascensor del patio sube al jugador al piso 2 (%.0f px)" % (y0 - pl.global_position.y))
+	var wall = _nodes_of(lvl, "res://items/ww_toggle.gd")
+	_check(wall.size() >= 1 and wall[0]._solid, "1-7: el muro de la bóveda está cerrado al empezar")
+	await _t1_at(lvl, Vector2i(316, 16))
+	await _frames(8)
+	_check(lvl.sw[0] and not wall[0]._solid, "1-7: pisar el interruptor del despacho abre el muro de la bóveda")
+	await _t1_pick_key(lvl, Vector2i(350, 28), "1-7 llave del patio")
+	await _t1_pick_key(lvl, Vector2i(30, 16), "1-7 llave del despacho")
+	await _t1_door_roundtrip(lvl, Vector2i(40, 28), Vector2i(14, 6), "1-7 sótano")
+	_ww.keys = {}
+	await _free_level(lvl)
+
+
+func _test_ww_t2_l8() -> void:
+	print("Nivel 1-8 Salto del Duende: descenso, burbujas, desmoronables y cueva del acantilado")
+	var lvl = await _t1_open(8)
+	var pl = lvl.player
+	_check(lvl.cols == 340 and lvl.nrows == 34, "1-8 mide 340x34 (%dx%d)" % [lvl.cols, lvl.nrows])
+	_check(_t2_count(lvl, "res://items/crumble.gd") == 10, "1-8: 5 plataformas desmoronables dobles en zigzag (%d celdas)" % _t2_count(lvl, "res://items/crumble.gd"))
+	await _t1_at(lvl, Vector2i(5, 3))
+	_check(await _t1_run(lvl, 97 * 16.0, 1800), "1-8: la cima escalonada se baja hasta el último peldaño (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
+	await _t1_at(lvl, Vector2i(106, 15))
+	_check(await _t1_run(lvl, 156 * 16.0, 2400), "1-8: las repisas del tramo 2 se bajan de una en una (x=%.0f y=%.0f muerto=%s)" % [pl.global_position.x, pl.global_position.y, pl.dead])
+	# burbujas hacia la repisa de la gema
+	await _t1_at(lvl, Vector2i(148, 21))
+	var rose: bool = false
+	for i in range(240):
+		await physics_frame
+		if pl.global_position.y < 14 * 16.0:
+			rose = true
+			break
+	var gem_ok: bool = false
+	if rose:
+		gem_ok = await _t1_hold(lvl, "move_left", 120, func(): return pl.is_on_floor() and pl.global_position.y < 14 * 16.0 and pl.global_position.x > 143 * 16.0 and pl.global_position.x < 147 * 16.0)
+	_check(rose and gem_ok, "1-8: la columna de burbujas sube a la repisa de la gema (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
+	await _t1_pick_key(lvl, Vector2i(20, 28), "1-8 llave de la cueva")
+	await _t1_door_roundtrip(lvl, Vector2i(300, 27), Vector2i(294, 32), "1-8 cámara bajo la poza")
+	await _free_level(lvl)
+
+
+func _test_ww_t2_l9() -> void:
+	print("Nivel 1-9 Templo de los Tres Sellos: sellos, muros, dardos, péndulos, pasadizos y salida secreta")
+	var lvl = await _t1_open(9)
+	var pl = lvl.player
+	_check(lvl.cols == 600 and lvl.nrows == 30, "1-9 mide 600x30 (%dx%d)" % [lvl.cols, lvl.nrows])
+	_check(_t2_count(lvl, "res://items/ww_pendulum.gd") == 3 and _t2_count(lvl, "res://items/ww_dart.gd") == 5, "1-9: 3 péndulos y 5 lanzadardos")
+	var walls: Array = _nodes_of(lvl, "res://items/ww_toggle.gd")
+	var w1: Array = walls.filter(func(t): return t.group == 1)
+	var w2: Array = walls.filter(func(t): return t.group == 2)
+	_check(w1.size() >= 1 and w2.size() >= 1 and w1[0]._solid and w2[0]._solid, "1-9: los dos muros de la cámara del ídolo están cerrados")
+	await _t1_at(lvl, Vector2i(114, 12))
+	await _frames(8)
+	_check(lvl.sw[0] and not w1[0]._solid and w2[0]._solid, "1-9: el sello 1 (cámara norte) abre solo el primer muro")
+	await _t1_at(lvl, Vector2i(410, 20))
+	await _frames(8)
+	_check(lvl.sw[1] and not w2[0]._solid, "1-9: el sello 2 (cámara este) abre el segundo muro")
+	await _t1_at(lvl, Vector2i(432, 20))
+	_check(await _t1_run(lvl, 585 * 16.0, 1500), "1-9: con los dos sellos abiertos se llega a la meta de la cámara del ídolo (x=%.0f)" % pl.global_position.x)
+	# pasadizos: boca A
+	await _t1_at(lvl, Vector2i(50, 20))
+	await _tap_jump()
+	await _until(func(): return pl.global_position.y > 25 * 16.0, 120)
+	await _frames(20)
+	_check(pl.global_position.distance_to(Vector2(41 * 16.0 + 8.0, 27 * 16.0)) < 60.0, "1-9: el pasadizo A (12 celdas) se entra con SALTO")
+	await _t1_at(lvl, Vector2i(42, 27))
+	_check(await _t1_run(lvl, 50 * 16.0, 600), "1-9: el pasadizo A se recorre de punta a punta")
+	await _t1_pick_key(lvl, Vector2i(30, 12), "1-9 llave de la cámara oeste")
+	await _t1_door_roundtrip(lvl, Vector2i(560, 20), Vector2i(558, 27), "1-9 cámara secreta")
+	var sg: Array = _scripts_of(lvl, "res://items/ww_secret_goal.gd")
+	_check(sg.size() == 1, "1-9: hay una salida secreta en la cámara oculta")
+	_ww.keys = {}
+	await _free_level(lvl)
+
+
+func _test_ww_t2_l10() -> void:
+	print("Nivel 1-10 Fortaleza de Raíces: ascensores, orbitales, prensas y puerta doble con 2 llaves")
+	var lvl = await _t1_open(10)
+	var pl = lvl.player
+	_check(lvl.cols == 640 and lvl.nrows == 34 and str(lvl.meta["kind"]) == "fortress", "1-10 es la fortaleza de 640x34 (%dx%d)" % [lvl.cols, lvl.nrows])
+	var kinds: Dictionary = {}
+	for n in _nodes_of(lvl, "res://items/ww_orbit.gd"):
+		kinds[n.kind] = int(kinds.get(n.kind, 0)) + 1
+	_check(kinds.get("elevator", 0) == 2 and kinds.get("orbit", 0) == 2 and _t2_count(lvl, "res://items/ww_press.gd") == 4, "1-10: 2 ascensores, 2 orbitales y 4 prensas (%s)" % str(kinds))
+	var e = _t2_enemies(lvl)
+	_check(e.get("guard", 0) == 4 and e.get("lobber", 0) == 3, "1-10: 4 guardianes y 3 lanzarrocas (%s)" % str(e))
+	# ascensor de la torre oeste
+	var els: Array = _nodes_of(lvl, "res://items/ww_orbit.gd").filter(func(n): return n.kind == "elevator")
+	els.sort_custom(func(a, b): return a.position.x < b.position.x)
+	els[0]._t = 0.0
+	els[0]._place()
+	await _frames(3)
+	await _t1_at(lvl, Vector2i(int(els[0].position.x / 16.0), 25))
+	var y0: float = pl.global_position.y
+	var rose: bool = false
+	for i in range(420):
+		await physics_frame
+		if pl.global_position.y < y0 - 70.0:
+			rose = true
+			break
+	_check(rose, "1-10: el ascensor de la torre oeste sube al jugador (%.0f px)" % (y0 - pl.global_position.y))
+	# orbital: lleva al jugador
+	var orb = _nodes_of(lvl, "res://items/ww_orbit.gd").filter(func(n): return n.kind == "orbit")[0]
+	await _t1_at(lvl, Vector2i(int(orb.position.x / 16.0), int(orb.position.y / 16.0) - 1))
+	pl.global_position = Vector2(orb.position.x, orb.position.y - 14.0)
+	await _frames(12)
+	var op0: Vector2 = orb.position
+	var pp0: Vector2 = pl.global_position
+	await _frames(60)
+	_check((orb.position - op0).length() > 20.0 and ((orb.position - op0) - (pl.global_position - pp0)).length() < 14.0, "1-10: la plataforma orbital arrastra al jugador")
+	# llaves y puerta doble
+	var door = lvl.warps.filter(func(w): return w.kind == "door" and w.need_key == 2)
+	_check(door.size() == 1, "1-10: la puerta de la meta exige 2 llaves")
+	_ww.keys = {}
+	await _t1_pick_key(lvl, Vector2i(120, 13), "1-10 llave 1 (torre oeste)")
+	await _t1_at(lvl, Vector2i(600, 25))
+	await _frames(10)
+	var dx0: float = pl.global_position.x
+	await _tap_jump()
+	await _frames(40)
+	_check(absf(pl.global_position.x - dx0) < 80.0 and _ww.key_count() == 1, "1-10: con 1 sola llave la puerta doble no se abre")
+	await _t1_pick_key(lvl, Vector2i(526, 11), "1-10 llave 2 (torre este)")
+	await _t1_at(lvl, Vector2i(600, 25))
+	await _frames(10)
+	await _tap_jump()
+	await _until(func(): return pl.global_position.x > 604 * 16.0, 120)
+	await _frames(20)
+	_check(pl.global_position.x > 604 * 16.0 and _ww.key_count() == 0, "1-10: con las 2 llaves se abre la puerta doble y se gastan")
+	_ww.keys = {}
+	await _free_level(lvl)
+
+
+func _test_ww_tanda2() -> void:
+	_wipe_ww_files()
+	_ww.reset()
+	await _test_ww_t2_l6()
+	await _test_ww_t2_l7()
+	await _test_ww_t2_l8()
+	await _test_ww_t2_l9()
+	await _test_ww_t2_l10()
+	_ww.keys = {}
+	_ww.reset()
+	_wipe_ww_files()
 
 
 func _test_ww_mechanics() -> void:

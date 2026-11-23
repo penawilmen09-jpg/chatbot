@@ -7,6 +7,11 @@ const SHOTS := {
 	3: [["puente", 55, 13], ["cadena", 118, 12], ["viaducto", 185, 22], ["liana", 612, 16], ["campo", 255, 13]],
 	4: [["vestibulo", 8, 24], ["columnas", 75, 24], ["embudo", 126, 24], ["anillo", 157, 24], ["galeria", 200, 21]],
 	5: [["bosque", 10, 29], ["lianas", 90, 18], ["tronco", 170, 30], ["copas_altas", 250, 11], ["meta", 300, 8]],
+	6: [["troncos", 12, 8], ["lecho", 80, 17], ["tuberia", 270, 22], ["escalera", 150, 17], ["final", 640, 8]],
+	7: [["patio", 30, 28], ["ascensor", 94, 28], ["sierra", 150, 22], ["despacho", 310, 16], ["chimenea", 366, 28]],
+	8: [["cima", 8, 3], ["peldanos", 70, 9], ["repisas", 120, 16], ["cueva", 20, 19], ["poza", 240, 27]],
+	9: [["antesala", 20, 20], ["patio", 160, 20], ["norte", 150, 12], ["este", 340, 20], ["idolo", 480, 20]],
+	10: [["entrada", 20, 25], ["torre_oeste", 80, 25], ["patio", 270, 25], ["torre_este", 500, 25], ["puerta", 590, 25]],
 }
 
 
