@@ -72,17 +72,17 @@ def build():
     # ---- subsuelo: Las Torres Huecas
     # H1: salon del pilar 3 (20x8) con pozo de acceso y escalones
     c.carve(140, 15, 160, 23)
-    c.carve(148, 12, 154, 15)
-    c.plat(148, 151, 14, "="); c.plat(151, 154, 17, "="); c.plat(148, 151, 20, "=")
+    c.carve(149, 12, 153, 15)
+    c.plat(149, 153, 14, "="); c.plat(149, 153, 17, "="); c.plat(149, 153, 20, "=")
     # V1: viaducto del eco (cols 160-214): tubo cerrado de 4 de alto
     c.fill(160, 18, 214, 24, "#")
     c.carve(160, 19, 214, 23)
     c.set(160, 23, "#") if False else None
     # H2: salon del pilar 4 (18x7)
     c.carve(214, 16, 232, 23)
-    c.carve(222, 14, 227, 16)
-    c.plat(222, 225, 15, "="); c.plat(225, 228, 18, "="); c.plat(220, 223, 20, "=")
-    c.plat(228, 232, 19, "#")              # cornisa con la llave B
+    c.carve(223, 14, 227, 16)
+    c.plat(223, 227, 17, "="); c.plat(223, 227, 20, "=")
+    c.plat(228, 232, 20, "#")              # cornisa con la llave B
     # V2: pasaje largo (cols 232-304) con ensanche-nicho
     c.fill(232, 18, 304, 24, "#")
     c.carve(232, 19, 304, 23)
@@ -90,8 +90,8 @@ def build():
     c.plat(264, 267, 19, "#"); c.plat(270, 274, 16, "#")
     # H3: salon del pilar 5 (20x8)
     c.carve(300, 15, 322, 23)
-    c.carve(310, 12, 316, 15)
-    c.plat(310, 313, 14, "="); c.plat(313, 316, 17, "="); c.plat(310, 313, 20, "=")
+    c.carve(311, 12, 315, 15)
+    c.plat(311, 315, 14, "="); c.plat(311, 315, 17, "="); c.plat(311, 315, 20, "=")
     # camara sellada (door) dentro del pilar 5
     c.carve(326, 16, 338, 23)
     # balcon del altar dentro del ultimo pilar
@@ -137,7 +137,7 @@ def build():
     for x, r in ((250, 22), (258, 20), (284, 22), (294, 20)):
         c.set(x, r, "\"")
     c.set(271, 15, "U")                      # llave A en el nicho
-    c.set(230, 18, "U")                      # llave B en la cornisa del salon 2
+    c.set(230, 19, "U")                      # llave B en la cornisa del salon 2
     c.set(321, 22, "A")
     c.warp((321, 22), (328, 22), "door", 1)
     c.set(328, 22, "A"); c.set(334, 22, "l"); c.coins(330, 22, 3); c.coins(335, 22, 2)

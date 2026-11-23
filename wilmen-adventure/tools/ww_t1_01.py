@@ -27,23 +27,23 @@ def build():
     c.plat(146, 148, 25, "#"); c.plat(149, 151, 23, "#"); c.plat(152, 154, 21, "#")   # escalera a M6
     c.carve(154, 15, 182, 19)                            # M6 Balcon de raices
     c.fill(154, 19, 182, 20, "#")
-    c.carve(176, 13, 182, 15)                            # X1: ventana a la superficie
-    c.plat(176, 179, 17, "="); c.plat(179, 182, 15, "=")
+    c.carve(177, 13, 181, 15)                            # X1: ventana a la superficie (abertura de 4)
+    c.plat(176, 179, 17, "="); c.plat(178, 182, 15, "=")
     segs = [(156, 170, 27), (170, 186, 26), (186, 202, 25), (202, 218, 24)]   # M4 Galeria larga (suelo que sube)
     c.carve(154, 23, 157, 27)
     for a, b, f in segs:
         c.carve(a, f - 4, b, f)
         c.fill(a, f, b, 30, "#")
-    c.carve(218, 12, 226, 24)                            # E3/X2: pozo del bosque alto
-    c.plat(219, 222, 21, "="); c.plat(222, 225, 18, "="); c.plat(219, 222, 15, "=")
+    c.carve(218, 14, 226, 24); c.carve(221, 12, 225, 14)  # E3/X2: pozo del bosque alto (abertura de 4)
+    c.plat(219, 222, 21, "="); c.plat(222, 225, 18, "="); c.plat(221, 225, 16, "=")
     c.carve(226, 20, 240, 24)                            # tramo oculto del pasadizo bajo tierra
     c.fill(218, 24, 240, 30, "#")
     c.carve(233, 16, 263, 19)                            # M7 pasadizo oculto 30x3 (techo de ladrillos)
     c.fill(233, 19, 263, 20, "#")
     c.plat(236, 238, 19, "B")
     c.plat(234, 237, 22, "#")
-    c.carve(258, 11, 263, 16)                            # X3: salida a la colina
-    c.plat(259, 262, 14, "=")
+    c.carve(258, 12, 262, 16)                            # X3: salida a la colina (abertura de 4)
+    c.plat(258, 262, 14, "=")
     c.carve(84, 17, 97, 21)                              # M5 Despensa secreta sobre la Zanja
     c.plat(84, 86, 21, "B")
     c.carve(452, 21, 467, 27)                            # Casita de piedra (sala sellada)

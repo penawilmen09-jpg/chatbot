@@ -49,12 +49,12 @@ def build():
     c.carve(296, 7, 308, 13)                                # Telarana (secreta, techo de ladrillos)
     c.plat(300, 302, 13, "B")
     c.carve(304, 19, 324, 25)                               # Tesoro 20x6
-    c.carve(332, 8, 337, 14)                                # X1 pozo a la superficie
-    c.plat(332, 335, 16, "="); c.plat(334, 337, 13, "="); c.plat(332, 335, 10, "=")
-    c.carve(372, 8, 378, 14)                                # E2 boca del barranco (hoyo)
-    c.plat(373, 376, 16, "="); c.plat(375, 378, 12, "=")
-    c.carve(392, 8, 397, 14)                                # X2 ventana alta
-    c.plat(392, 395, 16, "="); c.plat(394, 397, 13, "="); c.plat(392, 395, 10, "=")
+    c.carve(332, 8, 336, 14)                                # X1 pozo a la superficie (abertura de 4)
+    c.plat(332, 335, 16, "="); c.plat(333, 336, 13, "="); c.plat(332, 335, 10, "=")
+    c.carve(373, 8, 377, 14)                                # E2 boca del barranco (hoyo de 4)
+    c.plat(373, 376, 16, "="); c.plat(374, 377, 12, "=")
+    c.carve(393, 8, 397, 14)                                # X2 ventana alta (abertura de 4)
+    c.plat(393, 396, 16, "="); c.plat(394, 397, 13, "="); c.plat(393, 396, 10, "=")
 
     # ---- objetos
     c.set(4, 24, "P")

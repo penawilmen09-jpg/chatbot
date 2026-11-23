@@ -24,96 +24,85 @@ def vine(c, x, top):
 def build():
     c = Cv(340, 32)
     c.land(0, 36, 30)
-    # ---- copas (x0, x1, top)
     crown(c, 28, 42, 26, (33, 37))
     crown(c, 51, 64, 26, (55, 59))
     crown(c, 67, 82, 19, (72, 76))
-    crown(c, 93, 102, 19)                    # isla entre lianas encadenadas
+    crown(c, 93, 102, 19)
     crown(c, 109, 123, 19, (113, 117))
-    crown(c, 132, 146, 22, (137, 143))       # tronco A (hueco)
-    crown(c, 155, 164, 22); crown(c, 173, 182, 22)     # islas del hueco largo
-    crown(c, 191, 205, 22, (195, 201))       # tronco B (hueco)
-    crown(c, 214, 228, 22, (218, 222))
-    crown(c, 231, 246, 15, (236, 240))
-    crown(c, 255, 269, 15, (259, 263))
-    crown(c, 278, 292, 15, (282, 286))
-    crown(c, 295, 310, 8, (300, 304))        # copa de la meta
-    crown(c, 313, 322, 3)                    # rama de la salida secreta
-    # lianas (huecos de 9 celdas) entre copas del mismo nivel
-    for x, t in ((46, 26), (86, 19), (106, 19), (127, 22), (150, 22), (168, 22), (186, 22), (209, 22), (250, 15), (273, 15)):
+    crown(c, 132, 146, 19, (137, 143))       # tronco A (hueco)
+    crown(c, 155, 164, 19); crown(c, 173, 182, 19)
+    crown(c, 191, 205, 19, (195, 201))       # tronco B (hueco)
+    crown(c, 214, 228, 19, (218, 222))
+    crown(c, 231, 246, 12, (236, 240))
+    crown(c, 255, 269, 12, (259, 263))
+    crown(c, 278, 292, 12, (282, 286))
+    crown(c, 295, 311, 9, (300, 304))        # copa de la meta
+    crown(c, 313, 322, 2)                    # rama de la salida secreta
+    for x, t in ((46, 26), (86, 19), (106, 19), (127, 19), (150, 19), (168, 19), (186, 19), (209, 19)):
         vine(c, x, t)
-    # ---- La Red del Tronco: rama hueca bajo los vanos de las copas, uniendo los dos troncos
+    # ---- La Red del Tronco
     c.fill(146, 27, 196, 32, "#")
     for x in range(146, 196):
         c.top[x] = 27
-    c.carve(138, 24, 142, 32)                # tronco A: pozo 4x8
+    c.carve(138, 21, 142, 32)                # tronco A: pozo 4x11
     c.carve(142, 28, 196, 31)                # tunel de la rama (54x3)
-    c.carve(196, 24, 200, 32)                # tronco B: pozo 4x8
-    c.carve(196, 28, 200, 31)
-    c.carve(139, 22, 141, 24)                # boca en la copa A (E2)
-    c.carve(197, 22, 199, 24)                # boca en la copa B (X3)
-    c.plat(138, 141, 27, "="); c.plat(139, 142, 30, "=") if False else None
-    c.plat(196, 199, 27, "=")
+    c.carve(196, 21, 200, 32)                # tronco B: pozo 4x11
+    c.carve(139, 19, 141, 21)                # boca en la copa A
+    c.carve(197, 19, 199, 21)                # boca en la copa B
+    c.plat(138, 140, 28, "="); c.plat(140, 142, 25, "="); c.plat(138, 140, 22, "=")
+    c.plat(196, 198, 28, "="); c.plat(198, 200, 25, "="); c.plat(196, 198, 22, "=")
     c.carve(185, 27, 189, 29); c.plat(186, 189, 29, "=")      # ventana X2 a la rama
     c.plat(180, 182, 27, "B")                                  # ladrillos del techo: atajo
-    c.plat(188, 191, 24, "=")                                  # peldano de la rama a la copa B
+    c.plat(184, 187, 24, "="); c.plat(188, 191, 21, "=")       # peldanos de la rama a la copa B
     # ---- salas selladas en el cielo (solo por puerta)
     c.fill(4, 4, 18, 14, "#"); c.carve(6, 6, 16, 13)          # Nido del pajaro 10x7
     c.fill(22, 4, 36, 14, "#"); c.carve(24, 6, 34, 13)        # Terraza del atardecer 10x7
 
-    on = c.on
     c.set(3, 29, "P")
     c.arc(8, 26, 28, 3)
     c.coins(30, 25, 10)
-    # C1..C2
-    c.set(52, 22, "Y"); c.fill(50, 20, 56, 22, "#")           # murcielago bajo una rama sobre el aterrizaje de la liana 1
+    c.fill(50, 16, 56, 18, "#"); c.set(52, 18, "Y")           # murcielago sobre el aterrizaje de la liana 1
     c.coins(52, 25, 8)
-    c.set(63, 25, "%")                                        # seta vertical C2 -> C3
+    c.set(63, 25, "%")                                        # seta: C2 -> C3
     c.coins(69, 18, 12)
     c.set(72, 18, "%"); c.plat(76, 81, 12, "="); c.set(78, 11, "*")   # gema 1: seta a una repisa alta
     c.coins(94, 18, 7)
+    c.fill(95, 9, 100, 11, "#"); c.set(97, 11, "Y")           # murcielago sobre la isla central
     c.coins(110, 18, 4)
     c.set(116, 18, "C")
-    c.set(96, 12, "f")                                        # volador entre las lianas encadenadas
-    c.coins(133, 21, 10)
-    c.set(136, 21, "T") if False else None
-    # hueco largo: islas con monedas
-    c.coins(156, 21, 7); c.coins(174, 21, 7)
-    c.set(191, 12, "f")
+    c.coins(133, 18, 10)
+    c.coins(156, 18, 7); c.coins(174, 18, 7)
+    c.set(160, 10, "f"); c.set(178, 10, "f")                  # voladores sobre el vano largo
     # Red del tronco: objetos
     c.set(160, 26, "U")                                       # llave A en la rama (ruta baja)
     c.set(190, 30, "U")                                       # llave B al fondo del tunel
     c.set(170, 30, "M"); c.set(174, 30, "l"); c.coins(167, 30, 3); c.set(176, 30, "*")
-    c.set(150, 30, "w") if False else None
     c.coins(146, 30, 6); c.coins(180, 30, 4)
-    c.set(120, 18, "d") if False else None
     # puertas a las salas del cielo
-    c.set(200, 21, "A")
-    c.warp((200, 21), (8, 12), "door", 1)
+    c.set(203, 18, "A")
+    c.warp((203, 18), (8, 12), "door", 1)
     c.set(8, 12, "A"); c.set(13, 12, "*"); c.set(11, 12, "u"); c.coins(9, 12, 2); c.coins(14, 12, 2)
-    c.set(262, 14, "A")
-    c.warp((262, 14), (26, 12), "door", 1)
+    c.set(262, 11, "A")
+    c.warp((262, 11), (26, 12), "door", 1)
     c.set(26, 12, "A"); c.set(32, 12, "q"); c.coins(27, 12, 4); c.coins(29, 11, 3); c.coins(33, 12, 1)
-    # T oculta en la copa A -> camara central (secreto)
-    c.set(135, 21, "T"); c.set(134, 21, "d")
+    # T oculta en la copa A -> tunel de la rama (secreto)
+    c.set(135, 18, "T"); c.set(134, 18, "d")
     c.set(172, 30, "T")
-    c.warp((135, 21), (172, 30), "tunnel")
-    # resto del nivel
-    c.coins(215, 21, 12)
-    c.set(220, 21, "C")
-    c.set(227, 21, "%")                                       # seta vertical hacia C8
-    c.coins(233, 14, 12)
-    c.set(247, 12, "f") if False else None
-    c.coins(256, 14, 12)
-    c.set(281, 11, "Y"); c.fill(278, 9, 285, 11, "#")        # murcielago sobre el ultimo aterrizaje
-    c.coins(279, 14, 8)
-    c.set(281, 14, "C")
-    c.set(291, 14, "%")                                       # seta vertical hacia la copa de la meta
-    c.coins(297, 7, 8)
-    c.set(307, 7, "F")
-    c.set(308, 7, "%")                                        # seta de la salida secreta
-    c.set(317, 2, "O")
-    # decoracion
+    c.warp((135, 18), (172, 30), "tunnel")
+    c.coins(215, 18, 12)
+    c.set(220, 18, "C")
+    c.set(227, 18, "%")                                       # seta: C7 -> C8
+    c.coins(232, 11, 12)
+    c.set(243, 11, "{")                                       # seta diagonal: C8 -> C9
+    c.coins(256, 11, 12)
+    c.set(267, 11, "{")                                       # seta diagonal: C9 -> C10
+    c.fill(279, 5, 285, 7, "#"); c.set(282, 7, "Y")           # murcielago sobre C10
+    c.coins(279, 11, 8)
+    c.set(281, 11, "C")
+    c.coins(301, 8, 5)
+    c.set(299, 8, "F")
+    c.set(309, 8, "%")                                        # seta de la salida secreta
+    c.set(317, 1, "O")
     for x in (8, 18, 90, 118, 212, 224, 240, 262, 284):
         if c.top[x] < 32 and c.get(x, c.on(x)) == " ":
             c.set(x, c.on(x), "d")

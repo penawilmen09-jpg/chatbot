@@ -84,6 +84,33 @@ func _run() -> void:
 	_scene = load("res://levels/level.tscn")
 	_check(_scene != null, "level.tscn carga")
 
+	if OS.get_cmdline_user_args().has("--dbg"):
+		var args: PackedStringArray = OS.get_cmdline_user_args()
+		var lv_n: int = int(args[args.find("--dbg") + 1])
+		var sx: int = int(args[args.find("--dbg") + 2])
+		var sy: int = int(args[args.find("--dbg") + 3])
+		var tx: int = int(args[args.find("--dbg") + 4])
+		var lvl = await _t1_open(lv_n)
+		await _t1_at(lvl, Vector2i(sx, sy))
+		var pl = lvl.player
+		var cnt: Array = [0]
+		var tracer := func():
+			cnt[0] += 1
+			if cnt[0] % 6 == 0:
+				print("x=%.1f y=%.1f floor=%s sw=%s" % [pl.global_position.x / 16.0, pl.global_position.y / 16.0, pl.is_on_floor(), lvl.sw])
+		physics_frame.connect(tracer)
+		var ok: bool = await _t1_run(lvl, tx * 16.0, 500)
+		physics_frame.disconnect(tracer)
+		print("resultado=%s" % ok)
+		quit(0)
+		return
+
+	if OS.get_cmdline_user_args().has("--t1"):
+		await _test_ww_tanda1()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
+
 	if OS.get_cmdline_user_args().has("--mech"):
 		await _test_ww_mechanics()
 		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
@@ -3183,12 +3210,12 @@ func _hold(action: String, frames: int, stop: Callable = Callable()) -> bool:
 	return false
 
 
-func _vine_cross(lvl, vine, from_col: int, land_lo: float, land_hi: float, floor_y: float) -> bool:
+func _vine_cross(lvl, vine, from_col: int, land_lo: float, land_hi: float, floor_y: float, row: int = 24) -> bool:
 	## Jugador virtual: espera en el borde, salta hacia el asa cuando pasa cerca, se agarra y suelta cuando la trayectoria cae
 	## en la zona de aterrizaje. Devuelve true si aterriza (apoyado) dentro de [land_lo, land_hi].
 	var pl = lvl.player
 	await _until(func(): return not pl.dead, 600)
-	await _lab_put(lvl, from_col, 24)
+	await _lab_put(lvl, from_col, row)
 	var state: String = "wait"
 	var jump_frames: int = 0
 	for i in range(1500):
@@ -3767,6 +3794,435 @@ func _test_ww_enemies() -> void:
 	await _frames(200)
 	_check(pl.hp == hp4, "a un lado de la prensa estás a salvo")
 	await _end_mini(lvl)
+
+
+
+# ============ WILMEN WORLD (tanda 1): pruebas de motor sobre los niveles reales 1-1 a 1-5 ============
+func _t1_open(n: int):
+	_ww.test_text = ""
+	var lvl = await _ww_level(n)
+	lvl.player._invuln_t = 1000000.0
+	return lvl
+
+
+func _t1_at(lvl, cell: Vector2i) -> void:
+	## Coloca al jugador de pie (esperando antes a que reaparezca si había muerto) y lo hace invulnerable para el recorrido.
+	await _until(func(): return not lvl.player.dead, 900)
+	await _frames(3)
+	lvl.player._invuln_t = 1000000.0
+	_stand_at(lvl, cell)
+	await _frames(10)
+
+
+func _t1_air(lvl, x: int, row: int) -> bool:
+	return not "#=B?+><~_-".contains(lvl._cell(x, row))
+
+
+func _t1_run(lvl, target_x: float, max_frames: int, y_below: float = -1.0, y_above: float = -1.0) -> bool:
+	## Jugador virtual: corre a la derecha, salta (y doble salto) cuando se atasca o se acaba el suelo; no mira a los enemigos.
+	var pl = lvl.player
+	var stuck: int = 0
+	var last: float = pl.global_position.x
+	var jt: int = -1
+	var dbl: bool = false
+	for i in range(max_frames):
+		if pl.dead:
+			break
+		var ok_y: bool = (y_below < 0.0 or pl.global_position.y < y_below) and (y_above < 0.0 or pl.global_position.y > y_above)
+		if pl.global_position.x >= target_x and pl.is_on_floor() and ok_y:
+			Input.action_release("move_right")
+			Input.action_release("jump")
+			return true
+		Input.action_press("move_right")
+		if jt >= 0:
+			jt += 1
+			if jt == 14:
+				Input.action_release("jump")
+			if dbl and jt == 16:
+				Input.action_press("jump")
+			if jt > 30:
+				Input.action_release("jump")
+				jt = -1
+		elif pl.is_on_floor():
+			if absf(pl.global_position.x - last) < 0.4:
+				stuck += 1
+			else:
+				stuck = 0
+			var ax: int = int((pl.global_position.x + 14.0) / 16.0)
+			var fr: int = int((pl.global_position.y + 11.5) / 16.0)
+			var gap: int = 0
+			while gap < 10 and _t1_air(lvl, ax + gap, fr):
+				gap += 1
+			var edge: bool = gap >= 2
+			if stuck >= 16 or edge:
+				Input.action_press("jump")
+				jt = 0
+				dbl = stuck >= 16 or gap >= 5
+				stuck = 0
+		last = pl.global_position.x
+		await physics_frame
+	Input.action_release("move_right")
+	Input.action_release("jump")
+	return false
+
+
+func _t1_hold(lvl, action: String, max_frames: int, cond: Callable) -> bool:
+	for i in range(max_frames):
+		Input.action_press(action)
+		await physics_frame
+		if cond.call():
+			Input.action_release(action)
+			return true
+	Input.action_release(action)
+	return false
+
+
+func _t1_phase_chain(lvl, phs: Array, ground_edge_x: float, ground_target_x: float) -> bool:
+	## Cruza una cadena de plataformas que desaparecen saltando cuando la siguiente está sólida con tiempo de sobra.
+	var pl = lvl.player
+	var idx: int = 0
+	var jump_hold: int = 0
+	for i in range(3000):
+		if pl.dead:
+			break
+		if pl.global_position.x > ground_target_x and pl.is_on_floor():
+			Input.action_release("jump")
+			Input.action_release("move_right")
+			return true
+		if jump_hold > 0:
+			jump_hold -= 1
+			Input.action_press("move_right")
+			if jump_hold == 0:
+				Input.action_release("jump")
+				Input.action_release("move_right")
+		elif pl.is_on_floor():
+			var nxt = phs[idx] if idx < phs.size() else null
+			if nxt == null:
+				var le: float = phs[phs.size() - 1].position.x + phs[phs.size() - 1].cells * 16.0 - 14.0
+				if pl.global_position.x < le:
+					Input.action_press("move_right")
+				else:
+					Input.action_press("jump")
+					Input.action_press("move_right")
+					jump_hold = 26
+			else:
+				var tx: float = nxt.position.x
+				if pl.global_position.x > tx - 14.0 and pl.global_position.x < tx + nxt.cells * 16.0 - 2.0 and absf(pl.global_position.y - (nxt.position.y - 18.0)) < 10.0:
+					idx += 1
+				else:
+					var edge_x: float = ground_edge_x if idx == 0 else phs[idx - 1].position.x + phs[idx - 1].cells * 16.0 - 14.0
+					if pl.global_position.x < edge_x:
+						Input.action_press("move_right")
+					elif _phase_left(nxt) > 0.8 and nxt.solid:
+						Input.action_release("move_right")
+						Input.action_press("jump")
+						Input.action_press("move_right")
+						jump_hold = 26
+					else:
+						Input.action_release("move_right")
+		await physics_frame
+	Input.action_release("jump")
+	Input.action_release("move_right")
+	return false
+
+
+func _t1_door_roundtrip(lvl, outer: Vector2i, inner: Vector2i, name: String) -> void:
+	## Puerta con llave: sin llave no entra; con llave y SALTO entra, y se vuelve por la puerta de dentro.
+	var pl = lvl.player
+	_ww.keys = {}
+	_stand_at(lvl, outer)
+	await _frames(20)
+	var x0: float = pl.global_position.x
+	await _tap_jump()
+	await _frames(40)
+	_check(absf(pl.global_position.x - x0) < 80.0 and not lvl.warping, "%s: sin llave, SALTO no abre la puerta" % name)
+	_ww.keys = {"bronce": 1}
+	_stand_at(lvl, outer)
+	await _frames(20)
+	await _tap_jump()
+	await _until(func(): return absf(pl.global_position.x - x0) > 100.0 or absf(pl.global_position.y - float(outer.y * 16)) > 100.0, 120)
+	await _frames(30)
+	var inside: bool = pl.global_position.distance_to(Vector2(inner.x * 16.0 + 8.0, inner.y * 16.0)) < 90.0
+	_check(inside and _ww.key_count() == 0, "%s: con llave y SALTO se entra a la sala (llave gastada)" % name)
+	await _frames(40)
+	_stand_at(lvl, inner)
+	await _frames(20)
+	await _tap_jump()
+	await _until(func(): return pl.global_position.distance_to(Vector2(outer.x * 16.0 + 8.0, outer.y * 16.0)) < 90.0, 120)
+	await _frames(20)
+	_check(pl.global_position.distance_to(Vector2(outer.x * 16.0 + 8.0, outer.y * 16.0)) < 90.0, "%s: se sale por la puerta de dentro y queda abierta" % name)
+
+
+func _t1_pick_key(lvl, cell: Vector2i, name: String) -> void:
+	await _until(func(): return not lvl.player.dead, 900)
+	await _frames(3)
+	var n0: int = _ww.key_count()
+	lvl.player._invuln_t = 1000000.0
+	lvl.player.global_position = Vector2(cell.x * 16.0 + 8.0, cell.y * 16.0 + 8.0)
+	await _frames(8)
+	_check(_ww.key_count() == n0 + 1, "%s: la llave se recoge (llaves %d -> %d, jugador %s muerto=%s)" % [name, n0, _ww.key_count(), lvl.player.global_position, lvl.player.dead])
+
+
+func _t1_bubble(lvl, cell: Vector2i, top_y: float, side: String, dest_x: float, name: String) -> void:
+	## Sube por una columna de burbujas sin tocar nada y, arriba, avanza hacia el lado hasta apoyarse en la cornisa.
+	var pl = lvl.player
+	await _t1_at(lvl, cell)
+	var rose: bool = false
+	for i in range(240):
+		await physics_frame
+		if pl.global_position.y < top_y:
+			rose = true
+			break
+	var landed: bool = false
+	if rose:
+		landed = await _t1_hold(lvl, side, 200, func(): return pl.is_on_floor() and (pl.global_position.x > dest_x if side == "move_right" else pl.global_position.x < dest_x) and pl.global_position.y < top_y + 24.0)
+	_check(rose and landed, "%s (x=%.0f y=%.0f)" % [name, pl.global_position.x, pl.global_position.y])
+
+
+func _test_ww_t1_l1() -> void:
+	print("Nivel 1-1 Sendero del Amanecer: setas, madriguera, llave y puerta")
+	var lvl = await _t1_open(1)
+	var pl = lvl.player
+	_check(lvl.cols == 520 and lvl.nrows == 30, "1-1 mide 520x30 (%dx%d)" % [lvl.cols, lvl.nrows])
+	_stand_at(lvl, Vector2i(3, 15))
+	await _frames(10)
+	_check(await _t1_run(lvl, 97 * 16.0, 1200), "1-1: el claro y las primeras colinas se recorren hasta la seta")
+	await _t1_at(lvl, Vector2i(95, 15))
+	var up: bool = await _t1_hold(lvl, "move_right", 300, func(): return pl.is_on_floor() and pl.global_position.x > 103 * 16.0 and pl.global_position.y < 9 * 16.0)
+	_check(up, "1-1: la seta vertical lanza a la repisa alta de la gema (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
+	await _t1_at(lvl, Vector2i(106, 8))
+	_check(await _t1_run(lvl, 131 * 16.0, 900), "1-1: de la repisa se baja y se sigue hacia el bosque alto")
+	await _t1_at(lvl, Vector2i(131, 13))
+	var wood: bool = await _t1_run(lvl, 214 * 16.0, 2400)
+	await _t1_at(lvl, Vector2i(214, 11))
+	wood = wood and await _t1_run(lvl, 232 * 16.0, 500, -1.0, -1.0)      # el pozo de 4 celdas del bosque alto se salta
+	await _t1_at(lvl, Vector2i(232, 11))
+	wood = wood and await _t1_run(lvl, 331 * 16.0, 3000)
+	_check(wood, "1-1: bosque alto (con su pozo de 4 celdas) y colinas del alba se recorren hasta el primer salto de fosos (x=%.0f y=%.0f muerto=%s)" % [pl.global_position.x, pl.global_position.y, pl.dead])
+	await _t1_at(lvl, Vector2i(331, 11))
+	var pits: bool = await _t1_run(lvl, 384 * 16.0, 2400)
+	_check(pits, "1-1: los fosos de 3, 4 y 5 celdas se saltan (x=%.0f y=%.0f muerto=%s)" % [pl.global_position.x, pl.global_position.y, pl.dead])
+	await _t1_at(lvl, Vector2i(384, 11))
+	var diag: bool = await _t1_hold(lvl, "move_right", 400, func(): return pl.is_on_floor() and pl.global_position.x > 400 * 16.0)
+	_check(diag, "1-1: la seta diagonal salva el foso de 12 celdas (x=%.0f)" % pl.global_position.x)
+	await _t1_at(lvl, Vector2i(387, 11))
+	_check(await _t1_run(lvl, 402 * 16.0, 1500), "1-1: la escalera flotante también cruza el foso grande (sin seta)")
+	await _t1_at(lvl, Vector2i(421, 11))
+	_check(await _t1_run(lvl, 466 * 16.0, 2400, 6 * 16.0), "1-1: las dos setas encadenadas llevan a la roca de la meta (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
+	await _t1_at(lvl, Vector2i(438, 11))
+	_check(await _t1_run(lvl, 449 * 16.0, 1200), "1-1: el muro de 4 celdas también se pasa con el escalón (sin seta)")
+	# madriguera
+	await _t1_at(lvl, Vector2i(66, 15))
+	var ramp: bool = await _t1_hold(lvl, "move_right", 1200, func(): return pl.global_position.x > 117 * 16.0 and pl.global_position.y > 21 * 16.0)
+	_check(ramp, "1-1: por la rampa E1 se baja y se recorre la Zanja (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
+	await _t1_pick_key(lvl, Vector2i(120, 17), "1-1")
+	_stand_at(lvl, Vector2i(125, lvl._cell_top(125) - 1)); await _frames(20)
+	await _tap_jump()
+	await _until(func(): return pl.global_position.y > 16 * 16.0, 120)
+	await _frames(20)
+	_check(pl.global_position.distance_to(Vector2(122 * 16.0 + 8.0, 17 * 16.0)) < 60.0, "1-1: la boca secreta del árbol hueco lleva a la Raíz hueca (SALTO)")
+	await _t1_door_roundtrip(lvl, Vector2i(292, 10), Vector2i(454, 26), "1-1 Casita de piedra")
+	await _free_level(lvl)
+
+
+func _test_ww_t1_l2() -> void:
+	print("Nivel 1-2 Garganta de las Cascadas: burbujas, corrientes, llaves y puertas")
+	var lvl = await _t1_open(2)
+	var pl = lvl.player
+	_check(lvl.cols == 360 and lvl.nrows == 32, "1-2 mide 360x32 (%dx%d)" % [lvl.cols, lvl.nrows])
+	# corriente a la derecha sobre la poza
+	await _t1_at(lvl, Vector2i(44, 27))
+	var x0: float = pl.global_position.x
+	await _frames(50)
+	_check(pl.global_position.x > x0 + 30.0, "1-2: la corriente de la poza arrastra a la derecha (%.0f px)" % (pl.global_position.x - x0))
+	# burbujas 1: de la terraza 1 a la roca (la columna eleva sola; arriba se avanza a la derecha)
+	await _t1_bubble(lvl, Vector2i(81, 28), 17 * 16.0, "move_right", 84 * 16.0, "1-2: la columna de burbujas 1 sube a la terraza 2")
+	# corriente en contra sobre la repisa
+	await _t1_at(lvl, Vector2i(163, 19))
+	x0 = pl.global_position.x
+	await _frames(40)
+	_check(pl.global_position.x < x0 - 20.0, "1-2: la corriente de la terraza 2 empuja hacia atrás (%.0f px)" % (pl.global_position.x - x0))
+	# burbujas 2: hay que entrar en la columna desde la repisa y subir hasta la cresta
+	await _t1_at(lvl, Vector2i(220, 19))
+	await _t1_hold(lvl, "move_right", 40, func(): return pl.global_position.x > 223 * 16.0)
+	var rose2: bool = false
+	for i in range(300):
+		await physics_frame
+		if pl.global_position.y < 8 * 16.0:
+			rose2 = true
+			break
+	var up2: bool = false
+	if rose2:
+		up2 = await _t1_hold(lvl, "move_right", 200, func(): return pl.is_on_floor() and pl.global_position.x > 227 * 16.0 and pl.global_position.y < 8 * 16.0)
+	_check(rose2 and up2, "1-2: la columna de burbujas 2 sube a la cresta (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
+	var crest_ok: bool = true
+	var crest_info: String = ""
+	for seg in [[Vector2i(264, 6), 277 * 16.0], [Vector2i(280, 5), 291 * 16.0], [Vector2i(300, 5), 311 * 16.0], [Vector2i(314, 4), 320 * 16.0]]:
+		await _t1_at(lvl, seg[0])
+		var r: bool = await _t1_run(lvl, float(seg[1]), 900)
+		crest_info += " %s:%s(x=%.0f y=%.0f)" % [str(seg[0]), r, lvl.player.global_position.x / 16.0, lvl.player.global_position.y / 16.0]
+		crest_ok = crest_ok and r
+	_check(crest_ok, "1-2: la cresta (ledges, puente de piedra y plataformas móviles sobre la corriente) llega a la meta%s" % crest_info)
+	await _t1_pick_key(lvl, Vector2i(97, 24), "1-2 llave A")
+	await _t1_pick_key(lvl, Vector2i(216, 12), "1-2 llave B")
+	await _t1_door_roundtrip(lvl, Vector2i(342, 4), Vector2i(240, 26), "1-2 Mirador")
+	await _free_level(lvl)
+
+
+func _test_ww_t1_l3() -> void:
+	print("Nivel 1-3 Puente de los Mil Pasos: puentes, plataformas, liana, resorte y torres huecas")
+	var lvl = await _t1_open(3)
+	var pl = lvl.player
+	_check(lvl.cols == 820 and lvl.nrows == 24, "1-3 mide 820x24 (%dx%d)" % [lvl.cols, lvl.nrows])
+	await _t1_at(lvl, Vector2i(36, 13))
+	_check(await _t1_run(lvl, 74 * 16.0, 900), "1-3: el puente 1 se cruza corriendo antes de que caiga")
+	var br: Array = _nodes_of(lvl, "res://items/ww_bridge.gd")
+	_check(br.size() >= 8, "1-3: hay %d puentes derrumbables" % br.size())
+	var phs: Array = _nodes_of(lvl, "res://items/ww_phase.gd")
+	phs.sort_custom(func(a, b): return a.position.x < b.position.x)
+	var chain: Array = phs.filter(func(q): return q.position.x < 135 * 16.0)
+	await _t1_at(lvl, Vector2i(98, 13))
+	_check(chain.size() == 5 and await _t1_phase_chain(lvl, chain, 100 * 16.0 - 4.0, 133 * 16.0), "1-3: la cadena de plataformas que desaparecen se cruza con ritmo (%d)" % chain.size())
+	# liana sobre el hueco de 9 celdas
+	var vines: Array = _nodes_of(lvl, "res://items/ww_vine.gd")
+	_check(vines.size() == 1, "1-3: hay una liana de repaso")
+	_check(await _vine_cross(lvl, vines[0], 611, 621 * 16.0, 645 * 16.0, 17 * 16.0 - 10.0, 16), "1-3: la liana lleva al otro lado del hueco de 9 celdas")
+	# resorte hacia el arco de la gema 2
+	await _t1_at(lvl, Vector2i(369, 12))
+	var sp: bool = await _t1_hold(lvl, "move_right", 200, func(): return pl.is_on_floor() and pl.global_position.y < 7 * 16.0 and pl.global_position.x > 371 * 16.0)
+	_check(sp, "1-3: el resorte lanza al arco de la gema (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
+	# viaducto con dardos
+	var darts: Array = _nodes_of(lvl, "res://items/ww_dart.gd")
+	_check(darts.size() == 7, "1-3: 7 lanzadardos en los viaductos (%d)" % darts.size())
+	await _t1_at(lvl, Vector2i(161, 22))
+	_check(await _t1_run(lvl, 212 * 16.0, 1500), "1-3: el viaducto del eco se recorre de punta a punta")
+	await _t1_pick_key(lvl, Vector2i(271, 15), "1-3 llave A")
+	await _t1_pick_key(lvl, Vector2i(230, 18), "1-3 llave B")
+	await _t1_door_roundtrip(lvl, Vector2i(790, lvl._cell_top(790) - 1), Vector2i(798, 22), "1-3 Balcón del altar")
+	await _free_level(lvl)
+
+
+func _test_ww_t1_l4() -> void:
+	print("Nivel 1-4 Cueva de las Raíces: interruptores, topos, lanzarrocas y la red de salas")
+	var lvl = await _t1_open(4)
+	var pl = lvl.player
+	_check(lvl.cols == 420 and lvl.nrows == 28, "1-4 mide 420x28 (%dx%d)" % [lvl.cols, lvl.nrows])
+	var tg: Array = _nodes_of(lvl, "res://items/ww_toggle.gd")
+	var wall = tg.filter(func(t): return t.position.x < 100 * 16.0)[0]
+	_check(wall._solid and wall.group == 1, "1-4: el muro del pasillo B está cerrado al empezar")
+	await _t1_at(lvl, Vector2i(4, 24))
+	_check(await _t1_run(lvl, 52 * 16.0, 900), "1-4: vestíbulo y pasillo A llevan a la sala de las columnas")
+	await _t1_at(lvl, Vector2i(93, 24))
+	var ok_sw: bool = await _t1_hold(lvl, "move_right", 120, func(): return lvl.sw[0] == true)
+	_check(ok_sw, "1-4: pisar el interruptor 1 lo enciende")
+	await _frames(4)
+	_check(not wall._solid, "1-4: y el muro del pasillo B se abre (escenario modificado)")
+	await _t1_at(lvl, Vector2i(97, 24))
+	_check(await _t1_run(lvl, 114 * 16.0, 600), "1-4: el pasillo B se atraviesa hacia el embudo")
+	# galería inclinada con muros conmutables
+	var tg2: Array = tg.filter(func(t): return t.group == 2)
+	_check(tg2.size() == 10, "1-4: dos muros conmutables de 5 celdas del grupo 2 en la galería (%d tramos)" % tg2.size())
+	await _t1_at(lvl, Vector2i(173, 24))
+	var w1: Array = tg2.filter(func(t): return t.position.x < 197 * 16.0)
+	var w2: Array = tg2.filter(func(t): return t.position.x > 197 * 16.0)
+	_check(w1[0]._solid and not w2[0]._solid and not lvl.sw[1], "1-4: al entrar en la galería el primer muro `[` está cerrado y el segundo `]` abierto")
+	await _t1_hold(lvl, "move_right", 120, func(): return lvl.sw[1] == true)
+	await _frames(6)
+	_check(lvl.sw[1] and not w1[0]._solid and w2[0]._solid, "1-4: el interruptor de la entrada abre el primer muro y cierra el segundo")
+	await _t1_at(lvl, Vector2i(177, 24))
+	var gal: bool = await _t1_run(lvl, 193 * 16.0, 1200, -1.0, 12 * 16.0)
+	_check(gal and lvl.sw[1], "1-4: el interruptor de la entrada de la galería abre el primer muro y se pasa (x=%.0f y=%.0f sw2=%s)" % [pl.global_position.x, pl.global_position.y, lvl.sw[1]])
+	var wall2: Array = tg2.filter(func(t): return t.position.x > 197 * 16.0)
+	_check(wall2[0]._solid and not tg2.filter(func(t): return t.position.x < 197 * 16.0)[0]._solid, "1-4: con el interruptor encendido el segundo muro `]` está cerrado")
+	await _t1_at(lvl, Vector2i(198, 21))                       # pisar el interruptor que hay entre los dos muros
+	await _frames(6)
+	_check(not lvl.sw[1] and not wall2[0]._solid, "1-4: el interruptor entre los muros lo apaga y abre el segundo muro")
+	var gal2: bool = await _t1_run(lvl, 228 * 16.0, 1500, -1.0, 12 * 16.0)
+	_check(gal2, "1-4: tras el segundo muro la galería llega a su final (x=%.0f y=%.0f)" % [pl.global_position.x, pl.global_position.y])
+	await _t1_at(lvl, Vector2i(230, 17))
+	_check(await _t1_run(lvl, 330 * 16.0, 2400), "1-4: la gruta de salida (con el manantial) se recorre hasta el pozo")
+	var en: Array = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://enemies/ww_enemy.gd")
+	var kinds := {}
+	for e in en:
+		kinds[e.kind] = int(kinds.get(e.kind, 0)) + 1
+	_check(kinds.get("mole", 0) == 7 and kinds.get("lobber", 0) == 3, "1-4: 7 topos y 3 lanzarrocas con su función (%s)" % str(kinds))
+	await _t1_pick_key(lvl, Vector2i(151, 13), "1-4 llave A")
+	await _t1_pick_key(lvl, Vector2i(115, 18), "1-4 llave B")
+	await _t1_door_roundtrip(lvl, Vector2i(312, 17), Vector2i(306, 24), "1-4 Tesoro")
+	await _free_level(lvl)
+
+
+func _test_ww_t1_l5() -> void:
+	print("Nivel 1-5 Copas Altas: 8 lianas, 6 setas, red de troncos y salida secreta")
+	var lvl = await _t1_open(5)
+	var pl = lvl.player
+	_check(lvl.cols == 340 and lvl.nrows == 32, "1-5 mide 340x32 (%dx%d)" % [lvl.cols, lvl.nrows])
+	var vines: Array = _nodes_of(lvl, "res://items/ww_vine.gd")
+	vines.sort_custom(func(a, b): return a.position.x < b.position.x)
+	_check(vines.size() == 8, "1-5: 8 lianas (%d)" % vines.size())
+	var spec: Array = [
+		[46, 41, 25, 51, 64, 26], [86, 81, 18, 93, 102, 19], [106, 101, 18, 109, 123, 19], [127, 122, 18, 132, 146, 19],
+		[150, 145, 18, 155, 164, 19], [168, 163, 18, 173, 182, 19], [186, 181, 18, 191, 205, 19], [209, 204, 18, 214, 228, 19]]
+	for k in range(spec.size()):
+		var sp: Array = spec[k]
+		var ok: bool = await _vine_cross(lvl, vines[k], int(sp[1]), float(sp[3]) * 16.0, float(sp[4]) * 16.0, float(sp[5]) * 16.0 - 10.0, int(sp[2]))
+		_check(ok, "1-5: liana %d (col %d) cruza el hueco de 9 celdas" % [k + 1, int(sp[0])])
+		await _until(func(): return not pl.dead, 600)
+	# (columna de la seta, fila de pie, desde, zona de aterrizaje x0, x1, fila de pie del destino)
+	var shrooms: Array = [[63, 25, 61, 67, 82, 18], [72, 18, 70, 76, 81, 11], [227, 18, 225, 231, 246, 11], [243, 11, 241, 255, 269, 11],
+		[267, 11, 265, 278, 292, 11], [309, 8, 303, 313, 322, 1]]
+	for sh in shrooms:
+		await _t1_at(lvl, Vector2i(int(sh[2]), int(sh[1])))
+		var ok2: bool = await _t1_hold(lvl, "move_right", 300, func(): return pl.is_on_floor() and pl.global_position.x > int(sh[3]) * 16.0 and pl.global_position.x < (int(sh[4]) + 1) * 16.0 and pl.global_position.y < (int(sh[5]) + 1) * 16.0)
+		_check(ok2, "1-5: la seta de la col %d lleva a la copa/repisa de la col %d (x=%.0f y=%.0f)" % [int(sh[0]), int(sh[3]), pl.global_position.x, pl.global_position.y])
+	# red del tronco: boca secreta y puertas
+	_stand_at(lvl, Vector2i(135, 18)); await _frames(20)
+	await _tap_jump()
+	await _until(func(): return pl.global_position.y > 26 * 16.0, 120)
+	await _frames(20)
+	_check(pl.global_position.distance_to(Vector2(172 * 16.0 + 8.0, 30 * 16.0)) < 70.0, "1-5: la boca secreta de la copa lleva al túnel de la rama hueca (SALTO)")
+	await _t1_pick_key(lvl, Vector2i(160, 26), "1-5 llave A")
+	await _t1_pick_key(lvl, Vector2i(190, 30), "1-5 llave B")
+	await _t1_door_roundtrip(lvl, Vector2i(203, 18), Vector2i(8, 12), "1-5 Nido del pájaro")
+	await _t1_door_roundtrip(lvl, Vector2i(262, 11), Vector2i(26, 12), "1-5 Terraza del atardecer")
+	var sg: Array = _scripts_of(lvl, "res://items/ww_secret_goal.gd")
+	_check(sg.size() == 1, "1-5: hay una salida secreta sobre la meta")
+	await _free_level(lvl)
+
+
+func _test_ww_t1_clock() -> void:
+	print("Reloj: al reaparecer queda como mínimo el doble del tiempo de ruta que falta hasta la meta")
+	var lvl = await _t1_open(1)
+	var par: float = float(lvl.meta["par"])
+	var span: float = lvl.goal.position.x - lvl.spawn_pos.x
+	lvl.respawn_pos = Vector2(331 * 16.0 + 8.0, 11 * 16.0)
+	var frac: float = (lvl.goal.position.x - lvl.respawn_pos.x) / span
+	var want: float = 2.0 * par * frac
+	_check(absf(lvl.respawn_time_floor() - want) < 1.0 and want > 70.0, "1-1: desde el punto de control 331 el suelo de tiempo es 2 x par x lo que falta (%.0f s)" % lvl.respawn_time_floor())
+	lvl._cp_time = 20.0
+	lvl.player.die()
+	await _until(func(): return not lvl.player.dead, 900)
+	_check(lvl.time_left >= want - 1.0, "tras morir con poco tiempo guardado se reaparece con %.0f s (mínimo %.0f)" % [lvl.time_left, want])
+	var t_all: Array = []
+	for n in range(1, 6):
+		var d: Dictionary = _ww.parse_level(FileAccess.get_file_as_string(_ww.level_path(n)))
+		t_all.append(int(d["meta"]["time"]) >= int(2.5 * float(d["meta"]["par"])))
+	_check(not t_all.has(false), "los 5 niveles tienen @time >= 2,5 x @par")
+	await _free_level(lvl)
+
+
+func _test_ww_tanda1() -> void:
+	_wipe_ww_files()
+	_ww.reset()
+	await _test_ww_t1_clock()
+	await _test_ww_t1_l1()
+	await _test_ww_t1_l2()
+	await _test_ww_t1_l3()
+	await _test_ww_t1_l4()
+	await _test_ww_t1_l5()
+	_ww.keys = {}
+	_ww.reset()
+	_wipe_ww_files()
 
 
 func _test_ww_mechanics() -> void:

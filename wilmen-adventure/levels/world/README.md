@@ -81,3 +81,10 @@ Cada uno tiene un comportamiento propio (no son variantes de aspecto). Arte: `to
 | `0` | Lanzarrocas: estático; lanza rocas en parábola calculando tu posición. Se pisa |
 | `@press x,y,ancho` | Prensa (directiva, sin glifo; 2-3 celdas bajo un techo sólido, `x,y` = posición elevada): tiembla, cae al suelo, espera y sube |
 Los enemigos de WILMEN ADVENTURE que ya existían siguen disponibles: `w` caminante, `s` pinchudo, `j` saltarín, `f` volador, `t` disparador.
+
+## Niveles nuevos dibujados a mano (tanda 1: 1-1 a 1-5)
+Se generan con `tools/ww_t1_0N.py` (lienzo `tools/ww_cv.py`, sin piezas prefabricadas) y declaran `@par` (segundos de la ruta principal).
+Se validan con `python3 tools/ww_t1_check.py` (grafo de movimientos con setas, lianas, burbujas, interruptores, puertas y llaves:
+la meta se alcanza sin abrir puertas, todas las llaves son libres, hay tantas llaves como cerraduras, nunca se queda uno atrapado y el
+reloj cubre explorarlo todo) y con `godot ... smoke_test.gd -- --t1` (recorrido real de cada mecánica en el motor).
+Comparación visual: `python3 tools/ww_t1_sheet.py salida.png` (ver `docs/ww_tanda1_comparacion.png` y `docs/ww_tanda1_capturas.png`).

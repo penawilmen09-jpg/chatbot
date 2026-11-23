@@ -308,6 +308,14 @@ func _spawn_mechanics() -> void:
 		add_child(cu)
 
 
+func _cell_top(x: int) -> int:
+	## Primera fila sólida de una columna (para colocar objetos y pruebas sobre el suelo).
+	for y in range(nrows):
+		if "#=B?+><~_-".contains(_cell(x, y)):
+			return y
+	return nrows
+
+
 func toggle_switch(group: int) -> void:
 	sw[group - 1] = not bool(sw[group - 1])
 	switch_changed.emit(group)

@@ -21,7 +21,7 @@ def build():
     c.fill(40, 25, 56, 28, ":")                      # corriente a la derecha (16x3) sobre la poza
     # R1: roca del pozo (cols 84-98), con el pozo vertical dentro
     c.land(84, 99, 17)
-    c.carve(88, 17, 94, 29)                          # pozo 6x12
+    c.carve(88, 18, 94, 29); c.carve(89, 17, 93, 18)  # pozo 6x12 (abertura de 4 arriba)
     c.carve(94, 26, 99, 29)                          # puerta baja al pozo (lado derecho)
     c.plat(88, 91, 26, "#"); c.plat(91, 94, 23, "#"); c.plat(88, 91, 20, "#")   # salientes alternos
     c.carve(94, 21, 99, 25); c.fill(94, 25, 99, 26, "#")                        # nicho 5x4 con la llave A
@@ -46,10 +46,10 @@ def build():
     c.land(226, 263, 8)
     c.carve(236, 12, 248, 17)                        # Despensa del arcoiris
     c.carve(238, 20, 258, 27)                        # Mirador
-    for x0, x1, t in ((264, 271, 7), (274, 283, 6), (310, 319, 5)):
+    for x0, x1, t in ((264, 271, 7), (274, 283, 6), (309, 322, 5)):
         ledge(c, x0, x1, t)
-    c.fill(288, 6, 307, 8, "#")                      # puente de piedra de 19 celdas
-    for x in range(288, 307):
+    c.fill(287, 6, 306, 8, "#")                      # puente de piedra de 19 celdas
+    for x in range(287, 306):
         c.top[x] = 6
     c.land(337, 360, 5)
     c.fill(322, 2, 337, 5, ":")                      # corriente a la derecha sobre el ultimo hueco
@@ -86,7 +86,7 @@ def build():
     # terraza 3
     c.set(291, 5, "C")
     c.set(276, 5, "t")
-    c.coins(266, 6, 5); c.coins(276, 4, 5); c.coins(290, 5, 14)
+    c.coins(266, 6, 5); c.coins(276, 4, 5); c.coins(289, 5, 14)
     c.set(325, 5, "m"); c.set(331, 5, "m")
     c.set(342, 4, "A")
     c.warp((342, 4), (240, 26), "door", 1)
