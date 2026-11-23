@@ -23,6 +23,8 @@ const ToggleScript := preload("res://items/ww_toggle.gd")
 const CurrentScript := preload("res://items/ww_current.gd")
 const DartScript := preload("res://items/ww_dart.gd")
 const PendulumScript := preload("res://items/ww_pendulum.gd")
+const WwEnemyScript := preload("res://enemies/ww_enemy.gd")
+const PressScript := preload("res://items/ww_press.gd")
 const OrbitScript := preload("res://items/ww_orbit.gd")
 
 signal switch_changed(group: int)
@@ -251,11 +253,29 @@ func _spawn_mechanics() -> void:
 					swt.group = 1 if c == "/" else 2
 					swt.position = pos
 					add_child(swt)
+				"z", "D", "Y", "0":
+					var we = WwEnemyScript.new()
+					we.kind = {"z": "mole", "D": "guard", "Y": "bat", "0": "lobber"}[c]
+					we.world = world
+					we.level = self
+					we.position = pos
+					add_child(we)
 				"n", "b":
 					var ob = OrbitScript.new()
 					ob.kind = "orbit" if c == "n" else "elevator"
 					ob.position = pos if c == "n" else Vector2(x * TILE + 16, y * TILE + 12)
 					add_child(ob)
+	for r in _runs("~"):
+		var pr = PressScript.new()
+		pr.level = self
+		pr.cells = int(r["w"])
+		pr.offset = float(int(r["x"]) % 5) * 0.7
+		pr.position = Vector2(int(r["x"]) * TILE + 8, int(r["y"]) * TILE + 8)
+		var fy: int = int(r["y"]) + 1
+		while fy < nrows - 1 and _cell(int(r["x"]), fy) != "#" and _cell(int(r["x"]), fy) != "=":
+			fy += 1
+		pr.drop_px = maxf(0.0, float(fy - int(r["y"])) * TILE - 26.0)
+		add_child(pr)
 	for r in _runs("-"):
 		var ph = PhaseScript.new()
 		ph.cells = int(r["w"])

@@ -3575,10 +3575,187 @@ func _test_ww_doors() -> void:
 	await _end_mini(lvl)
 
 
+func _enemy_of(lvl, kind: String):
+	for n in lvl.get_children():
+		if n.get_script() != null and n.get_script().resource_path == "res://enemies/ww_enemy.gd" and n.kind == kind:
+			return n
+	return null
+
+
+func _test_ww_enemies() -> void:
+	print("Enemigos nuevos: topo, guardián, murciélago y lanzarrocas (comportamientos propios)")
+	# ---- topo ----
+	var g := Grid.new(60, 20)
+	g.ground(0, 60, 15)
+	g.put(30, 14, "z")
+	g.put(5, 14, "P")
+	var lvl = await _mini(g)
+	var pl = lvl.player
+	var mole = _enemy_of(lvl, "mole")
+	_check(mole != null and mole.state == "hidden" and not mole.is_in_group("enemies"), "el topo empieza escondido e inofensivo")
+	pl.global_position = Vector2(26 * 16, 14 * 16)  # lejos: sigue escondido
+	await _frames(40)
+	_check(mole.state == "hidden", "si estás lejos el topo no sale")
+	pl.global_position = Vector2(30 * 16 + 8 - 40, 14 * 16)
+	var hp0: int = pl.hp
+	await _until(func(): return mole.state == "warn", 60)
+	_check(mole.state == "warn" and pl.hp == hp0, "al acercarte tiembla (aviso) sin hacerte daño")
+	await _until(func(): return mole.state == "up", 60)
+	_check(mole.state == "up" and mole.is_in_group("enemies"), "después sale del suelo")
+	pl.global_position = Vector2(30 * 16 + 8, 15 * 16 - 10)
+	pl.velocity = Vector2.ZERO
+	pl._invuln_t = 0.0
+	await _frames(6)
+	_check(pl.hp < hp0, "si te quedas encima cuando sale te hace daño")
+	pl.global_position = Vector2(22 * 16, 15 * 16 - 10)
+	pl.velocity = Vector2.ZERO
+	await _until(func(): return mole.state == "hidden", 260)
+	_check(mole.state == "hidden", "y se vuelve a esconder (%s)" % mole.state)
+	# pisarlo cuando está fuera lo derrota
+	pl.global_position = Vector2(30 * 16 + 8 - 44, 14 * 16)
+	await _until(func(): return mole.state == "up", 160)
+	pl.global_position = Vector2(30 * 16 + 8, 15 * 16 - 10 - 14)
+	pl.velocity = Vector2(0, 80)
+	pl._invuln_t = 0.0
+	await _frames(8)
+	_check(mole.dead, "el topo que está fuera se derrota pisándolo")
+	await _end_mini(lvl)
+	# ---- guardián ----
+	g = Grid.new(80, 20)
+	g.ground(0, 80, 15)
+	g.fill(50, 10, 51, 15, "#")
+	g.put(40, 14, "D")
+	g.put(5, 14, "P")
+	lvl = await _mini(g)
+	pl = lvl.player
+	var gd = _enemy_of(lvl, "guard")
+	_check(gd != null and not gd.stompable, "el guardián no se puede pisar mientras está en guardia")
+	pl.global_position = Vector2(40 * 16 - 60, 14 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(4)
+	await _until(func(): return gd.state == "wind", 90)
+	_check(gd.state == "wind", "si le miras de frente se prepara (aviso)")
+	await _until(func(): return gd.state == "charge", 60)
+	_check(gd.state == "charge", "y carga contra ti")
+	var x_at: float = gd.position.x
+	await _until(func(): return gd.state == "stun", 120)
+	_check(gd.state == "stun" and gd.stompable, "al terminar la carga queda aturdido y entonces sí es vulnerable")
+	var hpg: int = pl.hp
+	gd.take_hit("spark")
+	_check(gd.dead, "aturdido, un disparo lo derrota")
+	await _end_mini(lvl)
+	g = Grid.new(80, 20)
+	g.ground(0, 80, 15)
+	g.put(40, 14, "D")
+	g.put(5, 14, "P")
+	lvl = await _mini(g)
+	pl = lvl.player
+	gd = _enemy_of(lvl, "guard")
+	gd.take_hit("spark")
+	_check(not gd.dead, "con el escudo en guardia el disparo no le hace nada")
+	pl.global_position = Vector2(gd.position.x, gd.position.y - 30)
+	pl.velocity = Vector2(0, 120)
+	pl._invuln_t = 0.0
+	var hp1: int = pl.hp
+	await _frames(8)
+	_check(not gd.dead and pl.hp == hp1 and pl.velocity.y < 0.0, "caer sobre su cabeza te hace rebotar sin daño ni derrotarlo")
+	await _end_mini(lvl)
+	# ---- murciélago ----
+	g = Grid.new(60, 20)
+	g.ground(0, 60, 15)
+	g.fill(25, 4, 36, 5, "#")
+	g.put(30, 5, "Y")
+	g.put(5, 14, "P")
+	lvl = await _mini(g)
+	pl = lvl.player
+	var bat = _enemy_of(lvl, "bat")
+	var home: Vector2 = bat.position
+	_check(bat.state == "hang", "el murciélago cuelga del techo")
+	pl.global_position = Vector2(30 * 16 + 8, 14 * 16)
+	pl.velocity = Vector2.ZERO
+	await _until(func(): return bat.state == "warn", 120)
+	_check(bat.state == "warn", "al pasar debajo bate las alas (aviso)")
+	await _until(func(): return bat.state == "dive", 60)
+	_check(bat.state == "dive" and bat.velocity.length() > 150.0 and bat.velocity.y > 0.0, "y se lanza en picado hacia ti (%.0f px/s)" % bat.velocity.length())
+	pl.global_position = Vector2(16 * 16, 14 * 16)  # nos apartamos
+	await _until(func(): return bat.state == "rise", 120)
+	await _until(func(): return bat.state == "hang", 400)
+	_check(bat.state == "hang" and bat.position.distance_to(home) < 5.0, "después vuelve a su sitio del techo")
+	await _end_mini(lvl)
+	# ---- lanzarrocas ----
+	g = Grid.new(80, 20)
+	g.ground(0, 80, 15)
+	g.put(50, 14, "0")
+	g.put(5, 14, "P")
+	lvl = await _mini(g)
+	pl = lvl.player
+	var lob = _enemy_of(lvl, "lobber")
+	pl.global_position = Vector2(50 * 16 - 120, 14 * 16)
+	pl.velocity = Vector2.ZERO
+	var rock = null
+	for i in range(400):
+		await physics_frame
+		pl.global_position.x = 50 * 16 - 120
+		var rs: Array = lvl.get_children().filter(func(n): return n is Area2D and n.get_script() != null and "G" in n and "_life" in n)
+		if not rs.is_empty():
+			rock = rs[0]
+			break
+	_check(rock != null, "el lanzarrocas lanza una roca cuando estás a tiro")
+	var peak: float = rock.position.y
+	var hp2: int = pl.hp
+	pl._invuln_t = 0.0
+	var apex_ok := false
+	for i in range(240):
+		await physics_frame
+		pl.velocity = Vector2.ZERO
+		pl.global_position.x = 50 * 16 - 120
+		if is_instance_valid(rock):
+			peak = minf(peak, rock.position.y)
+		else:
+			break
+	_check(peak < rock.position.y - 0.0 if is_instance_valid(rock) else peak < 14 * 16 - 10.0, "la roca describe una parábola (sube y baja; cima en y=%.0f)" % peak)
+	_check(pl.hp < hp2, "y si no te mueves te alcanza")
+	_check(lob.stompable, "el lanzarrocas se puede pisar")
+	await _end_mini(lvl)
+	# ---- prensa ----
+	g = Grid.new(60, 20)
+	g.ground(0, 60, 15)
+	g.fill(28, 2, 32, 3, "#")
+	g.fill(29, 4, 31, 5, "~")
+	g.put(5, 14, "P")
+	lvl = await _mini(g)
+	pl = lvl.player
+	var pr = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_press.gd")
+	_check(pr.size() == 1 and pr[0].cells == 2 and pr[0].drop_px > 100.0, "la prensa de 2 celdas llega hasta el suelo (%.0f px)" % (pr[0].drop_px if pr.size() > 0 else 0.0))
+	pr = pr[0]
+	var seen := {}
+	for i in range(260):
+		await physics_frame
+		seen[pr.phase_name] = true
+		pl.global_position = Vector2(20 * 16, 14 * 16)  # a salvo, fuera de su zona
+	_check(seen.has("up") and seen.has("warn") and seen.has("fall") and seen.has("down") and seen.has("rise"), "ciclo completo: reposo, aviso, caída, abajo y subida")
+	pr._t = 0.0
+	var hp3: int = pl.hp
+	pl.global_position = Vector2(30 * 16 - 8 + 8, 14 * 16)
+	pl._invuln_t = 0.0
+	await _frames(40)
+	_check(pl.hp == hp3, "debajo de la prensa elevada no hay peligro")
+	await _until(func(): return pl.hp < hp3, 120)
+	_check(pl.hp < hp3, "la prensa que cae te hace daño")
+	pr._t = 0.0
+	pl.global_position = Vector2(24 * 16, 14 * 16)
+	pl._invuln_t = 0.0
+	var hp4: int = pl.hp
+	await _frames(200)
+	_check(pl.hp == hp4, "a un lado de la prensa estás a salvo")
+	await _end_mini(lvl)
+
+
 func _test_ww_mechanics() -> void:
 	_wipe_ww_files()
 	_ww.reset()
 	await _test_ww_doors()
+	await _test_ww_enemies()
 	await _test_ww_mech_shrooms()
 	await _test_ww_mech_vine()
 	await _test_ww_mech_logs()

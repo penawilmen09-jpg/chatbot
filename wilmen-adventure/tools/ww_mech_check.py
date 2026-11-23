@@ -10,6 +10,8 @@ Comprueba, por nivel (incluido el taller ww_950), que cada mecanica esta bien co
   / \\    interruptores: si hay bloques ( ) [ ] del grupo debe existir su interruptor (y viceversa).
   : . ,  corrientes: zonas rectangulares de >= 2 celdas.
   " `    lanzadardos: con suelo debajo; ! pendulo: ancla solida arriba.
+  z D 0  topo, guardian y lanzarrocas: sobre suelo firme; Y murcielago: colgado bajo un techo solido.
+  ~      prensa: tramo de 2-3 celdas con techo solido encima y suelo debajo a >= 4 celdas.
   n b    orbital: radio libre de 3 celdas; ascensor: 6 celdas libres encima y parada baja a ras del foso.
 Altura: entre 20 y 40 filas; con mas de 20 filas, el nivel debe tener suelo/plataforma en la zona baja (sin vacio total).
 Uso: python3 tools/ww_mech_check.py [archivos...]   (sin argumentos: todos los niveles de levels/world)
@@ -68,6 +70,23 @@ def check(rows):
                     errs.append("liana (%d,%d) de %d celdas (debe ser 6..12)" % (x, y, n))
                 if not solid(x, y - 1):
                     errs.append("liana (%d,%d) sin ancla solida arriba" % (x, y))
+            elif ch in "zD0" and not solid(x, y + 1):
+                errs.append("enemigo '%s' (%d,%d) sin suelo debajo" % (ch, x, y))
+            elif ch == "Y" and not solid(x, y - 1):
+                errs.append("murcielago (%d,%d) sin techo solido encima" % (x, y))
+            elif ch == "~" and c(x - 1, y) != "~":
+                n = 0
+                while c(x + n, y) == "~":
+                    n += 1
+                if not (2 <= n <= 3):
+                    errs.append("prensa (%d,%d) de %d celdas (2..3)" % (x, y, n))
+                if not all(solid(x + i, y - 1) for i in range(n)):
+                    errs.append("prensa (%d,%d) sin techo solido encima" % (x, y))
+                fy = y + 1
+                while fy < H and not solid(x, fy):
+                    fy += 1
+                if fy - y < 5:
+                    errs.append("prensa (%d,%d) con menos de 4 celdas libres hasta el suelo" % (x, y))
             elif ch in "&'" and not solid(x, y + 1):
                 errs.append("tolva (%d,%d) sin suelo debajo" % (x, y))
             elif ch in "\"`" and False:
