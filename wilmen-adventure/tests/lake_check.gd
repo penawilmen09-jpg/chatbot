@@ -62,7 +62,7 @@ func _try(lvl, game, delay: int) -> Dictionary:
 			Input.action_release("jump")
 			return {"ok": false, "why": ("CAIDA" if pl.global_position.y > 28.0 * 16.0 else "ENEMIGO") + " en x=%d y=%d vy=%d hp=%s (frame %d)" % [int(pl.global_position.x / 16.0), int(pl.global_position.y / 16.0), int(pl.velocity.y), str(pl.hp), i]}
 		var feet: float = pl.global_position.y + 10.0
-		if OS.get_cmdline_user_args().has("trace") and delay == int(OS.get_cmdline_user_args()[OS.get_cmdline_user_args().find("trace") + 1]) and i % 6 == 0:
+		if OS.get_cmdline_user_args().has("trace") and delay == int(OS.get_cmdline_user_args()[OS.get_cmdline_user_args().find("trace") + 1]) and (i % 6 == 0 or i > 820):
 			print("   t=%d pos=(%.0f,%.0f) v=(%.0f,%.0f) floor=%s" % [i, pl.global_position.x, pl.global_position.y, pl.velocity.x, pl.velocity.y, str(pl.is_on_floor())])
 		if pl.global_position.x >= END_X and pl.is_on_floor():
 			Input.action_release("move_right")

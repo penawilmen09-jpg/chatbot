@@ -12,7 +12,7 @@ W=$(mktemp -d)
 cp -r "$SRC" "$W/p" && cd "$W/p"
 rm -rf .godot
 echo "WILMEN WORLD TEST" > wilmen_test_build.flag
-sed -i 's|^package/unique_name=.*|package/unique_name="com.wilmen.adventure.test"|; s|^package/name=.*|package/name="WILMEN WORLD TEST"|; s|^version/code=.*|version/code='"$CODE"'|; s|^version/name=\(.*\)"$|version/name=\1-TEST"|; s|^include_filter="\(.*\)"$|include_filter="\1, wilmen_test_build.flag"|' export_presets.cfg
+sed -i 's|^package/unique_name=.*|package/unique_name="com.wilmen.adventure.test"|; s|^package/name=.*|package/name="WILMEN WORLD TEST"|; s|^version/code=.*|version/code='"$CODE"'|; s|^version/name=.*|version/name="2.7.2-ww-lago-TEST"|; s|^include_filter="\(.*\)"$|include_filter="\1, wilmen_test_build.flag"|' export_presets.cfg
 export GODOT_ANDROID_KEYSTORE_RELEASE_PATH=$PWD/android/wilmen-sideload.keystore GODOT_ANDROID_KEYSTORE_RELEASE_USER=wilmen GODOT_ANDROID_KEYSTORE_RELEASE_PASSWORD=wilmenadventure
 "$G" --headless --import >/dev/null 2>&1 || true
 mkdir -p build
