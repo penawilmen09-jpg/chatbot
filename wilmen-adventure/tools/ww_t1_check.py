@@ -38,10 +38,29 @@ def arc_fixed(ck, ax, ay, bx, by, apex):
     return True
 
 
+def expand_movers(rows):
+    """Plataformas móviles (`m` horizontal, `v` vertical): 2 celdas de ancho, de un solo sentido, oscilan +-2,5 celdas. Para la ruta se
+    consideran paradas a su altura: `m` cubre su recorrido (x-1..x+2, el jugador espera a que llegue) y `v` solo su fila (el paso por
+    el nivel de salida; sube y baja 2,5 celdas, así que pasa por ahí dos veces por ciclo)."""
+    g = [list(r) for r in rows]
+    for y, r in enumerate(rows):
+        for x, ch in enumerate(r):
+            if ch == "m":
+                for xx in range(x - 1, x + 3):
+                    if 0 <= xx < len(g[y]) and g[y][xx] in " mv":
+                        g[y][xx] = "="
+            elif ch == "v":
+                for xx in (x, x + 1):
+                    if 0 <= xx < len(g[y]) and g[y][xx] in " mv":
+                        g[y][xx] = "="
+    return ["".join(r) for r in g]
+
+
 class Sim:
     def __init__(self, path):
         self.path = path
         self.rows, self.meta, self.warps = wc.parse(path)
+        self.rows = expand_movers(self.rows)
         self.H, self.W = len(self.rows), len(self.rows[0])
         self.errors, self.notes = [], []
         self.toggles = {1: False, 2: False}

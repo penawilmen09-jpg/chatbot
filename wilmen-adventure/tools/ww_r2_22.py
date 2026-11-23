@@ -13,10 +13,16 @@ def build():
         c.land(66 + 14 * i, 74 + 14 * i, 22)
     c.land(190, 262, 22)
     c.land(270, 420, 8)
-    for gx in (75, 103, 131):
-        c.fill(gx, 18, gx + 5, 22, ":")
-    for gx in (89, 117, 145):
-        c.fill(gx, 18, gx + 5, 22, ".")
+    # Lago: ocho huecos de 6 celdas entre las islas. Plataformas de piedra del desierto: `m` se mueve de lado a lado, `v` sube y baja
+    # (+-2,5 celdas, ~5 s por ciclo, de un solo sentido y sin empujes) y las repisas `=` quietas son escalones fijos.
+    c.set(76, 22, "m")                                  # hueco 74-79: lanzadera horizontal
+    c.plat(89, 91, 21, "="); c.plat(92, 94, 20, "=")    # hueco 88-93: dos escalones quietos (el segundo, mas alto)
+    c.set(104, 22, "v")                                 # hueco 102-107: ascensor de piedra
+    c.set(118, 22, "m")                                 # hueco 116-121: lanzadera
+    c.plat(131, 133, 20, "="); c.plat(134, 136, 21, "=")  # hueco 130-135: escalones quietos
+    c.set(146, 22, "m")                                 # hueco 144-149: lanzadera
+    c.set(160, 22, "v")                                 # hueco 158-163: ascensor
+    c.set(174, 22, "m")                                 # hueco 172-177: lanzadera
     # palmeral: escalera de palmeras hasta la meseta
     for x, y in ((262, 19), (266, 16), (262, 13), (266, 10)):
         c.plat(x, x + 4, y, "=")

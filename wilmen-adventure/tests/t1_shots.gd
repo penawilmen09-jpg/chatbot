@@ -13,7 +13,7 @@ const SHOTS := {
 	9: [["antesala", 20, 20], ["patio", 160, 20], ["norte", 150, 12], ["este", 340, 20], ["idolo", 480, 20]],
 	10: [["entrada", 20, 25], ["torre_oeste", 80, 25], ["patio", 270, 25], ["torre_este", 500, 25], ["puerta", 590, 25]],
 	21: [["dunas", 6, 15], ["cintas", 80, 15], ["viento", 156, 14], ["cueva", 330, 22], ["meta", 520, 11]],
-	22: [["lago", 70, 21], ["corrientes", 140, 21], ["palmeral", 262, 21], ["meseta", 330, 7], ["cueva", 340, 22]],
+	22: [["lago", 72, 21], ["escalones", 100, 21], ["lanzaderas", 140, 21], ["palmeral", 262, 21], ["meseta", 330, 7], ["cueva", 340, 22]],
 	23: [["entrada", 8, 21], ["prensas", 85, 17], ["cintas", 130, 21], ["canon", 200, 16], ["meta", 380, 14]],
 	24: [["pozo", 22, 11], ["camara_a", 50, 17], ["rampa_c", 145, 18], ["sala_d", 230, 23], ["salida", 300, 17]],
 	25: [["tormenta", 50, 14], ["viento", 118, 14], ["cinta", 170, 13], ["desmoronables", 400, 10], ["secreta", 426, 3]],
