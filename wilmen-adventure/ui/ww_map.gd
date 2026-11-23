@@ -269,7 +269,7 @@ func _refresh_all() -> void:
 	var data: Dictionary = WW.map_data()
 	for n in data["nodes"]:
 		_refresh_node(int(n["id"]))
-	_stats.text = "Vidas %d   Monedas %d   Gemas %d   Llaves %d" % [WW.lives, WW.coins, _total_gems(), WW.key_count()]
+	_stats.text = "%sVidas %d   Monedas %d   Gemas %d   Llaves %d" % ["[TEST] " if WW.test_unlock else "", WW.lives, WW.coins, _total_gems(), WW.key_count()]
 	_prog.text = WW.region_progress_text(int(WW.map_node_data(at_node).get("region", 1)))
 	_update_info()
 
@@ -278,7 +278,7 @@ func _total_gems() -> int:
 	var g: int = 0
 	for k in WW.levels:
 		g += WW.gems_in(int(k))
-	return g
+	return maxi(g, WW.gems) if WW.test_unlock else g
 
 
 func _local_name(id: int) -> String:

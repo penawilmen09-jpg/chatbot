@@ -42,6 +42,10 @@ var current_level: int = 1  # nivel de WILMEN WORLD que se va a jugar (1..120)
 var map_node: int = 1  # dónde está el héroe en el mapa
 var _map: Dictionary = {}
 var _extra: Dictionary = {}  # claves desconocidas (de versiones futuras): se conservan al guardar
+## APK de pruebas (WILMEN WORLD TEST): solo existe si la compilación incluye este fichero marcador. La APK normal NO lo lleva, así que
+## en ella `test_unlock` es siempre falso y el progreso funciona exactamente igual que antes.
+const TEST_FLAG := "res://wilmen_test_build.flag"
+var test_unlock: bool = FileAccess.file_exists(TEST_FLAG)
 
 
 func _ready() -> void:
@@ -80,6 +84,14 @@ func total_keys() -> int:
 	return c
 
 
+func seed_test_progress() -> void:
+	## Cartera inicial de la APK de pruebas: 99 vidas, 9999 monedas, 999 gemas y 99 llaves. No marca niveles como completados.
+	lives = 99
+	coins = 9999
+	gems = 999
+	keys = {KEY_TYPE: 99}
+
+
 func has_progress() -> bool:
 	return completed_count() > 0 or coins > 0 or gems > 0 or not nodes.is_empty()
 
@@ -97,6 +109,8 @@ func reset() -> void:
 	stats = {}
 	map_node = 1
 	_extra = {}
+	if test_unlock:
+		seed_test_progress()
 	changed.emit()
 
 
@@ -217,6 +231,8 @@ func load_game() -> void:
 	if d.is_empty():
 		d = _parse_dict(_read_text(save_path + ".bak"))  # archivo ausente o dañado: copia del último guardado válido
 		if d.is_empty():
+			if test_unlock:
+				seed_test_progress()  # primera vez en la APK de pruebas
 			return
 		push_warning("Guardado de WILMEN WORLD ausente o dañado: se restauró la copia .bak")
 	from_dict(d)
@@ -514,6 +530,8 @@ func secret_done(n: int) -> bool:
 
 func edge_unlocked(e: Dictionary) -> bool:
 	## Un camino se abre al completar su nivel de origen (salida normal) o al encontrar su salida secreta.
+	if test_unlock:
+		return true
 	var need: Dictionary = e["need"]
 	match str(need["type"]):
 		"done":
@@ -536,6 +554,8 @@ func node_state(id: int) -> String:
 			break
 	if kind == "sealed":
 		return "sealed" if reached else "hidden"
+	if test_unlock and has_level(id):
+		return "done" if is_done(id) else "available"  # APK de pruebas: todo nivel construido es accesible
 	if bool(n["hidden"]) and not reached:
 		return "hidden"
 	if region_status(int(n["region"])) != "playable":

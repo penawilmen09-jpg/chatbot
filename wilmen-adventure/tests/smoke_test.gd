@@ -214,6 +214,7 @@ func _run() -> void:
 	await _test_ww_base()
 	await _test_ww_content()
 	await _test_ww_map()
+	await _test_ww_testbuild()
 	await _test_ww_levels()
 	await _test_flow()
 	await _test_touch_controls()
@@ -2124,6 +2125,33 @@ func _test_ww_base() -> void:
 
 
 # ============================ WILMEN WORLD: contenido de la región 1 (20 niveles) ===
+func _test_ww_testbuild() -> void:
+	print("WILMEN WORLD TEST: APK de pruebas con todos los niveles abiertos (el modo normal no cambia)")
+	_wipe_ww_files()
+	_ww.reset()
+	_check(not _ww.test_unlock, "la compilación normal NO es de pruebas (no lleva el fichero marcador)")
+	_check(_ww.node_state(21) == "locked" and not _ww.can_enter(21) and _ww.lives == 5 and _ww.coins == 0, "en la normal, la región 2 sigue bloqueada y la cartera inicial es la de siempre")
+	_ww.test_unlock = true
+	_ww.reset()
+	_check(_ww.lives == 99 and _ww.coins == 9999 and _ww.gems == 999 and _ww.key_count() == 99, "TEST: 99 vidas, 9999 monedas, 999 gemas y 99 llaves")
+	var ok: bool = true
+	for n in range(1, 26):
+		if not _ww.can_enter(n) or _ww.node_state(n) != "available":
+			ok = false
+	_check(ok, "TEST: los 25 niveles construidos (regiones 1 y 2) se pueden pisar sin completar nada")
+	_check(_ww.completed_count() == 0 and not _ww.is_done(20), "TEST: no se marca ningún nivel como completado")
+	_check(not _ww.route(1, 21).is_empty() and not _ww.route(1, 25).is_empty() and not _ww.route(1, 7).is_empty(), "TEST: el mapa ofrece camino directo del 1-1 al 2-1, al 2-5 y a la casa 1-7")
+	_check(_ww.start_level(22) and _ww.current_level == 22, "TEST: se puede arrancar el 2-2 directamente")
+	_ww.save_game()
+	_ww.reset()
+	_ww.load_game()
+	_check(_ww.lives == 99 and _ww.gems == 999, "TEST: la cartera de pruebas se guarda y se recupera")
+	_ww.test_unlock = false
+	_wipe_ww_files()
+	_ww.reset()
+	_check(_ww.node_state(21) == "locked" and _ww.lives == 5, "al volver al modo normal el desbloqueo desaparece (no queda nada pegado)")
+
+
 func _test_ww_content() -> void:
 	print("WILMEN WORLD: región 1 completa (20 niveles reales de 700 a 1000 columnas) y mapa de 120 niveles")
 	var avail: Array = _ww.available_levels()
