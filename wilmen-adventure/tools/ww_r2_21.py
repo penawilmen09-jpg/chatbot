@@ -41,7 +41,7 @@ def build():
         pass
     c.set(170, 15, "S"); c.set(215, 15, "S")
     c.set(150, 15, "C") if False else None
-    c.set(160, 15, "C"); c.set(300, 13, "C"); c.set(430, 13, "C")
+    c.set(166, 15, "C"); c.set(300, 13, "C"); c.set(430, 13, "C")
     c.coins(104, 13, 6); c.coins(165, 12, 6); c.coins(196, 14, 8); c.set(157, 7, "*"); c.coins(184, 7, 8)
     # cueva: llave, gema, reloj, vida
     c.set(370, 23, "U"); c.set(356, 23, "I"); c.set(330, 23, "u"); c.coins(310, 23, 6)

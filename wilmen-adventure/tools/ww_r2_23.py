@@ -26,7 +26,7 @@ def build():
     c.set(170, 18, "S"); c.set(200, 16, "t"); c.set(268, 21, "w"); c.set(310, 18, "s"); c.set(350, 16, "j")
     for x in (170, 171):
         pass
-    c.set(45, 21, "C"); c.set(160, 18, "C"); c.set(300, 18, "C")
+    c.set(38, 21, "C"); c.set(160, 18, "C"); c.set(300, 18, "C")
     c.coins(50, 18, 6); c.coins(100, 18, 6); c.coins(165, 16, 8); c.coins(192, 14, 8); c.coins(264, 19, 8); c.coins(342, 14, 8)
     # plataformas altas con gemas
     c.plat(98, 103, 16, "="); c.set(100, 15, "*")

@@ -214,6 +214,7 @@ func _run() -> void:
 	await _test_ww_base()
 	await _test_ww_content()
 	await _test_ww_map()
+	await _test_ww_ground()
 	await _test_ww_testbuild()
 	await _test_ww_levels()
 	await _test_flow()
@@ -2125,6 +2126,18 @@ func _test_ww_base() -> void:
 
 
 # ============================ WILMEN WORLD: contenido de la región 1 (20 niveles) ===
+func _test_ww_ground() -> void:
+	print("WILMEN WORLD: spawn y puntos de control con suelo firme debajo en todos los niveles construidos")
+	var bad: Array = []
+	for n in _ww.available_levels():
+		var rws: Array = _ww.parse_level(FileAccess.get_file_as_string(_ww.level_path(n)))["rows"]
+		for yy in range(rws.size() - 1):
+			for xx in range(rws[yy].length()):
+				if "PC".contains(rws[yy][xx]) and not ("#=BcXG<>_".contains(rws[yy + 1][xx]) if xx < rws[yy + 1].length() else false):
+					bad.append("%d: '%s' sin suelo en (%d,%d)" % [n, rws[yy][xx], xx, yy])
+	_check(bad.is_empty(), "ningun spawn (P) ni punto de control (C) flota sobre un hueco %s" % str(bad))
+
+
 func _test_ww_testbuild() -> void:
 	print("WILMEN WORLD TEST: APK de pruebas con todos los niveles abiertos (el modo normal no cambia)")
 	_wipe_ww_files()
