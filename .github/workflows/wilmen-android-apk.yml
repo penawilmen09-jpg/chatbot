@@ -3,7 +3,7 @@ name: WILMEN ADVENTURE - Pruebas y APK de Android
 # 1) Valida los 100 niveles y ejecuta las pruebas en Godot 4.3 headless (bloqueante).
 # 1b) Prueba de render en pantalla (Xvfb + Mesa) en 11 relaciones de aspecto: sin franjas sin cubrir (bloqueante).
 # 2) Si pasan, exporta el APK RELEASE de Android y lo publica como artefacto descargable.
-# Cada ejecución genera una versión nueva (version code = 100 + número de ejecución), firmada con la
+# Cada ejecución genera una versión nueva (version code = 1000 + número de ejecución (siempre por encima de las APK entregadas a mano, 211-270)), firmada con la
 # misma clave, así que cada APK se instala encima del anterior.
 on:
   workflow_dispatch:
@@ -249,7 +249,7 @@ jobs:
 
       - name: Versión de esta compilación
         run: |
-          CODE=$((100 + ${{ github.run_number }}))
+          CODE=$((1000 + ${{ github.run_number }}))
           sed -i "s/^version\/code=.*/version\/code=${CODE}/" export_presets.cfg
           sed -i "s/^version\/name=.*/version\/name=\"2.0.${{ github.run_number }}\"/" export_presets.cfg
           grep -E "^version/" export_presets.cfg
@@ -371,7 +371,7 @@ jobs:
 
       - name: Versión de esta compilación
         run: |
-          CODE=$((100 + ${{ github.run_number }}))
+          CODE=$((1000 + ${{ github.run_number }}))
           sed -i "s/^version\/code=.*/version\/code=${CODE}/" export_presets.cfg
           sed -i "s/^version\/name=.*/version\/name=\"2.0.${{ github.run_number }}\"/" export_presets.cfg
           grep -E "^version/" export_presets.cfg
