@@ -12,6 +12,11 @@ const SHOTS := {
 	8: [["cima", 8, 3], ["peldanos", 70, 9], ["repisas", 120, 16], ["cueva", 20, 19], ["poza", 240, 27]],
 	9: [["antesala", 20, 20], ["patio", 160, 20], ["norte", 150, 12], ["este", 340, 20], ["idolo", 480, 20]],
 	10: [["entrada", 20, 25], ["torre_oeste", 80, 25], ["patio", 270, 25], ["torre_este", 500, 25], ["puerta", 590, 25]],
+	21: [["dunas", 6, 15], ["cintas", 80, 15], ["viento", 156, 14], ["cueva", 330, 22], ["meta", 520, 11]],
+	22: [["lago", 70, 21], ["corrientes", 140, 21], ["palmeral", 262, 21], ["meseta", 330, 7], ["cueva", 340, 22]],
+	23: [["entrada", 8, 21], ["prensas", 85, 17], ["cintas", 130, 21], ["canon", 200, 16], ["meta", 380, 14]],
+	24: [["pozo", 22, 11], ["camara_a", 50, 17], ["rampa_c", 145, 18], ["sala_d", 230, 23], ["salida", 300, 17]],
+	25: [["tormenta", 50, 14], ["viento", 118, 14], ["cinta", 170, 13], ["desmoronables", 400, 10], ["secreta", 426, 3]],
 }
 
 
@@ -32,7 +37,10 @@ func _run() -> void:
 	DirAccess.make_dir_recursive_absolute(dir)
 	var ww = root.get_node("WW")
 	ww.save_path = "user://t1_shots_save.json"
+	var only_r2: bool = args.size() > 1 and args[1] == "r2"
 	for n in SHOTS:
+		if only_r2 and n <= 20:
+			continue
 		ww.test_text = ""
 		ww.start_level(n)
 		var lvl = load("res://levels/ww_level.tscn").instantiate()
@@ -49,7 +57,7 @@ func _run() -> void:
 			lvl.camera.reset_smoothing()
 			await _frames(45)
 			var img: Image = root.get_viewport().get_texture().get_image()
-			img.save_png("%s/1-%d_%s.png" % [dir, n, s[0]])
+			img.save_png("%s/%d-%d_%s.png" % [dir, (n - 1) / 20 + 1, (n - 1) % 20 + 1, s[0]])
 			print("captura 1-", n, " ", s[0])
 		lvl.queue_free()
 		await process_frame

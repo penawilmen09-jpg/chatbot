@@ -2127,8 +2127,9 @@ func _test_ww_base() -> void:
 func _test_ww_content() -> void:
 	print("WILMEN WORLD: región 1 completa (20 niveles reales de 700 a 1000 columnas) y mapa de 120 niveles")
 	var avail: Array = _ww.available_levels()
-	_check(avail == range(1, 21), "existen exactamente los 20 niveles de la región 1 (ww_001..020): %s" % str(avail.size()))
-	_check(not _ww.has_level(21) and not _ww.has_level(120), "los niveles de las regiones 2 a 6 NO existen todavía (no se muestran como jugables)")
+	_check(avail == range(1, 26), "existen la región 1 completa (ww_001..020) y la tanda A de la región 2 (021..025): %s" % str(avail.size()))
+	_check(not _ww.has_level(26) and not _ww.has_level(120), "los niveles 26 a 120 NO existen todavía (no se muestran como jugables)")
+	avail = avail.filter(func(n): return n <= 20)
 	var kinds: Dictionary = {}
 	var titles: Dictionary = {}
 	var shas: Dictionary = {}
@@ -2183,7 +2184,7 @@ func _test_ww_content() -> void:
 	var statuses: Array = []
 	for r in data["regions"]:
 		statuses.append(str(r["status"]))
-	_check(statuses == ["playable", "construction", "construction", "construction", "construction", "construction"], "región 1 jugable; las otras cinco visibles y en construcción")
+	_check(statuses == ["playable", "playable", "construction", "construction", "construction", "construction"], "regiones 1 y 2 jugables (2 con su primera tanda); las otras cuatro visibles y en construcción")
 	_check(data["bridges"].size() >= 8 and data["rivers"].size() >= 4 and data["mountains"].size() >= 8, "el mapa tiene puentes, ríos y montañas")
 	var tunnels: int = 0
 	for e in data["edges"]:
@@ -2214,7 +2215,7 @@ func _test_ww_map() -> void:
 	_check(avail_n == 1, "un único nivel disponible al empezar")
 	_check(_ww.node_state(2) == "locked" and _ww.node_state(20) == "locked", "el resto de la región 1 está bloqueado (pero visible)")
 	_check(_ww.node_state(7) == "hidden" and _ww.node_state(901) == "hidden", "la casa 1-7 y el túnel sellado están ocultos hasta descubrirlos")
-	_check(_ww.node_state(21) == "construction" and _ww.node_state(120) == "construction", "las regiones 2 a 6 aparecen «en construcción»")
+	_check(_ww.node_state(21) == "locked" and _ww.node_state(120) == "construction", "la región 2 está bloqueada hasta superar el castillo y las regiones 3 a 6 aparecen «en construcción»")
 	_check(not _ww.can_enter(2) and not _ww.can_enter(21) and _ww.can_enter(1), "solo se puede entrar en el nivel disponible")
 	# ---- desbloqueos legítimos ----
 	_check(_ww.route(1, 2).is_empty(), "no hay camino hasta el 1-2 antes de completar el 1-1")
@@ -2239,14 +2240,12 @@ func _test_ww_map() -> void:
 		if int(e["a"]) == 9 and int(e["b"]) == 15:
 			edge_secret = e
 	_check(not edge_secret.is_empty() and _ww.edge_unlocked(edge_secret), "la salida secreta del 1-9 abre un túnel bajo la montaña hasta el 1-15")
-	_check(_ww.node_state(20) == "locked" and _ww.node_state(21) == "construction", "el castillo sigue bloqueado y la región 2 sin construir")
+	_check(_ww.node_state(20) == "locked" and _ww.node_state(21) == "locked", "el castillo sigue bloqueado y la región 2 también")
 	# la región siguiente solo está en construcción porque no tiene niveles: sin ellos no se puede pisar
 	_ww_done(19)
 	_ww_done(20)
-	_check(_ww.region_cleared(1) and _ww.node_state(21) == "construction" and not _ww.can_enter(21), "con el castillo superado, la región 2 sigue sin niveles (en construcción) y no se puede pisar")
+	_check(_ww.region_cleared(1) and _ww.node_state(21) == "available" and _ww.can_enter(21), "con el castillo superado, el 2-1 se abre de verdad")
 	# ... pero el desbloqueo es real: en cuanto existe un nivel de la región 2, el mapa lo ofrece y se puede jugar
-	_ww.test_levels = [21]
-	_ww.test_text = FileAccess.get_file_as_string("res://tests/fixtures/ww_old_001.txt")
 	_check(_ww.region_status(2) == "playable" and _ww.node_state(21) == "available" and _ww.can_enter(21), "con un nivel construido en la región 2, el castillo superado lo desbloquea de verdad (estado=%s)" % _ww.node_state(21))
 	_ww.save_game()
 	_ww.reset()

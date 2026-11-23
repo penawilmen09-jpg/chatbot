@@ -3,7 +3,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 from ww_cv import Cv
 
-META = dict(title="Canon de Arenisca", region=2, theme=2, time=380, par=140, diff=2, kind="normal", zone=0)
+META = dict(title="Canon de Arenisca", region=2, theme=3, time=380, par=140, diff=2, kind="normal", zone=0)
 
 
 def build():

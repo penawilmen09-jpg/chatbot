@@ -2,7 +2,7 @@
 ; Cueva: camaras enterradas conectadas.
 @title Ruinas de Arena
 @region 2
-@theme 2
+@theme 3
 @time 420
 @par 160
 @difficulty 2

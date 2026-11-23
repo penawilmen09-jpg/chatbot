@@ -2,7 +2,7 @@
 ; Oasis: lago con islas y corrientes, palmeral, meseta y cueva del manantial.
 @title Oasis Espejismo
 @region 2
-@theme 2
+@theme 3
 @time 400
 @par 150
 @difficulty 2

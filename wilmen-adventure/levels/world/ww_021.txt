@@ -2,7 +2,7 @@
 ; Dunas: cintas de arena, viento, resortes y cueva bajo la duna.
 @title Dunas del Amanecer
 @region 2
-@theme 2
+@theme 3
 @time 380
 @par 140
 @difficulty 1

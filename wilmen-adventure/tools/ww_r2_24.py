@@ -3,7 +3,7 @@ import sys, os
 sys.path.insert(0, os.path.dirname(__file__))
 from ww_cv import Cv
 
-META = dict(title="Ruinas de Arena", region=2, theme=2, time=420, par=160, diff=2, kind="cave", zone=2)
+META = dict(title="Ruinas de Arena", region=2, theme=3, time=420, par=160, diff=2, kind="cave", zone=2)
 
 
 def build():
