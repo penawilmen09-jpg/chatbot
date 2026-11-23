@@ -256,7 +256,7 @@ func parse_level(text: String) -> Dictionary:
 	##   @warp x,y -> x,y tunnel|door [key=N] [dir=1|-1]   (conecta dos celdas: túnel o puerta; `key` solo en el extremo A)
 	## Las líneas que empiezan por `;` son comentarios.
 	var rows: Array = []
-	var meta: Dictionary = {"title": "Nivel", "region": 1, "theme": 1, "time": 300, "difficulty": 1, "kind": "normal", "zone": -1, "boss": 0}
+	var meta: Dictionary = {"title": "Nivel", "region": 1, "theme": 1, "time": 300, "difficulty": 1, "kind": "normal", "zone": -1, "boss": 0, "par": 0}
 	var warps: Array = []
 	var presses: Array = []
 	for line in text.split("\n"):
@@ -272,7 +272,7 @@ func parse_level(text: String) -> Dictionary:
 					meta["title"] = val
 				"kind":
 					meta["kind"] = val
-				"region", "theme", "time", "difficulty", "zone", "boss":
+				"region", "theme", "time", "difficulty", "zone", "boss", "par":
 					meta[key] = int(val)
 				"press":
 					var pp: PackedStringArray = val.replace(" ", "").split(",")

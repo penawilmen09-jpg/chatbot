@@ -453,6 +453,17 @@ func _on_player_died() -> void:
 	_respawn()
 
 
+func respawn_time_floor() -> float:
+	## Al reaparecer en un punto de control queda como mínimo el DOBLE del tiempo que se tarda (ruta principal, `@par`) en recorrer
+	## lo que falta hasta la meta, para que morir con poco tiempo no deje un nivel imposible.
+	var par: float = float(meta.get("par", 0))
+	if par <= 0.0 or goal == null or not is_instance_valid(goal):
+		return 0.0
+	var span: float = maxf(1.0, goal.position.x - spawn_pos.x)
+	var frac: float = clampf((goal.position.x - respawn_pos.x) / span, 0.0, 1.0)
+	return minf(2.0 * par * frac, time_total)
+
+
 func _respawn() -> void:
 	super()
 	get_tree().call_group("ww_reset", "reset_state")
@@ -462,6 +473,7 @@ func _respawn() -> void:
 		switch_changed.emit(2)
 	timed_out = false
 	time_left = maxf(_cp_time, minf(RESPAWN_MIN, time_total * 0.3))
+	time_left = maxf(time_left, respawn_time_floor())
 	_tick_stage = 0
 	warping = false
 

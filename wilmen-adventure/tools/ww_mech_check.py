@@ -154,7 +154,7 @@ def check(rows, presses=()):
                     x += 1
                 if x - s < 4:
                     errs.append("puente (%d,%d) de solo %d tablas" % (s, y, x - s))
-                if not solid(s - 1, y) or not solid(x, y):
+                if not (solid(s - 1, y) or solid(s - 1, y + 1) or c(s - 1, y) == "_" or c(s - 1, y + 2) == "_") or not (solid(x, y) or solid(x, y + 1) or c(x, y) == "_" or c(x, y + 1) == "_" or c(x, y + 2) == "_"):
                     errs.append("puente (%d,%d) sin suelo firme a sus lados" % (s, y))
             else:
                 x += 1

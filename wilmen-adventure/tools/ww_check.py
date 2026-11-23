@@ -25,7 +25,7 @@ def parse(path):
             continue
         if line.startswith("@"):
             k, _, v = line[1:].partition(" ")
-            if k in ("time", "difficulty", "region", "theme", "zone", "boss"):
+            if k in ("time", "difficulty", "region", "theme", "zone", "boss", "par"):
                 meta[k] = int(v)
             elif k in ("title", "kind"):
                 meta[k] = v
@@ -406,7 +406,7 @@ def distinct(levels):
 
 
 def main():
-    files = [f for f in sorted(glob.glob(os.path.join(WORLD_DIR, "ww_*.txt"))) if not f.endswith("ww_950.txt")]  # el taller (950) se valida con ww_mech_check.py
+    files = [f for f in sorted(glob.glob(os.path.join(WORLD_DIR, "ww_*.txt"))) if not f.endswith("ww_950.txt") and "@par" not in open(f).read()]  # el taller (950) se valida con ww_mech_check.py
     bad = 0
     levels = []
     for f in files:
@@ -423,7 +423,8 @@ def main():
         print("✗ " + e)
         bad += 1
     import ww_mech_check as mc
-    for f in files + [os.path.join(WORLD_DIR, "ww_950.txt")]:
+    all_files = sorted(glob.glob(os.path.join(WORLD_DIR, "ww_*.txt")))
+    for f in all_files:
         for e in mc.check(mc.load(f), mc.PRESSES.get(f, ())):
             print("%s: x %s" % (os.path.basename(f), e))
             bad += 1

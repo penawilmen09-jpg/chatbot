@@ -2101,12 +2101,22 @@ func _test_ww_content() -> void:
 		var cols: int = int(d["cols"])
 		var run: float = float(cols) * 16.0 / 125.0
 		var t: int = int(meta["time"])
-		if cols < 700 or cols > 1000 or d["rows"].size() != 20:
-			bad.append("%d: columnas %d" % [n, cols])
-		if t < int(run * 2.6) or t > int(run * 4.2):
-			bad.append("%d: tiempo %d" % [n, t])
-		if txt.count("P") != 1 or txt.count("F") != 1 or txt.count("*") != 3 or txt.count("C") < 3:
-			bad.append("%d: P/F/gemas/puntos de control" % n)
+		var par: int = int(meta.get("par", 0))
+		if par > 0:
+			# niveles nuevos (diseñados a mano): 340-900 columnas, 20-40 filas y reloj holgado respecto a la ruta principal
+			if cols < 340 or cols > 900 or d["rows"].size() < 20 or d["rows"].size() > 40:
+				bad.append("%d: tamaño %dx%d" % [n, cols, d["rows"].size()])
+			if t < int(par * 2.5):
+				bad.append("%d: tiempo %d < 2,5 x par %d" % [n, t, par])
+			if txt.count("P") != 1 or txt.count("F") != 1 or txt.count("*") != 3 or txt.count("C") < 2:
+				bad.append("%d: P/F/gemas/puntos de control" % n)
+		else:
+			if cols < 700 or cols > 1000 or d["rows"].size() != 20:
+				bad.append("%d: columnas %d" % [n, cols])
+			if t < int(run * 2.6) or t > int(run * 4.2):
+				bad.append("%d: tiempo %d" % [n, t])
+			if txt.count("P") != 1 or txt.count("F") != 1 or txt.count("*") != 3 or txt.count("C") < 3:
+				bad.append("%d: P/F/gemas/puntos de control" % n)
 		if d["warps"].size() < 1 or txt.count("U") + int(str(meta["kind"]) == "castle") < 1:
 			bad.append("%d: sin túneles/llaves" % n)
 		var secret_expected: bool = [5, 9, 13, 19].has(n)
@@ -2313,13 +2323,16 @@ func _test_ww_levels() -> void:
 	var load_bad: Array = []
 	for n in range(1, 21):
 		var l0 = await _ww_level(n)
-		if l0.player == null or l0.goal == null or l0.cols < 700 or int(l0.time_total) != int(l0.meta["time"]) or l0.warps.size() < 2 and n != 20:
+		var min_cols: int = 340 if int(l0.meta.get("par", 0)) > 0 else 700
+		if l0.player == null or l0.goal == null or l0.cols < min_cols or int(l0.time_total) != int(l0.meta["time"]) or l0.warps.size() < 1 and n != 20:
 			load_bad.append(n)
 		if n == 20 and (l0.boss == null or l0.boss.get_script().resource_path != "res://enemies/ww_boss.gd"):
 			load_bad.append(n)
 		await _free_level(l0)
 	_check(load_bad.is_empty(), "los 20 niveles se cargan y se pueden jugar en el motor %s" % str(load_bad))
 	# ---- entrar en el nivel 1: sesión aislada, reloj y HUD ----
+	# (estas pruebas de motor usan el nivel 1 ANTIGUO como pieza de prueba: tiene túneles, puerta con llave, reloj y verja)
+	_ww.test_text = FileAccess.get_file_as_string("res://tests/fixtures/ww_old_001.txt")
 	var lvl = await _ww_level(1)
 	_check(_game.world_active() and _game.mode == "world", "al entrar se abre la sesión de WILMEN WORLD")
 	_check(lvl.warps.size() == 6 and lvl.time_total == float(lvl.meta["time"]) and lvl.number == 1, "nivel 1 cargado con sus 3 conexiones y su reloj (%d s)" % int(lvl.time_total))
@@ -2451,7 +2464,8 @@ func _test_ww_levels() -> void:
 	_ww.load_game()
 	_check(_ww.is_done(1) and _ww.gems_in(1) == 2 and _ww.record(1)["best_time"] > 0.0, "tras cerrar y abrir el juego, el progreso sigue")
 	_check(_sha(story_path) == story_hash, "WILMEN ADVENTURE sigue sin tocarse tras completar un nivel")
-	# ---- salida secreta (1-5) ----
+	# ---- salida secreta (1-5): aquí ya se usan los niveles reales ----
+	_ww.test_text = ""
 	_ww_done(1)
 	_ww_done(2)
 	_ww_done(3)
@@ -2464,11 +2478,15 @@ func _test_ww_levels() -> void:
 	_check(_ww.secret_done(5) and lvl.final_info.get("secret", false), "tocar la bandera secreta registra la salida secreta")
 	_check(_ww.node_state(7) == "available" and int(lvl.final_info.get("opened", 0)) >= 1, "y descubre un camino nuevo en el mapa (la casa 1-7)")
 	await _free_level(lvl)
-	# ---- verja con candado (1-4) ----
+	# ---- verja con candado (nivel de prueba en memoria) ----
 	_ww.keys = {}
-	lvl = await _ww_level(4)
+	var gg := Grid.new(60, 20)
+	gg.ground(0, 60, 15)
+	gg.fill(30, 12, 31, 15, "Q")
+	gg.put(20, 14, "P")
+	lvl = await _mini(gg)
 	var gates: Array = _scripts_of(lvl, "res://items/ww_gate.gd")
-	_check(gates.size() == 1 and gates[0].cells == 3, "el 1-4 tiene una verja de 3 celdas")
+	_check(gates.size() == 1 and gates[0].cells == 3, "una columna de 3 'Q' forma una verja de 3 celdas")
 	var gate = gates[0]
 	var gate_id: String = gate.gate_id
 	var gcell := Vector2i(int((gate.position.x - 8) / 16), int((gate.position.y - 8) / 16))
@@ -2482,9 +2500,9 @@ func _test_ww_levels() -> void:
 	Input.action_press("move_right")
 	await _frames(120)
 	Input.action_release("move_right")
-	_check(_ww.key_count() == 0 and _ww.is_open(4, gate_id), "con llave la verja se abre, gasta la llave y queda abierta")
+	_check(_ww.key_count() == 0 and _ww.is_open(1, gate_id), "con llave la verja se abre, gasta la llave y queda abierta")
 	_check(lvl.player.global_position.x > gate_x + 8, "y el jugador la atraviesa")
-	await _free_level(lvl)
+	await _end_mini(lvl)
 	# ---- jefe del castillo (1-20): tres fases ----
 	lvl = await _ww_level(20)
 	var b = lvl.boss
@@ -2540,6 +2558,7 @@ func _test_ww_levels() -> void:
 	await _free_level(lvl)
 	_check(_ww.lives >= 1, "la partida de WILMEN WORLD conserva al menos una vida")
 	_check(_sha(story_path) == story_hash, "al final, la partida de WILMEN ADVENTURE sigue idéntica")
+	_ww.test_text = ""
 	_wipe_ww_files()
 	_ww.reset()
 	_reset_game()
