@@ -69,10 +69,10 @@ const BOSS_NAMES := [
 	"Rey Tronco", "Golem de Cristal", "Rey Escarabajo", "Yeti Gélido", "Señor de las Sombras",
 	"Águila Tormenta", "Dragón de Magma", "Gorila Ancestral", "Coloso Mecánico", "Emperador del Vacío",
 ]
-const POWERS := ["spark", "dash", "shield", "freeze", "blink", "gust", "flame", "leap", "pulse", "nova"]
+const POWERS := ["spark", "dash", "shield", "freeze", "fireball", "gust", "flame", "leap", "pulse", "nova"]
 const POWER_NAMES := {
 	"spark": "Chispa Esmeralda", "dash": "Impulso de Cristal", "shield": "Escudo Solar",
-	"freeze": "Aliento Helado", "blink": "Paso Sombrío", "gust": "Ráfaga Celeste",
+	"freeze": "Aliento Helado", "fireball": "Bola de Fuego", "gust": "Ráfaga Celeste",
 	"flame": "Llamarada", "leap": "Salto Salvaje", "pulse": "Pulso Eléctrico", "nova": "Nova Final",
 }
 const POWER_HELP := {
@@ -80,7 +80,7 @@ const POWER_HELP := {
 	"dash": "Embestida invulnerable que rompe bloques y enemigos.",
 	"shield": "Escudo que te protege de todo durante unos segundos.",
 	"freeze": "Congela enemigos; tócalos para romperlos.",
-	"blink": "Te teletransportas hacia delante y esquivas daño.",
+	"fireball": "Bola de fuego de largo alcance: elimina enemigos a más de dos pantallas, sin atravesar paredes.",
 	"gust": "Una ráfaga que atraviesa a varios enemigos.",
 	"flame": "Tres llamas en abanico.",
 	"leap": "Un gran salto extra, también en el aire.",

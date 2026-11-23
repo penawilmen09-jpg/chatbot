@@ -105,6 +105,12 @@ func _run() -> void:
 		quit(0)
 		return
 
+	if OS.get_cmdline_user_args().has("--fire"):
+		await _test_ww_fireball()
+		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
+		quit(0 if _failed == 0 else 1)
+		return
+
 	if OS.get_cmdline_user_args().has("--t1"):
 		await _test_ww_tanda1()
 		print("RESULTADO: %s" % ("TODO OK" if _failed == 0 else "%d fallos" % _failed))
@@ -4223,6 +4229,194 @@ func _test_ww_tanda1() -> void:
 	_ww.keys = {}
 	_ww.reset()
 	_wipe_ww_files()
+
+
+# ================= Bola de fuego de largo alcance (sustituye al poder de teletransportación) =================
+func _lf_nodes(lvl) -> Array:
+	return lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/fireball_long.gd")
+
+
+func _lf_fire(lvl) -> void:
+	lvl.player.skill_cd = 0.0
+	Input.action_press("skill")
+	await physics_frame
+	Input.action_release("skill")
+	await physics_frame
+
+
+func _lf_level(extra: String, put: Callable):
+	var g := Grid.new(160, 20)
+	g.ground(0, 160, 15)
+	g.put(4, 14, "P")
+	put.call(g)
+	var lvl = await _mini(g, extra)
+	lvl.player.power = "fireball"
+	lvl.player.base_power = "fireball"
+	lvl.player.skill_cd_max = float(lvl.player.POWER_COOLDOWN["fireball"])
+	lvl.player._invuln_t = 1000000.0
+	lvl.player.facing = 1
+	return lvl
+
+
+func _test_ww_fireball() -> void:
+	print("Bola de fuego de largo alcance (sustituye al teletransporte)")
+	_check(not _game.POWERS.has("blink") and _game.POWERS[4] == "fireball" and _game.POWER_NAMES["fireball"] == "Bola de Fuego", "el poder 5 ya no es el teletransporte: es la Bola de Fuego")
+	_check(not load("res://characters/player/player.gd").source_code.contains("_blink"), "el código de teletransporte ya no existe en el personaje")
+	# alcance largo, sin mover al personaje, animada y con estela
+	var lvl = await _lf_level("", func(g): pass)
+	var pl = lvl.player
+	var x0: float = pl.global_position.x
+	await _lf_fire(lvl)
+	var fb: Array = _lf_nodes(lvl)
+	_check(fb.size() == 1, "al pulsar el botón del poder sale una bola de fuego")
+	var f = fb[0]
+	_check(absf(pl.global_position.x - x0) < 4.0, "el personaje no se teletransporta (x %.0f -> %.0f)" % [x0, pl.global_position.x])
+	var start_x: float = f.global_position.x
+	await _frames(30)
+	_check(is_instance_valid(f) and f.global_position.x - start_x > 250.0 and absf(f.global_position.y - (pl.global_position.y - 2.0)) < 1.0, "vuela deprisa y en línea horizontal (%.0f px en 0,5 s)" % (f.global_position.x - start_x))
+	_check(f._trail != null and f._trail.emitting and f._glow != null and f._ball.visible, "tiene estela de llamas, brillo y dibujo animado mientras vuela")
+	var last_x: float = start_x
+	while is_instance_valid(f) and not f.exploded:
+		last_x = f.global_position.x
+		await physics_frame
+	var total: float = last_x - start_x
+	_check(total > 800.0 and total < 1200.0, "recorre una distancia larga hasta agotar su alcance (%.0f px)" % total)
+	await _frames(30)
+	await _end_mini(lvl)
+	# pared sólida: no la atraviesa y estalla contra ella
+	lvl = await _lf_level("", func(g): g.fill(40, 8, 41, 15, "#"))
+	pl = lvl.player
+	await _lf_fire(lvl)
+	f = _lf_nodes(lvl)[0]
+	var wx: float = 0.0
+	while is_instance_valid(f) and not f.exploded:
+		wx = f.global_position.x
+		await physics_frame
+	_check(wx > 30.0 * 16.0 and wx < 40.0 * 16.0 + 2.0, "no atraviesa una pared sólida: estalla contra ella (x=%.0f, pared en 640)" % wx)
+	await _end_mini(lvl)
+	# plataformas de una sola dirección y vacíos no la detienen
+	lvl = await _lf_level("", func(g):
+		g.fill(20, 13, 26, 14, "=")
+		g.fill(60, 15, 70, 20, " "))
+	await _lf_fire(lvl)
+	f = _lf_nodes(lvl)[0]
+	var xs: float = f.global_position.x
+	var lastx: float = 0.0
+	while is_instance_valid(f) and not f.exploded:
+		lastx = f.global_position.x
+		await physics_frame
+	_check(lastx - xs > 800.0, "pasa por delante de plataformas finas y por encima de huecos (%.0f px)" % (lastx - xs))
+	await _end_mini(lvl)
+	# cuevas y túneles: dentro de un pasillo cerrado funciona igual (y se estrella al final)
+	lvl = await _lf_level("", func(g):
+		g.fill(0, 0, 160, 12, "#")
+		g.fill(0, 12, 60, 15, " ")
+		g.fill(60, 12, 160, 15, "#")
+		g.put(4, 14, "P"))
+	await _lf_fire(lvl)
+	f = _lf_nodes(lvl)[0]
+	var cx: float = 0.0
+	while is_instance_valid(f) and not f.exploded:
+		cx = f.global_position.x
+		await physics_frame
+	_check(cx > 55.0 * 16.0 and cx < 60.0 * 16.0 + 2.0, "dentro de un túnel recorre el pasillo entero (880 px) y estalla en su pared final (x=%.0f)" % cx)
+	await _end_mini(lvl)
+	# hacia la izquierda
+	lvl = await _lf_level("", func(g): g.put(4, 14, " "); g.put(120, 14, "P"))
+	lvl.player.facing = -1
+	await _lf_fire(lvl)
+	f = _lf_nodes(lvl)[0]
+	_check(f.dir.x < 0.0, "mirando a la izquierda, la bola sale hacia la izquierda")
+	var xl: float = 1e9
+	while is_instance_valid(f) and not f.exploded:
+		xl = f.global_position.x
+		await physics_frame
+	_check(120.0 * 16.0 - xl > 800.0, "y también alcanza más de 800 px hacia la izquierda (%.0f)" % (120.0 * 16.0 - xl))
+	await _end_mini(lvl)
+	# tiempo de espera entre disparos
+	lvl = await _lf_level("", func(g): pass)
+	pl = lvl.player
+	pl.skill_cd = 0.0
+	Input.action_press("skill")
+	await physics_frame
+	Input.action_release("skill")
+	await _frames(3)
+	Input.action_press("skill")
+	await physics_frame
+	Input.action_release("skill")
+	await _frames(3)
+	_check(_lf_nodes(lvl).size() == 1, "pulsar dos veces seguidas solo dispara una vez (espera %.1f s)" % pl.skill_cd_max)
+	await _frames(int(pl.skill_cd_max * 60.0) + 8)
+	Input.action_press("skill")
+	await physics_frame
+	Input.action_release("skill")
+	await _frames(3)
+	_check(_lf_nodes(lvl).size() == 2, "pasado el tiempo de espera se puede disparar de nuevo (repetidamente)")
+	await _end_mini(lvl)
+	# impactos contra todos los tipos de enemigos
+	var kinds: Array = [["w", "caminante"], ["s", "pinchudo"], ["j", "saltarín"], ["f", "volador"], ["t", "disparador"]]
+	for k in kinds:
+		lvl = await _lf_level("", func(g): g.put(60, 14, k[0]))
+		var en = lvl.get_children().filter(func(n): return n.is_in_group("enemies") and n.get("kind") != null)[0]
+		en.position.y = 14 * 16 + 8
+		await _lf_fire(lvl)
+		var t0: float = lvl.player.global_position.x
+		await _until(func(): return not is_instance_valid(en) or en.dead, 240)
+		var far: float = absf(en.position.x - t0) if is_instance_valid(en) else 999.0
+		_check(not is_instance_valid(en) or en.dead, "la bola derrota al %s a %.0f px de distancia" % [k[1], 56.0 * 16.0])
+		await _end_mini(lvl)
+	for k in [["z", "topo"], ["D", "guardián"], ["Y", "murciélago"], ["0", "lanzarrocas"]]:
+		lvl = await _lf_level("", func(g):
+			g.put(60, 14, k[0])
+			if k[0] == "Y":
+				g.fill(58, 12, 63, 13, "#")
+				g.put(60, 14, " ")
+				g.put(60, 13, "Y"))
+		var en2 = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://enemies/ww_enemy.gd")[0]
+		if k[0] == "z":
+			en2.state = "up"; en2._set_active(true); en2.add_to_group("enemies")
+		if k[0] == "D":
+			en2.state = "stun"; en2.stompable = true
+		await _lf_fire(lvl)
+		await _until(func(): return en2.dead, 240)
+		_check(en2.dead, "la bola derrota al %s (%s)" % [k[1], "aturdido" if k[0] == "D" else ("ya fuera" if k[0] == "z" else "en guardia")])
+		await _end_mini(lvl)
+	# guardián con escudo: la bola se detiene en el escudo y no lo derrota
+	lvl = await _lf_level("", func(g): g.put(60, 14, "D"))
+	var gd = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://enemies/ww_enemy.gd")[0]
+	await _lf_fire(lvl)
+	await _frames(100)
+	_check(not gd.dead and _lf_nodes(lvl).size() <= 1, "el escudo del guardián detiene la bola sin derrotarlo")
+	await _end_mini(lvl)
+	# enemigo detrás de una pared: no lo alcanza
+	lvl = await _lf_level("", func(g):
+		g.put(90, 14, "w")
+		g.fill(60, 8, 61, 15, "#"))
+	var behind = lvl.get_children().filter(func(n): return n.is_in_group("enemies"))[0]
+	await _lf_fire(lvl)
+	await _frames(200)
+	_check(not behind.dead, "un enemigo tras una pared sólida no es alcanzado")
+	await _end_mini(lvl)
+	# jefe: recibe daño
+	var bs = load("res://enemies/boss.tscn")
+	lvl = await _lf_level("", func(g): pass)
+	var boss = bs.instantiate()
+	boss.world = 1
+	boss.level = lvl
+	boss.position = Vector2(60 * 16.0, 14 * 16.0)
+	lvl.add_child(boss)
+	await _frames(4)
+	var hp_b: int = int(boss.hp)
+	boss.activate(0.0, 160 * 16.0, 0.0)
+	boss._gen += 1
+	boss.mode = "idle"
+	boss._invuln_t = 0.0
+	boss.shielded = false
+	await _frames(3)
+	await _lf_fire(lvl)
+	await _frames(240)
+	_check(int(boss.hp) < hp_b, "la bola daña al jefe (%d -> %d)" % [hp_b, int(boss.hp)])
+	await _end_mini(lvl)
 
 
 func _test_ww_mechanics() -> void:

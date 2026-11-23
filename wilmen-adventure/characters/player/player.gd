@@ -7,6 +7,7 @@ signal died
 const SpriteUtil := preload("res://characters/sprite_util.gd")
 const ProjectileScene := preload("res://items/projectile.tscn")
 const FireballScript := preload("res://items/fireball.gd")
+const LongFireballScript := preload("res://items/fireball_long.gd")
 
 const RUN_SPEED := 125.0
 const ACCEL := 950.0
@@ -22,7 +23,7 @@ const COYOTE := 0.10
 const JUMP_BUFFER := 0.12
 const DASH_SPEED := 300.0
 const MAX_HP := 3
-const POWER_COOLDOWN := {"spark": 0.45, "dash": 1.0, "shield": 8.0, "freeze": 0.8, "blink": 1.0,
+const POWER_COOLDOWN := {"spark": 0.45, "dash": 1.0, "shield": 8.0, "freeze": 0.8, "fireball": 0.7,
 	"gust": 0.6, "flame": 0.8, "leap": 1.0, "pulse": 1.3, "nova": 9.0}
 
 var level = null  # el nivel que contiene al jugador (duck typing)
@@ -300,9 +301,8 @@ func _use_skill() -> void:
 			_shoot("ice", Vector2(facing * 200.0, 0.0), 0.0, false)
 			Audio.play_sfx("freeze")
 			_fx(Color("#8fe0ff"), 6)
-		"blink":
-			_blink()
-			Audio.play_sfx("blink")
+		"fireball":
+			_long_fireball()
 		"gust":
 			_shoot("feather", Vector2(facing * 290.0, 0.0), 0.0, false, true)
 			Audio.play_sfx("dash", 1.3)
@@ -417,23 +417,15 @@ func _juice(on_floor: bool, delta: float) -> void:
 				level.spawn_burst(global_position + Vector2(-facing * 4.0, 10), Color(1, 1, 1, 0.6), 1)
 
 
-func _blink() -> void:
-	var step := Vector2(facing * 4.0, 0.0)
-	var t: Transform2D = global_transform
-	var moved: float = 0.0
-	while moved < 64.0:
-		if test_move(t, step):
-			break
-		t.origin += step
-		moved += 4.0
-	if level != null:
-		level.spawn_burst(global_position, Color("#b080ff"), 8)
-	global_position = t.origin
-	_invuln_t = maxf(_invuln_t, 0.45)
-	if camera != null:
-		camera.reset_smoothing()
-	if level != null:
-		level.spawn_burst(global_position, Color("#ffe05a"), 8)
+func _long_fireball() -> void:
+	## Bola de fuego de largo alcance (~1.000 px) en horizontal hacia donde mira el personaje. No mueve al personaje.
+	var f = LongFireballScript.new()
+	f.dir = Vector2(float(facing), 0.0)
+	f.position = position + Vector2(facing * 12.0, -2.0)
+	get_parent().add_child(f)
+	Audio.play_sfx("fire", 1.1)
+	_fx(Color("#ff7a1a"), 6)
+	_squash(Vector2(1.15, 0.9))
 
 
 func is_attacking() -> bool:

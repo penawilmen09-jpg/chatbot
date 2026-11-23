@@ -9,7 +9,7 @@ const ICON_HEART_EMPTY := 1
 const ICON_COIN := 2
 const ICON_GEM := 3
 const ICON_LIFE := 4
-const ICON_POWER_BASE := 5  # spark, dash, shield, freeze, blink
+const ICON_POWER_BASE := 5  # spark, dash, shield, freeze, fireball
 
 
 static func icon(index: int) -> AtlasTexture:

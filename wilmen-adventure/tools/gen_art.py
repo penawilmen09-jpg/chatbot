@@ -597,12 +597,14 @@ def gen_ui_icons():
     cell(lambda d: (d.ellipse([3, 2, 12, 13], fill=C("#ffd23a")), rect(d, 7, 5, 2, 6, C("#e0a010"))))
     cell(lambda d: (d.polygon([(8, 1), (14, 6), (8, 15), (2, 6)], fill=C("#ff4aa8")), px(d, 5, 5, WHITE)))
     cell(lambda d: (d.ellipse([1, 1, 14, 14], fill=C("#1fa38a")), d.line([(4, 5), (6, 10), (8, 6), (10, 10), (12, 5)], fill=WHITE)))
-    # 5..9 poderes: chispa, impulso, escudo, hielo, sombra
+    # 5..9 poderes: chispa, impulso, escudo, hielo, bola de fuego
     cell(lambda d: (d.polygon([(8, 0), (10, 6), (15, 8), (10, 10), (8, 15), (6, 10), (1, 8), (6, 6)], fill=C("#ffd23a"))))
     cell(lambda d: (d.polygon([(1, 3), (9, 3), (14, 8), (9, 13), (1, 13), (5, 8)], fill=C("#59e0f0"))))
     cell(lambda d: (d.polygon([(2, 2), (13, 2), (13, 9), (8, 14), (2, 9)], fill=C("#ffb030")), rect(d, 6, 5, 3, 5, C("#fff0b0"))))
     cell(lambda d: (d.polygon([(8, 0), (14, 8), (8, 15), (2, 8)], fill=C("#8fe0ff")), d.line([(8, 3), (8, 12)], fill=WHITE), d.line([(4, 8), (12, 8)], fill=WHITE)))
-    cell(lambda d: (d.ellipse([1, 1, 14, 14], fill=C("#5a2a9a")), d.ellipse([5, 4, 14, 12], fill=C("#1a0a30")), px(d, 10, 7, C("#ffe05a"))))
+    # bola de fuego de largo alcance (sustituye al Paso Sombrio): bola naranja con nucleo amarillo y estela de llamas
+    cell(lambda d: (d.polygon([(0, 5), (7, 4), (7, 11), (0, 10)], fill=C("#ff3a1a")), d.polygon([(1, 6), (7, 6), (7, 9), (1, 9)], fill=C("#ff9a2a")),
+                    d.ellipse([6, 2, 15, 13], fill=C("#ff7a1a")), d.ellipse([8, 4, 14, 11], fill=C("#ffc83a")), d.ellipse([10, 6, 13, 9], fill=C("#fff6a0"))))
     # 10..14 poderes nuevos: rafaga, llamarada, salto salvaje, pulso, nova
     cell(lambda d: (d.arc([1, 3, 14, 14], 200, 340, fill=WHITE, width=2), d.arc([3, 1, 12, 10], 20, 200, fill=C("#8fd8ff"), width=2), d.line([(2, 12), (13, 12)], fill=C("#8fd8ff"))))
     cell(lambda d: (d.polygon([(8, 0), (13, 7), (11, 15), (5, 15), (3, 7)], fill=C("#ff7a1a")), d.polygon([(8, 5), (11, 10), (9, 15), (6, 15), (5, 10)], fill=C("#ffe05a"))))

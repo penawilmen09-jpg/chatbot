@@ -58,6 +58,14 @@ jobs:
           if grep -E "SCRIPT ERROR|Parse Error|FALLO|ERROR:" /tmp/smoke.log | grep -v -E "resources still in use|RID allocations of type"; then echo "Errores detectados"; exit 1; fi
           grep -q "RESULTADO: TODO OK" /tmp/smoke.log
 
+      - name: Bola de fuego de largo alcance (poder que sustituye al teletransporte)
+        run: |
+          set -o pipefail
+          godot --headless --path . --script res://tests/smoke_test.gd -- --fire 2>&1 | tee /tmp/fire.log
+          grep -c "  ok   " /tmp/fire.log | sed 's/^/comprobaciones ok: /'
+          if grep -E "SCRIPT ERROR|Parse Error|FALLO|ERROR:" /tmp/fire.log | grep -v -E "resources still in use|RID allocations of type"; then echo "Errores detectados"; exit 1; fi
+          grep -q "RESULTADO: TODO OK" /tmp/fire.log
+
       - name: Niveles nuevos de WILMEN WORLD (tanda 1): recorrido de cada mecánica en el motor
         run: |
           set -o pipefail

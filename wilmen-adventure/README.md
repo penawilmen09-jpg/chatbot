@@ -13,7 +13,7 @@ anuncios y sin compras. Todo el arte y el audio son originales y se generan con 
 | 2 Cuevas de Cristal | 11-20 | Golem de Cristal | Impulso de Cristal | túneles, ascensores, plataformas móviles |
 | 3 Desierto Perdido | 21-30 | Rey Escarabajo | Escudo Solar | fosos anchos, pinchos |
 | 4 Reino de Hielo | 31-40 | Yeti Gélido | Aliento Helado | suelo resbaladizo |
-| 5 Castillo de las Sombras | 41-50 | Señor de las Sombras | Paso Sombrío | lava |
+| 5 Castillo de las Sombras | 41-50 | Señor de las Sombras | Bola de Fuego (largo alcance) | lava |
 | 6 Islas Voladoras | 51-60 | Águila Tormenta | Ráfaga Celeste | corrientes de viento, islas, plataformas frágiles |
 | 7 Reino Volcánico | 61-70 | Dragón de Magma | Llamarada | géiseres de lava, lava |
 | 8 Jungla Salvaje | 71-80 | Gorila Ancestral | Salto Salvaje | barro, plataformas frágiles |
