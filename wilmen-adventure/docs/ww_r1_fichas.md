@@ -25,19 +25,50 @@ uno, **sin la biblioteca de piezas** con la que se hicieron los actuales.
 
 1. **Estructura propia**: ningún par de niveles comparte el tipo de recorrido. Ningún par consecutivo se parece en estructura ni en
    mecánica principal.
-2. **Túneles únicos**: cada túnel, cueva o habitación subterránea tiene sus propias dimensiones, forma y recorrido. Ninguna sala
-   se repite con otro color.
-3. **Enemigos por comportamiento**: cada nivel usa un conjunto distinto y los coloca según el escenario, no a intervalos fijos.
-4. **Mecánicas**: cada una debuta en un nivel que la enseña y vuelve después con otro uso. No hace falta usarlas todas siempre.
-5. **Tamaño variable**: de 20 a 32 filas y de 340 a 900 columnas según el diseño. Tiempos ajustados a cada nivel.
-6. **Se conserva**: cuenta atrás (a cero muere y pierde una vida), vidas, puntos de control, monedas, 3 gemas por nivel, llaves y
-   guardado. Las puertas y túneles solo se entran con SALTO.
-7. **Justo y completable**: dificultad creciente. Un nivel solo se da por terminado si (a) el validador lo da por completable,
-   (b) sus mecánicas se comprueban en el motor y (c) la comparación con los demás confirma que es distinto. Las gemas más
-   difíciles nunca bloquean el avance.
-8. **Huecos del mapa que se respetan**: cuevas en 4 y 13, casa en 7, fortaleza en 10, nivel secreto en 19, castillo con jefe en 20;
-   salidas secretas en 5 (→ casa 1-7), 9 (→ 1-15), 13 (→ 1-19) y 19 (→ túnel sellado al Océano).
-9. Cada nivel tiene **al menos 1 llave** (para sus puertas) y 3 gemas; las llaves y las puertas están siempre en el mismo nivel.
+2. **Subsuelo explorable (nuevo)**: los túneles y cuevas son **redes reales** situadas bajo el nivel (no habitaciones sueltas
+   para coger una gema). Cada red tiene como mínimo: **2 entradas**, **2 salidas distintas**, **1 bifurcación**, **1 camino secreto**
+   y habitaciones de formas y tamaños diferentes. Las bocas de túnel (`T`, con SALTO) se usan solo como atajos o accesos secretos;
+   el resto se recorre a pie. Ninguna sala se repite con otro color.
+3. **Más exploración y rutas opcionales con recompensa que merece la pena**: además de gemas, hay **orbes de poder temporales**
+   (llama, hielo, pulso, barrera, gigante), **vidas**, **corazones**, **relojes**, **atajos** y zonas con **monedas en cantidad**.
+   Cada ruta opcional indica qué ofrece y qué cuesta (riesgo o tiempo).
+4. **Cada enemigo y cada trampa tiene una función** escrita en la ficha: enseñar una mecánica, vigilar una ruta opcional,
+   obligar a cronometrar una liana, proteger un secreto, etc. No hay enemigos de relleno.
+5. **Reloj justo** (ver sección 1.1). **Llaves sin bloqueos** (ver sección 1.2).
+6. **Mecánicas**: cada una debuta en un nivel que la enseña y vuelve después con otro uso.
+7. **Tamaño variable**: de 20 a 32 filas y de 340 a 900 columnas, según el diseño.
+8. **Se conserva**: cuenta atrás (a cero muere y pierde una vida), vidas, puntos de control, monedas, 3 gemas por nivel, llaves
+   y guardado. Las puertas y túneles solo se entran con SALTO.
+9. **Justo y completable**: dificultad creciente. Un nivel solo se da por terminado si (a) el validador lo da por completable,
+   (b) sus mecánicas se comprueban en el motor, (c) un jugador virtual recorre su ruta principal y (d) la comparación con los
+   demás confirma que es distinto. Las gemas más difíciles nunca bloquean el avance.
+10. **Huecos del mapa que se respetan**: cuevas en 4 y 13, casa en 7, fortaleza en 10, nivel secreto en 19, castillo con jefe en 20;
+    salidas secretas en 5 (→ casa 1-7), 9 (→ 1-15), 13 (→ 1-19) y 19 (→ túnel sellado al Océano).
+
+### 1.1 Reloj: cómo se calcula para que no se muera injustamente
+- Se miden **tres tiempos** de cada nivel con el validador y el jugador virtual:
+  **(P)** ruta principal a ritmo normal (≈ 4 celdas/s de media incluyendo saltos y esperas);
+  **(E)** recorrido de exploración completa (todas las rutas opcionales, gemas y secretos);
+  **(L)** límite del reloj.
+- **Regla**: `L = E × 1,25`, redondeado a la decena, y siempre `L ≥ 2,5 × P`. Es decir, hay tiempo para **explorarlo todo** y aún
+  sobra un 25 %, y para quien solo va a la meta, el reloj es muy holgado.
+- **Cada zona opcional tiene su reloj**: un reloj de +15 s o +30 s dentro o junto a la zona que **compensa con creces** el
+  tiempo que cuesta visitarla. Ninguna exploración gasta tiempo neto.
+- **Al reaparecer** (cambio a aplicar y probar antes de construir): el punto de control no solo guarda el tiempo, sino que
+  garantiza **como mínimo el doble del tiempo de la ruta principal que queda hasta la meta** (nunca menos de 60 s hasta ahora).
+  Así, morir con poco tiempo no deja una situación imposible.
+- Cuando quedan menos de 45 s ya existe el aviso visual y sonoro del reloj (se mantiene).
+
+### 1.2 Llaves: cómo se evita quedarse bloqueado
+1. **La ruta principal hasta la meta no necesita ninguna llave** en los niveles 1-1 a 1-5. Todas las puertas con cerradura son
+   opcionales y protegen recompensas. (Más adelante, en la fortaleza 1-10, habrá cerraduras obligatorias con sus propias reglas.)
+2. **Todas las llaves de un nivel se pueden coger sin abrir ninguna puerta**: ninguna llave está detrás de una cerradura.
+3. **Hay al menos tantas llaves como cerraduras** en cada nivel; así se pueden abrir todas en cualquier orden y gastar una llave
+   en una puerta nunca impide abrir otra.
+4. Las llaves ya cogidas y las puertas ya abiertas **se recuerdan** (si mueres o sales, no se pierden ni se vuelven a cobrar).
+5. **Toda pared conmutable tiene un interruptor a cada lado**, y ninguna habitación tiene como única salida un interruptor ni una
+   puerta cerrada: siempre se puede volver.
+6. El validador comprueba estas reglas por simulación (todos los órdenes posibles de usar las llaves).
 
 ## 2. Piezas disponibles
 
@@ -52,11 +83,11 @@ uno, **sin la biblioteca de piezas** con la que se hicieron los actuales.
 
 | # | Nombre | Tipo | Tamaño | Estructura | Mecánica principal | Familia de enemigos | Trampas | Túnel |
 |---|---|---|---|---|---|---|---|---|
-| 1 | Sendero del Amanecer | normal | 520×20 | colinas horizontales | setas | caminante, saltarín | ninguna | corto recto con llave |
-| 2 | Garganta de las Cascadas | normal | 360×32 | ascenso en 3 terrazas | corrientes y burbujas | volador, disparador | pinchos | pozo vertical |
-| 3 | Puente de los Mil Pasos | normal | 820×22 | pilares y puentes, sin suelo | puentes y plataformas que desaparecen | murciélago, volador | dardos | corredor largo bajo el abismo |
-| 4 | Cueva de las Raíces | cueva | 560×28 | red de 6 salas | interruptores | topo, lanzarrocas | pinchos | salas con bifurcación de 3 bocas |
-| 5 | Copas Altas | normal | 420×32 | 7 árboles gigantes | lianas | murciélago, volador | — | hueco vertical del tronco |
+| 1 | Sendero del Amanecer | normal | 520×26 | colinas + madriguera | setas | caminante, saltarín | ninguna | madriguera suave de 7 espacios, 3 entradas/3 salidas |
+| 2 | Garganta de las Cascadas | normal | 360×32 | ascenso en 3 terrazas + panal interior | corrientes y burbujas | volador, disparador | pinchos | panal vertical de 6 espacios, 4 entradas/3 salidas |
+| 3 | Puente de los Mil Pasos | normal | 820×24 | pilares y puentes, sin suelo | puentes y plataformas que desaparecen | murciélago, volador | dardos | torres huecas y viaductos (~130 celdas) |
+| 4 | Cueva de las Raíces | cueva | 560×28 | red de 11 espacios | interruptores | topo, lanzarrocas | pinchos | cueva completa, 2 entradas/3 salidas |
+| 5 | Copas Altas | normal | 420×32 | 7 árboles gigantes | lianas | murciélago, volador | — | red de troncos y rama hueca de 56 celdas |
 | 6 | Pantano Hundido | normal | 680×20 | doble nivel (alto / inundado) | corrientes + troncos | topo, saltarín, disparador | troncos | tubería hundida inclinada |
 | 7 | Aserradero del Leñador | casa | 380×30 | edificio de 3 pisos | ascensores | guardián | prensas, péndulos-sierra | chimenea con 2 codos |
 | 8 | Salto del Duende | normal | 340×32 | descenso | burbujas como freno | murciélago, volador | pinchos, desmoronables | cueva en L tras la cascada |
@@ -83,276 +114,377 @@ túneles son «ancho × alto» de la sala en celdas.
 ---
 
 ## 1-1 · Sendero del Amanecer  *(tanda 1)*
-**Función en el juego**: el primer nivel; enseña a moverse, a recoger y a rebotar. Es el único nivel sin trampas.
+**Función en el juego**: el primer nivel. Enseña a moverse, a rebotar y a explorar un subsuelo sencillo. Es el único nivel sin trampas.
 
-**Datos**: normal · 520 × 20 · 300 s · dificultad 1/5 · puntos de control en las columnas 205, 300 y 420.
+**Datos**: normal · **520 × 26** (superficie en las filas 5-16, subsuelo en las 17-25) · puntos de control en cols 205, 300 y 420.
+**Reloj**: P (ruta principal) ≈ 110 s · E (explorarlo todo) ≈ 250 s · **L = 320 s**.
+**Tema visual**: claro de bosque al amanecer, niebla baja, luz dorada; el subsuelo es una madriguera de raíces con luz cálida.
 
-**Tema visual**: claro de bosque al amanecer, niebla baja, luz dorada, flores. Fondo de árboles lejanos.
+### Superficie
+- **A. Claro de salida (cols 0-60)**: suelo casi plano con dos desniveles de 1 celda; arco de monedas y un tronco caído de 6 celdas.
+- **B. Primeras colinas (60-130)**: cuatro colinas suaves. Al pie de un risco de 8 celdas (col 100) hay una **seta vertical**; arriba,
+  una repisa de 7 celdas con 8 monedas y la **gema 1**.
+- **C. Fosos del salto (130-205)**: tres fosos de 3, 4 y 5 celdas entre islas de 8-10, y un cuarto de **12 celdas** (cols 185-197).
+  Se salva con la **seta diagonal** (col 183) o con una escalera de tres plataformas flotantes (más lenta, 4 saltos). Control en 205.
+- **D. Bosque alto (205-300)**: el suelo sube en tres escalones; copas bajas opcionales con monedas.
+- **E. Colinas del alba (300-420)**: cinco colinas redondeadas sin vacíos. Reloj +15 s (col 360). Puerta de piedra (col 392).
+- **F. Cima (420-520)**: rampa hasta la roca de la meta (fila 4, col 505); dos setas encadenadas (col 440 diagonal, col 462 vertical)
+  la alcanzan directamente; alternativa: rampa de escalones (60 columnas más).
 
-**Terreno y plataformas**
-- **A. Claro de salida (cols 0-60)**: suelo casi plano (fila 15) con dos desniveles de 1 celda. Sin vacíos. Un arco de monedas y un
-  tronco caído (plataforma de 6 celdas, fila 13) para practicar el primer salto.
-- **B. Primeras colinas (60-130)**: cuatro colinas suaves (alturas fila 15 → 13 → 15 → 12). Al pie de un risco de 8 celdas
-  (col 100) hay una **seta vertical**; arriba, una repisa de 7 celdas con 8 monedas y la **gema 1**.
-- **C. Fosos del salto (130-205)**: tres fosos de 3, 4 y 5 celdas entre islas de suelo de 8-10 celdas, y un cuarto foso de
-  **12 celdas** (col 185-197). Salvarlo exige la **seta diagonal** (col 183); la alternativa es una escalera de tres plataformas
-  `=` flotantes (más lenta, 4 saltos). Punto de control en col 205.
-- **D. Bosque alto (205-300)**: el suelo sube en tres escalones a la fila 9. Copas bajas de 5-7 celdas como plataformas
-  opcionales con monedas. Aquí está la boca del túnel corto (col 225).
-- **E. Colinas del alba (300-420)**: cinco colinas redondeadas (fila 12-14) con claros entre ellas; sin vacíos. Reloj +15 s (col 360).
-  Puerta de piedra con cerradura (col 392). Punto de control en col 420.
-- **F. Cima (420-520)**: rampa larga hasta la roca de la meta (fila 4, col 505). Dos setas encadenadas (col 440 diagonal, col 462
-  vertical) lanzan directamente a la roca; la alternativa es subir por la rampa de escalones (60 columnas más).
+### Subsuelo explorable: «La Madriguera» (cols 60-330, filas 17-25)
+Una red de **7 espacios distintos**, 3 entradas y 3 salidas:
+- **Entradas**: **E1** boca abierta en la superficie (col 66, escalera de 4 repisas hacia abajo); **E2** boca secreta en el árbol hueco
+  (col 125, T con SALTO, cae en lo alto de la Raíz hueca); **E3** hoyo en el bosque alto (col 216) que cae en la Galería larga.
+- **M1 «Zanja» (46 × 5, cols 70-116)**: pasillo largo con techo bajo que baja en suave pendiente; 1 caminante.
+- **M2 «Raíz hueca» (14 × 9, cols 118-132)**: cámara vertical con repisas alternas cada 2 filas; en lo más alto, la **llave**.
+- **M3 «Sala del eco» (20 × 7, ovalada, cols 134-154)**: es la **bifurcación principal**, con tres salidas: arriba hacia M6, al este hacia M4 y
+  abajo hacia M5.
+- **M4 «Galería larga» (56 × 4, cols 156-212, sube de la fila 22 a la 18)**: un reloj +15 s a mitad; a media galería, una **segunda
+  bifurcación**: continúa hasta el pozo de salida X2 (col 226) o gira por el **pasadizo oculto M7**.
+- **M5 «Despensa» (12 × 5)**: **habitación secreta** tras una pared de ladrillos (se rompe golpeando con la cabeza desde abajo): **orbe
+  de pulso**, 15 monedas y la **gema 3**.
+- **M6 «Balcón de raíces» (22 × 4)**: galería alta sobre M3 con una **vida extra** y una ventana que sale a la superficie (X1, col 175).
+- **M7 «Pasadizo oculto» (34 × 3)**: discurre bajo las colinas hasta salir en la colina de las 300 (X3, junto al punto de control).
+- **Salidas**: **X1** ventana de M6 (col 175), **X2** pozo con repisas al final de M4 (col 226), **X3** boca de M7 (col 300).
 
-**Recorrido principal**: A → B (puede ignorar la repisa) → C con la seta diagonal → D → E → F con las dos setas → meta.
-**Rutas alternativas**: repisa alta de B (gema 1); escalera flotante de C (sin seta); rampa de escalones de F (sin setas).
+### Recorrido y rutas opcionales (con coste y premio)
+| Ruta | Dónde | Coste | Premio |
+|---|---|---|---|
+| **Principal** | superficie A → F con las setas | nada | meta |
+| Repisa de la seta vertical | B (col 100) | ~15 s | gema 1 + 8 monedas |
+| Escalera flotante | C | más lenta | 10 monedas (alternativa a la seta) |
+| Madriguera completa | M1-M7 | ~100 s | llave, orbe de pulso, vida, gema 3, reloj +15 s |
+| Casita de piedra | puerta col 392 (1 llave) | ~20 s | gema 2, 20 monedas, 1 corazón |
+| Atajo por M7 | de M4 a X3 | ~0 s | salta ~100 columnas de superficie |
 
-**Túneles, cuevas y puertas**
-- **Túnel corto A/B** (col 225 → col 262): sala recta de **22 × 5** celdas bajo la colina; entrada y salida a 37 columnas de
-  distancia. En su centro hay un pedestal con la **llave**; 1 caminante patrulla la sala. Sin trampas.
-- **Puerta de piedra** (col 392, cerradura, 1 llave): lleva a la **Casita de piedra**, sala de **14 × 6** con 20 monedas y la
-  **gema 2**; se vuelve por la misma puerta.
-- **Boca oculta** (col 118, detrás de un árbol decorativo): cámara de **12 × 4** bajo el árbol hueco con 10 monedas y la **gema 3**.
+### Enemigos y su función
+- **Caminante (col 40)**: aislado en el claro; enseña a pisar sin riesgo.
+- **Caminante (col 85)**: patrulla junto al pie de la seta vertical; enseña a esperar y entrar en el momento.
+- **Saltarín (col 160)**: en la primera isla de C; enseña su salto (se agacha antes de saltar).
+- **Saltarín (col 175)**: en la isla previa al foso grande; obliga a decidir entre seta diagonal y escalera.
+- **Caminante en M1**: practica pisar en un espacio cerrado, sin caídas.
+- **Caminante (col 330) + saltarín (col 340)**: examen combinado antes del reloj; repasan lo aprendido.
+- **Caminante (col 372)**: vigila la puerta de piedra (protege una recompensa opcional).
+No hay más enemigos: 8 en total.
 
-**Enemigos y ubicación**
-- **Caminante** ×5: cols 40 (claro A), 85 y 112 (colinas B), 330 y 372 (colinas E). Patrullas de 6-9 celdas, sin trampas cerca.
-- **Saltarín** ×3: col 160 (primera isla de C, enseña el salto), col 175 (isla 3), col 340 (colina E).
-- No hay voladores, ni disparadores, ni enemigos nuevos (se introducen desde el 1-2).
+### Trampas
+Ninguna. Los únicos peligros son los fosos de C y los enemigos.
 
-**Trampas y obstáculos**: ninguna. Los únicos peligros son los fosos de C y los enemigos.
+### Mecánica especial
+**Setas** (vertical, diagonal y encadenadas, en ese orden).
 
-**Mecánica especial**: **setas** (vertical, diagonal y encadenadas); se enseñan en ese orden.
+### Llaves y cerraduras
+| Llave | Dónde (libre, sin abrir nada) | Cerradura | Obligatoria |
+|---|---|---|---|
+| 1 llave | lo alto de M2 | Puerta de la Casita de piedra (col 392) | **No** |
+Hay 1 llave para 1 cerradura. La ruta principal no necesita llaves.
 
-**Secretos y recompensas**
-- **Gema 1**: repisa de la seta vertical (B). **Gema 2**: Casita de piedra (puerta con llave). **Gema 3**: cámara bajo el árbol hueco.
-- **1 llave** (túnel corto). **1 reloj** +15 s. ~120 monedas repartidas en arcos.
+### Secretos y recompensas
+Gema 1 (repisa B) · gema 2 (Casita) · gema 3 (Despensa M5) · orbe de pulso · vida extra (M6) · 1 reloj +15 s en M4 y otro +15 s en
+superficie · ~150 monedas.
 
-**Diferencias concretas respecto a los demás**
-- Es el único nivel **sin ninguna trampa**; los demás empiezan en 1-2 con corrientes y pinchos.
-- Es el único con el recorrido **totalmente horizontal sobre colinas** (los demás son verticales, sin suelo, cuevas, etc.).
-- Tiene solo **dos comportamientos enemigos** (patrulla y salto); a partir del 1-2 aparecen disparadores y voladores.
-- Las setas son aquí el centro; en 1-12 se usan en cadena vertical, y en 1-5 solo como apoyo.
+### Diferencias concretas respecto a los demás
+- Único sin trampas y único con recorrido **horizontal sobre colinas**.
+- Su subsuelo es una **madriguera suave y bifurcada de 3 entradas / 3 salidas**; no tiene peligros (los demás subsuelos tienen
+  dardos, corrientes, topos o interruptores).
+- Solo dos comportamientos enemigos (patrulla y salto).
 
 ---
 
 ## 1-2 · Garganta de las Cascadas  *(tanda 1)*
-**Función en el juego**: enseña a leer el agua (corrientes y burbujas) y a subir un nivel vertical.
+**Función en el juego**: enseña a leer el agua (corrientes y burbujas), a subir en vertical y a explorar un subsuelo vertical.
 
-**Datos**: normal · 360 × 32 · 330 s · dificultad 1-2/5 · puntos de control en cols 120 (fin de la terraza 1), 220 y 300.
+**Datos**: normal · **360 × 32** · puntos de control en cols 120, 220 y 300.
+**Reloj**: P ≈ 150 s · E ≈ 330 s · **L = 420 s**.
+**Tema visual**: garganta de roca húmeda con tres cascadas en cadena, arcoíris, musgo; el subsuelo es roca con filtraciones y cristales.
 
-**Tema visual**: garganta de roca húmeda con tres cascadas en cadena, arcoíris, helechos y musgo.
+### Superficie (3 terrazas unidas por cascadas)
+- **Terraza 1 (cols 0-125, fila 29)**: poza (cols 40-56) con **corriente a la derecha** de 16 × 3 sobre tres piedras; rocas que suben hasta la
+  cascada 1 (cols 110-125).
+- **Subida 1**: **columna de burbujas** (cols 118-120, filas 17-28) que eleva 11 celdas; alternativa: tres móviles verticales.
+- **Terraza 2 (60-230, filas 17-19)**: zigzag de repisas de 4-6 celdas; en cols 150-160 una **corriente a la izquierda** de 10 × 4.
+- **Subida 2**: cascada 2 (cols 225-240): burbujas (cols 232-233) o dos móviles verticales y un resorte.
+- **Terraza 3 (150-360, filas 4-8)**: repisas estrechas, puente de piedra de 18 celdas, meta en col 352; último tramo con corriente a la
+  derecha de 14 celdas y dos móviles horizontales.
 
-**Terreno y plataformas** (se asciende en **3 terrazas** unidas por cascadas; no hay suelo continuo)
-- **Terraza 1 «Valle del pozo» (cols 0-125, suelo en fila 29)**: salida en col 4. Una **poza** (cols 40-56) con una **corriente a
-  la derecha** de 16 × 3 celdas sobre tres piedras de apoyo; hay que cruzarla dejándose llevar o saltando entre piedras.
-  Después, rocas que suben (filas 27 y 25) hasta el pie de la **cascada 1** (cols 110-125, muro de la fila 12 a la 29).
-- **Subida 1**: **columna de burbujas** (cols 118-120, filas 17-28) que eleva **11 celdas** hasta la terraza 2; alternativa:
-  tres **plataformas verticales móviles** (col 100, 106 y 112) de 6 celdas de recorrido, más lentas.
-- **Terraza 2 «Repisas del arcoíris» (cols 60-230, filas 17-19)**: **zigzag** de repisas de 4-6 celdas (derecha, vuelta a la
-  izquierda, derecha). Entre cols 150-160 hay una **corriente a la izquierda** de 10 × 4 que empuja hacia atrás; se cruza
-  saltando por una repisa elevada. Punto de control en 220.
-- **Subida 2**: **cascada 2** (cols 225-240). Ruta A: burbujas (cols 232-233, filas 8-16, eleva 9 celdas). Ruta B: dos plataformas
-  verticales (cols 214 y 222) y un resorte.
-- **Terraza 3 «Cresta» (cols 150-360, filas 4-8)**: repisas estrechas y un puente de piedra de 18 celdas; la meta está en col 352,
-  fila 3. Último tramo: **cascada 3** con una corriente a la derecha de 14 celdas de ancho y dos plataformas móviles
-  horizontales.
+### Subsuelo explorable: «El Panal» (en la roca entre la terraza 2 y la 3, cols 88-250, filas 6-29)
+Red de **6 espacios** con 4 entradas y 3 salidas:
+- **Entradas**: **E1** boca del pozo en la terraza 1 (col 90); **E2** arco del arcoíris en la terraza 2 (col 150, subida de 3 celdas);
+  **E3** boca secreta **tras la cascada 1** (col 124); **E4** ventana baja de la terraza 3 (col 186) desde el exterior.
+- **P1 «Pozo» (6 × 14, cols 88-94, filas 15-29)**: cámara vertical con 5 salientes alternos; a media altura, un **nicho de 4 × 4** con la
+  **llave A**. Sale arriba a la terraza 2 (X1).
+- **P2 «Galería del goteo» (48 × 3, cols 150-198, fila 13)**: galería larga con goteras; recibe desde E2 y desemboca en P3.
+- **P3 «Cámara de las cascadillas» (20 × 10, cols 198-218)**: sala con una cascada interior que forma una **columna de burbujas**; es la
+  **bifurcación principal**: izquierda arriba (burbujas) hacia P5; derecha por escalones hacia P4; abajo una **puerta con cerradura**.
+- **P4 «Sifón» (30 × 4, cols 220-250, filas 14-17)**: galería inundada con **corriente en contra**; al final, la **llave B** y salida X2 al
+  balcón de la cascada 2.
+- **P5 «Mirador interior» (26 × 5, cols 160-186, filas 6-10)**: galería alta con una ventana a la terraza 3 (salida X3, **atajo que se
+  salta la cascada 2**) y la **despensa del arcoíris** tras una puerta con cerradura.
+- **P6 «Cueva del arcoíris» (18 × 6)**: **habitación secreta** a la que se llega desde E3 (tras la cascada 1) por un pasadizo de 14 × 3; tiene
+  un cofre (gema 2) y una vida extra.
+- **Salidas**: X1 (terraza 2, junto al pozo), X2 (balcón de la cascada 2) y X3 (terraza 3, ventana de P5).
 
-**Recorrido principal**: terraza 1 (poza) → burbujas 1 → zigzag de terraza 2 → burbujas 2 → cresta → meta.
-**Rutas alternativas**: móviles verticales en lugar de burbujas (1 y 2); el pozo interior (ver túneles) salta la mitad del zigzag.
+### Recorrido y rutas opcionales
+| Ruta | Dónde | Coste | Premio |
+|---|---|---|---|
+| **Principal** | terraza 1 → burbujas → zigzag → burbujas → cresta | nada | meta |
+| Móviles verticales | en lugar de burbujas | más lenta | seguridad (sin voladores) |
+| El Panal (parte) | pozo → P2 → P3 → P5 → X3 | ~60 s | **atajo** que salta la cascada 2 y gema 1 en P2 |
+| Panal completo | P1-P6 | ~150 s | 2 llaves, gema 1 y 2, vida, reloj +30 s |
+| Mirador (puerta col 300) | terraza 3 | ~20 s | gema 3, 1 corazón, orbe de hielo |
+| Despensa del arcoíris (puerta en P5) | P5 | ~15 s | 30 monedas y 1 vida |
 
-**Túneles, cuevas y puertas**
-- **Pozo vertical** (boca en la terraza 1, col 90 → boca superior en la terraza 2, col 160): sala vertical de **6 × 16** celdas
-  con **5 salientes alternos** izquierda/derecha; se sube saltando de saliente en saliente. A media altura hay un **nicho con
-  la llave** y la **gema 1** (desvío de 4 celdas).
-- **Cueva tras la cascada 1** (boca oculta tras el agua, col 124, fila 28): sala de **18 × 6** con tres charcos y un cofre con la
-  **gema 2**.
-- **Puerta con cerradura** (terraza 3, col 300): lleva al **mirador**, sala de **12 × 6** con la **gema 3** y un reloj +30 s.
+### Enemigos y su función
+- **Voladores ×2 sobre la columna de burbujas 1**: castigan quedarse parado en las burbujas; hay que subir moviéndose.
+- **Voladores ×2 en P3**: patrullan en vertical y guardan la bifurcación; obligan a elegir camino mirando su ritmo.
+- **Disparador (col 205, terraza 2)**: cubre el tramo hacia la cascada 2; obliga a usar las repisas como cobertura.
+- **Disparador (col 275, terraza 3)**: protege el punto de control; fuerza a cronometrar el cruce.
+No hay enemigos de suelo ni en la terraza 1 (el agua se aprende sin presión). 6 en total.
 
-**Enemigos y ubicación**
-- **Voladores** ×6: en la **terraza 2**, entre cols 130 y 200, patrullando 8 celdas a alturas de fila 10-15; son la defensa de la ruta
-  de las burbujas.
-- **Disparadores** ×2: col 205 (fila 16, mira a la izquierda) y col 275 (fila 8), cubriendo la subida de la cascada 2.
-- **Ningún enemigo de suelo** y ningún enemigo en la terraza 1 (enseña el agua sin presión).
+### Trampas
+- **Pinchos al pie de cada cascada**: penalizan fallar la burbuja y hacen que el desvío sea una decisión.
+- **Corriente en contra** (cols 150-160 y en P4): enseña que el agua también frena.
 
-**Trampas y obstáculos**: tiras de **pinchos** de 3-5 celdas al pie de cada cascada; las corrientes a favor y en contra.
+### Mecánica especial
+**Corrientes de agua y burbujas**, más móviles verticales.
 
-**Mecánica especial**: **corrientes de agua y burbujas** + plataformas móviles verticales.
+### Llaves y cerraduras
+| Llave | Dónde (libre) | Cerradura | Obligatoria |
+|---|---|---|---|
+| Llave A | nicho del pozo (P1) | Mirador (puerta col 300) | No |
+| Llave B | final del Sifón (P4) | Despensa del arcoíris (P5) | No |
+Hay 2 llaves para 2 cerraduras, ambas opcionales. Cada llave está libre (ninguna está tras una cerradura).
 
-**Secretos y recompensas**
-- **Gema 1**: nicho del pozo. **Gema 2**: cueva tras la cascada 1. **Gema 3**: mirador (puerta con llave).
-- **1 llave** (nicho del pozo). **2 relojes** (+15 s en terraza 2, +30 s en el mirador). Monedas siguiendo las columnas de burbujas.
+### Secretos y recompensas
+Gema 1 (P2) · gema 2 (P6, secreta) · gema 3 (Mirador) · 2 vidas (P6 y despensa) · orbe de hielo · 2 relojes (+30 s en el Panal, +15 s en
+la terraza 2) · ~120 monedas siguiendo las columnas de burbujas.
 
-**Diferencias concretas respecto a los demás**
-- Es el único nivel que se resuelve **subiendo en 3 terrazas** con agua; el 1-8 es el opuesto (bajada) y el 1-6 es horizontal.
-- Primer nivel con **enemigos en el aire** y **disparadores**, y sin enemigos terrestres.
-- Su túnel es **vertical, estrecho (6 celdas) y se sube con salientes**; el de 1-1 es horizontal y recto.
-- Usa agua como **mecánica**; en 1-6 y 1-15 el agua es horizontal y arrastra, aquí eleva.
+### Diferencias concretas respecto a los demás
+- Único que se resuelve **subiendo en 3 terrazas** con agua (el 1-8 es el opuesto).
+- Su subsuelo es **vertical y compacto**, con 6 espacios y una bifurcación con puerta cerrada y atajo hacia la cresta.
+- Primer nivel con **enemigos aéreos y disparadores**, y sin ningún enemigo terrestre.
+- El agua **eleva**; en 1-6 y 1-15 arrastra horizontalmente.
 
 ---
 
 ## 1-3 · Puente de los Mil Pasos  *(tanda 1)*
-**Función en el juego**: enseña a no detenerse (puentes que caen) y a leer el ritmo de las plataformas que desaparecen.
+**Función en el juego**: enseña a no detenerse (puentes que caen) y a leer el ritmo de las plataformas que desaparecen; el subsuelo
+son torres huecas unidas por viaductos.
 
-**Datos**: normal · 820 × 22 · 360 s · dificultad 2/5 · puntos de control en cols 190, 380 y 560.
+**Datos**: normal · **820 × 24** (superficie en las filas 9-17, subsuelo y viaductos en las 18-23) · puntos de control en cols 190, 380 y 560.
+**Reloj**: P ≈ 170 s · E ≈ 340 s · **L = 430 s**.
+**Tema visual**: abismo con niebla azulada, puentes de cuerda y madera entre torres de roca, arcos de piedra; interiores de piedra tallada.
 
-**Tema visual**: abismo con niebla azulada, puentes de cuerda y madera entre torres de roca, arcos de piedra, águilas lejanas.
+### Superficie (12 pilares y vacío; sin suelo continuo)
+- **Pilar 1 (0-40)**: salida. **Puente 1 (40-72, 30 tablas)**: se derrumba al pisarlo; lo cubre un arco de piedra.
+- **Pilar 2 (72-100)** y **cadena de plataformas que desaparecen (100-160)**: 5 de 3 celdas, huecos de 3, alturas 14-13-12-13-14.
+- **Pilar 3 (160-190)** con control. **Puente 2 largo (190-232, 40 tablas)** que baja 2 celdas a mitad.
+- **Pilar 4 (232-270)** y **campo de pilares diminutos (270-340)**: cuatro de 3 celdas separados por 6, con desmoronables.
+- **Pilar 5 (340-380)**, **puente 3 (380-410)** y **puente 4 (440-470)**.
+- **Pilares 6-11 (470-760)**: pilares de 6-14 celdas a distintas alturas, huecos de 8-26 salvados por puentes, cadenas y **una liana de 8
+  celdas**. **Pilar 12 (760-820)**: altar de la meta.
 
-**Terreno y plataformas** (**no hay suelo continuo**: 12 pilares de roca separados por precipicios)
-- **Pilar 1 (cols 0-40, fila 14)**: salida; un descanso largo para ver el abismo.
-- **Puente 1 (cols 40-72, 30 tablas, fila 14)**: se derrumba al pisarlo; se cruza corriendo. Un arco de piedra lo cubre.
-- **Pilar 2 (72-100)** y **cadena de plataformas que desaparecen (100-160)**: 5 plataformas de 3 celdas con alturas
-  14-13-12-13-14 y huecos de 3 celdas; el puente de aquí «ya se cayó» y obliga a usar el ritmo (≈1 s por plataforma).
-- **Pilar 3 (160-190, fila 12)**: punto de control (col 190).
-- **Puente 2 largo (190-232, 40 tablas)**: el mayor de la fase; desciende 2 celdas a mitad de camino.
-- **Pilar 4 (232-270)** y **campo de pilares diminutos (270-340)**: cuatro pilares de 3 celdas separados por 6 celdas, con
-  plataformas que se **desmoronan** como apoyo intermedio.
-- **Pilar 5 (340-380)** con punto de control; **puente 3 (380-410, 30 tablas)** y **puente 4 (440-470)** separados por un pilar de 6
-  celdas.
-- **Pilares 6-11 (470-760)**: pilares de 6-14 celdas a alturas distintas (fila 10-16) con huecos de 8-26 celdas salvados por
-  puentes, cadenas que desaparecen y una **liana de 8 celdas** (única, de repaso) sobre el hueco más ancho.
-- **Pilar 12 (760-820)**: el altar de la meta (col 810).
+### Subsuelo explorable: «Las Torres Huecas» (pilares 3, 4/5 y 7, más viaductos)
+Los pilares 3, 5 y 7 tienen **interior tallado**; los une una red de **viaductos cubiertos**, pasillos cerrados que cruzan el abismo y
+permiten saltarse los puentes. Total ≈ 130 celdas de recorrido subterráneo.
+- **Entradas**: **E1** escalera en la cima del pilar 3 (col 175); **E2** puerta oculta (T) en el costado del pilar 5 (col 355); **E3**
+  entrada baja del pilar 7 (col 520) desde el exterior.
+- **N1 «Salón del pilar 3» (20 × 8)**: sala de guardia con escalera; bifurcación: viaducto V1 hacia el este o escalera al sótano.
+- **V1 «Viaducto del eco» (24 × 4)**: pasillo cubierto con **3 lanzadardos** alternados (arriba y abajo).
+- **N2 «Cámara del pilar 5» (16 × 10)**: nudo vertical con **bifurcación**: arriba (sale al extremo del puente 3, salida X1), abajo (el
+  **sumidero**, un pozo con la llave B) y al este el viaducto largo.
+- **V2 «Pasaje largo» (38 × 5)**: corredor con 4 lanzadardos y un **nicho lateral de 4 × 4** con la **llave A**.
+- **S1 «Galería del tesoro» (14 × 5)**: **habitación secreta** tras una pared de ladrillos en V2: orbe de gigante, una vida y la **gema 1**.
+- **N3 «Salón del pilar 7» (18 × 7)**: salida arriba a la cima del pilar 7 (X2) y salida abajo al pilar 8 (X3); una **puerta con cerradura**
+  a la **cámara sellada** (10 × 5).
+- **Salidas**: X1 (puente 3), X2 (cima del pilar 7), X3 (pilar 8, secreta).
 
-**Recorrido principal**: arriba, por los puentes (más rápido, arriesgado porque caen).
-**Rutas alternativas**: el **túnel largo** inferior que se salta los puentes 2 y 3; las pasarelas de madera bajas (fila 18) en el
-tramo 470-760 que sustituyen a los puentes pero con plataformas que desaparecen.
+### Recorrido y rutas opcionales
+| Ruta | Dónde | Coste | Premio |
+|---|---|---|---|
+| **Principal** | superficie por los puentes | nada (pide ritmo) | meta |
+| Pasarelas bajas | tramo 470-760 (fila 18) | más lento | evita puentes, con plataformas que desaparecen |
+| Torres huecas (atajo) | N1 → V1 → N2 → V2 → N3 | ~70 s (ahorra ~100) | evita los puentes 2 y 3 y los voladores |
+| Torres huecas completas | + sumidero + S1 | ~140 s | 2 llaves, gema 1, orbe de gigante, vida, reloj +30 s |
+| Cámara del arco | col 340, fila 4 | ~25 s | gema 2 y reloj +15 s |
+| Balcón del altar | puerta col 790 | ~20 s | gema 3, reloj +30 s, corazón |
+| Cámara sellada | puerta en N3 | ~20 s | orbe de barrera y 50 monedas |
 
-**Túneles, cuevas y puertas**
-- **Corredor bajo el abismo** (boca en el pilar 3, col 188, fila 20 → salida en el pilar 7, col 520): sala recta de **62 × 5**
-  celdas, con **6 lanzadardos** alternados arriba y abajo cada 8-10 celdas; un **nicho lateral de 4 × 4** con la **llave** a la
-  mitad. Atajo de unos 330 columnas.
-- **Puerta con cerradura** (pilar 12, col 790): lleva al **balcón del altar**, sala de **10 × 5** con la **gema 3** y un reloj
-  +30 s.
-- **Cámara del arco** (sin túnel: se llega desde un puente que cae rápido, col 340, fila 4): plataforma de **8 × 3** sobre el arco
-  de piedra con la **gema 2**.
+### Enemigos y su función
+- **Murciélago (col 55)**: sobre el puente 1; obliga a cruzar corriendo en vez de andar.
+- **Murciélago (col 150)**: sobre la cadena que desaparece; castiga quedarse en una plataforma.
+- **Murciélago (col 215)**: sobre el puente 2; comprueba que se cruza sin parar.
+- **Murciélago (col 330)**: guarda la ruta hacia la cámara del arco.
+- **Voladores ×2 (cols 205 y 220, puente 2)**: son el motivo para elegir el viaducto como alternativa.
+No hay enemigos dentro de las torres: el reto allí son los dardos. 6 en total.
 
-**Enemigos y ubicación**
-- **Murciélagos** ×4, **colgados de los arcos de piedra** sobre los puentes: cols 55 (puente 1), 150 (cadena), 215 (puente 2) y 330
-  (campo de pilares). Pican cuando cruzas por debajo.
-- **Voladores** ×3: junto al puente 2 (col 205 y 220) y en el último hueco (col 640).
-- **Ningún enemigo terrestre** (el abismo y los puentes son el reto).
+### Trampas
+- **Dardos** en V1 y V2: obligan a cronometrar en un espacio cerrado (sin esquivar con el salto en el aire).
+- **Puentes derrumbables** y **plataformas que desaparecen**: enseñan el ritmo.
 
-**Trampas y obstáculos**: **dardos** en el túnel inferior; puentes derrumbables; plataformas que desaparecen; el vacío.
+### Mecánica especial
+**Puentes que se derrumban** y **plataformas que desaparecen**.
 
-**Mecánica especial**: **puentes que se derrumban** + **plataformas que desaparecen** (debutan aquí).
+### Llaves y cerraduras
+| Llave | Dónde (libre) | Cerradura | Obligatoria |
+|---|---|---|---|
+| Llave A | nicho de V2 | Balcón del altar (col 790) | No |
+| Llave B | sumidero de N2 | Cámara sellada (N3) | No |
+2 llaves para 2 cerraduras; ambas opcionales y libres.
 
-**Secretos y recompensas**
-- **Gema 1**: flotando sobre la cadena de plataformas que desaparecen (hay que cogerla a tiempo). **Gema 2**: cámara del arco.
-  **Gema 3**: balcón del altar (puerta con llave).
-- **1 llave** (nicho del corredor). **2 relojes** (+15 s en pilar 3, +30 s en el balcón).
+### Secretos y recompensas
+Gema 1 (S1) · gema 2 (cámara del arco) · gema 3 (balcón) · orbe de gigante · orbe de barrera · 1 vida · 3 relojes (+15 s arco, +30 s
+torres, +30 s balcón).
 
-**Diferencias concretas respecto a los demás**
-- Único nivel **sin ningún tramo de suelo continuo** (12 pilares y vacío).
-- Único con **puentes derrumbables como protagonistas** (en 1-17 son pequeños; en 1-15 hay balsas).
-- Su túnel es un **corredor largo recto de 62 celdas con dardos**, distinto del corto de 1-1 y del pozo de 1-2.
-- Primer nivel con **murciélagos**; en 1-5 cuelgan de ramas y en 1-13 de techos de mina.
+### Diferencias concretas respecto a los demás
+- **Sin ningún tramo de suelo continuo** y con subsuelo hecho de **torres y viaductos** (no cuevas excavadas).
+- Primer nivel con **murciélagos** y con **dardos en espacio cerrado**.
+- Los puentes son protagonistas; en 1-5 son lianas y en 1-1 setas.
 
 ---
 
 ## 1-4 · Cueva de las Raíces  *(tanda 1 · cueva)*
-**Función en el juego**: enseña a modificar el escenario (interruptores y bloques) y a elegir caminos dentro de una cueva.
+**Función en el juego**: enseña a modificar el escenario (interruptores y bloques) y es la cueva más grande y explorable de la tanda 1.
 
-**Datos**: cueva · 560 × 28 · 360 s · dificultad 2-3/5 · puntos de control en salas 2, 4 y 5. Techo continuo salvo en la salida.
+**Datos**: cueva · **560 × 28** · puntos de control en salas 2, 4 y 5. Techo continuo salvo en las salidas.
+**Reloj**: P ≈ 190 s · E ≈ 380 s · **L = 480 s**.
+**Tema visual**: raíces gigantes entrelazadas, hongos luminosos azules, gotas de agua; zonas más cálidas junto al tesoro.
 
-**Tema visual**: cueva de raíces gigantes entrelazadas, hongos luminosos azules, gotas de agua, tonos marrones y verdes.
+### Red de 11 espacios, 2 entradas y 3 salidas
+- **Entradas**: **E1** vestíbulo (col 0); **E2** «Boca del barranco», un agujero en la ladera exterior (col 420, fila 8) que cae a la parte alta de
+  la sala 5 (se llega por la ladera exterior).
+- **Sala 1 «Vestíbulo» (36 × 11)**: salida; suelo en dos escalones; hongos decorativos.
+- **Pasillo A (14 × 3)**: bajo y recto.
+- **Sala 2 «Columnas» (44 × 14)**: cinco columnas de 2 celdas; pinchos en 3 huecos. Al fondo el **interruptor 1** y la pared `)` que tapa el
+  pasillo B (hay otro interruptor 1 al otro lado del pasillo, por si se vuelve).
+- **Pasillo B (16 × 4)**: se abre con el interruptor 1.
+- **Sala 3 «Embudo» (28 arriba → 6 abajo, 16 de profundidad)**: espiral invertida de escalones. **Bifurcación de 3 bocas**: superior (a
+  sala 5), media (a sala 4) e inferior (alameda de topos).
+- **«Alameda» (36 × 4)**: pasadizo largo y estrecho con topos que vuelve a la sala 2 (camino alternativo que se salta el interruptor 1); en
+  su extremo, la **llave B**.
+- **Sala 4 «Cámara circular» (24 × 24)**: anillo de plataformas alrededor de un pilar; **interruptor 2** en lo alto (con su espejo en la entrada de
+  la galería) y la **llave A** en el anillo superior.
+- **«Manantial» (30 × 4)**: galería inundada con corriente a la derecha bajo la sala 4; lleva a la **puerta del manantial** (cerradura) y a
+  la **salida X2** al exterior, a la derecha de la meta (premio: una vida).
+- **Sala 5 «Galería inclinada» (60 × 8)**: sube 8 celdas; bloques `(` que alternan con el interruptor 2; al final, la puerta del tesoro y el
+  pozo de salida.
+- **Sala 6 «Tesoro» (20 × 10)**: cofre, gema 3 y reloj.
+- **«Telaraña» (16 × 6)**: **habitación secreta** a la que se accede rompiendo ladrillos al final de la galería; orbe de hielo y la **gema 2**.
+- **Salidas**: **X1** pozo de 5 × 12 al final de la galería (a la meta, col 540); **X2** manantial (exterior); **X3** «chimenea del tesoro»
+  (secreta, de la sala 6 a un saliente sobre la meta, con 30 monedas).
 
-**Terreno y plataformas** (red de **6 salas** a distintas alturas, todas distintas)
-- **Sala 1 «Vestíbulo» (36 × 11)**: salida; suelo con dos escalones y hongos decorativos. Sin enemigos.
-- **Pasillo A (14 × 3)**: bajo y recto hasta la sala 2.
-- **Sala 2 «Columnas» (44 × 14)**: cinco columnas de piedra de 2 celdas de ancho; los huecos entre columnas tienen **pinchos** en 3
-  de ellos. Al fondo, el **interruptor 1** y una pared de **bloques conmutables `)`** (cerrada) que tapan el pasillo B.
-- **Pasillo B (16 × 4)**: se abre al activar el interruptor 1.
-- **Sala 3 «Embudo» (28 de ancho arriba → 6 abajo, 16 de profundidad)**: se baja por **escalones en espiral invertida**.
-  Desde aquí hay **bifurcación de 3 bocas**: superior (a sala 5), media (a sala 4) e inferior (alameda de topos de 36 × 4 que
-  sube de vuelta cerca de la sala 2).
-- **Sala 4 «Cámara circular» (24 × 24)**: anillo de plataformas alrededor de un pilar central; el **interruptor 2** está en lo alto
-  del pilar y la **llave** en el anillo superior (se abre con ese interruptor, que invierte plataformas del anillo).
-- **Sala 5 «Galería inclinada» (60 × 8)**: pendiente que sube 8 celdas, con **bloques `(` que se alternan** con el interruptor 2.
-  Al final, la **puerta con cerradura** al tesoro.
-- **Sala 6 «Tesoro» (20 × 10)**: cofre, gema y reloj. Solo se abre con la puerta (llave).
-- **Salida**: un **pozo vertical de 5 × 12** al final de la sala 5 sube a un claro del bosque exterior (cols 520-560) donde está la meta.
+### Recorrido y rutas opcionales
+| Ruta | Dónde | Coste | Premio |
+|---|---|---|---|
+| **Principal** | 1 → A → 2 (interruptor 1) → B → 3 → 4 → 5 → pozo → meta | nada | meta |
+| Boca superior del embudo | directa a la sala 5 | arriesgada (lanzarrocas) | ahorra ~50 s |
+| Alameda de topos | de la sala 3 a la 2 | ~40 s | llave B y salta el interruptor 1 |
+| Manantial | bajo la sala 4 | ~40 s | llave B (alternativa), vida y salida X2 |
+| Telaraña | fin de la galería | ~25 s | gema 2 y orbe de hielo |
+| Tesoro | puerta de la sala 5 | ~20 s | gema 3, cofre y reloj +30 s |
+| Gema 1 | columnas de la sala 2 | ~15 s | gema 1 (se llega saltando de columna a columna) |
 
-**Recorrido principal**: 1 → pasillo A → 2 (activar interruptor 1) → pasillo B → 3 → boca media → 4 → 5 → pozo → meta.
-**Rutas alternativas**: boca superior del embudo (directo a la sala 5 pero con lanzarrocas), boca inferior (alameda de topos que
-devuelve a la sala 2 y permite saltarse el interruptor 1 con otro recorrido).
+### Enemigos y su función
+- **Topos ×3 en la sala 2** (entre columnas, cols 90, 104, 120): obligan a cruzar con ritmo mientras se evitan los pinchos.
+- **Topos ×3 en la alameda** (uno cada 12 celdas): castigan correr sin mirar; avisan temblando 0,6 s.
+- **Lanzarrocas (arriba del embudo)**: cubre la bajada; hace que las bocas inferiores sean una alternativa atractiva.
+- **Lanzarrocas ×2 al inicio de la galería inclinada**: disparan en pendiente; los huecos de los bloques sirven de cobertura.
+No hay caminantes ni voladores. 9 en total.
 
-**Túneles, cuevas y puertas**: todo el nivel es una cueva; las salas son la red de túneles. Dos mini-túneles de acceso a
-nichos: uno de **8 × 3** bajo la sala 2 (monedas) y otro de **10 × 4** sobre la sala 4 (reloj).
+### Trampas
+- **Pinchos** de la sala 2 (separan las columnas; obligan a saltar entre ellas).
+- **Bloques conmutables**: son el puzle; cada pared tiene un interruptor a cada lado, así nunca se queda cerrada una habitación.
 
-**Enemigos y ubicación**
-- **Topos** ×7: 3 en la sala 2 (cols 90, 104, 120, sobre arena entre columnas) y 4 en la **alameda** (uno cada 8 celdas, en fila).
-- **Lanzarrocas** ×3: 1 arriba del embudo (en la boca superior) y 2 al inicio de la galería inclinada, disparando hacia abajo.
-- **Ningún volador**, ningún caminante.
+### Mecánica especial
+**Interruptores y bloques conmutables** (el interruptor solo actúa al pisarlo; el estado se reinicia al reaparecer).
 
-**Trampas y obstáculos**: pinchos en la sala 2; **bloques que se cierran y abren** (interruptores); la pendiente de la galería.
+### Llaves y cerraduras
+| Llave | Dónde (libre) | Cerradura | Obligatoria |
+|---|---|---|---|
+| Llave A | anillo alto de la sala 4 | Tesoro (sala 5) | No |
+| Llave B | final de la alameda | Puerta del manantial | No |
+2 llaves para 2 cerraduras; ambas opcionales y libres. La salida X1 (pozo) está siempre abierta.
 
-**Mecánica especial**: **interruptores y bloques conmutables** (debutan aquí; hay que dejar el estado correcto para abrir cada
-paso; el interruptor solo se activa al pisarlo, no mientras te quedas).
+### Secretos y recompensas
+Gema 1 (columnas) · gema 2 (Telaraña) · gema 3 (Tesoro) · orbe de hielo · vida (manantial) · 2 relojes (+30 s tesoro, +15 s sala 4) · 30 monedas
+en la chimenea.
 
-**Secretos y recompensas**
-- **Gema 1**: sobre una columna de la sala 2 (saltando de columna en columna). **Gema 2**: anillo alto de la sala 4. **Gema 3**:
-  sala del tesoro (puerta con llave).
-- **1 llave** (sala 4). **2 relojes**. **Habitación secreta**: la sala 6, o el nicho sobre la sala 4 (solo con interruptor 2 apagado).
-
-**Diferencias concretas respecto a los demás**
-- Único nivel con **techo continuo y salas de formas distintas** conectadas en red; el 1-13 también es cueva pero con vías y carritos.
-- Primer nivel con **topos y lanzarrocas** (comportamiento: emerger y lanzar en parábola).
-- Su **bifurcación de 3 bocas** y su **pozo vertical de salida** no aparecen en ningún otro.
-- Los interruptores aquí son una **puerta/pasillo**; en 1-9 se encadenan en un orden y en 1-18 se combinan con un ascensor.
+### Diferencias concretas respecto a los demás
+- Único **nivel-cueva con 11 espacios de formas distintas** (rectangular, ovalada, embudo, anillo, pendiente, galerías inundadas).
+- Primer nivel con **topos y lanzarrocas**.
+- La **bifurcación de 3 bocas** y las **3 salidas** (pozo, manantial, chimenea secreta) no se repiten en otro nivel.
+- Los interruptores aquí son **puertas y pasillos**; en 1-9 se encadenan en orden libre y en 1-18 se unen a un ascensor.
 
 ---
 
 ## 1-5 · Copas Altas  *(tanda 1 · salida secreta → casa 1-7)*
-**Función en el juego**: enseña a balancearse con las lianas, con un tramo guiado de setas.
+**Función en el juego**: enseña a balancearse con las lianas; el subsuelo son ramas y troncos huecos.
 
-**Datos**: normal · 420 × 32 · 330 s · dificultad 3/5 · puntos de control en las copas de los árboles 3 y 5. Salida secreta.
+**Datos**: normal · **420 × 32** · puntos de control en las copas de los árboles 3 y 5.
+**Reloj**: P ≈ 140 s · E ≈ 270 s · **L = 340 s**.
+**Tema visual**: copas de árboles gigantes sobre un mar de nubes al atardecer; interior de los troncos con luz ámbar.
 
-**Tema visual**: copas de árboles gigantes sobre un mar de nubes al atardecer; cielo naranja y violeta; pájaros.
+### Superficie (7 árboles; casi sin suelo)
+- **Suelo del bosque (cols 0-40, fila 30)**: salida; es el único suelo del nivel además de la meta.
+- **Árboles** (troncos de 4-6 celdas) en cols ≈ 30, 90, 150, 215, 275, 335 y 395; copas de 8-14 celdas a filas 22, 16, 24, 10, 18, 8 y 12.
+- **Vacíos de 10 a 22 celdas** entre copas, imposibles de saltar.
+- **Hueco 1 (20 celdas)**: una liana de 9 celdas (para aprender).
+- **Hueco 2 (18)**: **seta vertical** en una rama que lanza a la copa 3.
+- **Hueco 3 (22)**: **dos lianas encadenadas**.
+- **Huecos 4-6**: liana larga + rama intermedia; los dos últimos suben a las copas altas. **Último árbol (col 395)**: la meta.
 
-**Terreno y plataformas** (7 árboles gigantes; no hay suelo continuo)
-- **Suelo del bosque (cols 0-40, fila 30)**: salida y un tronco caído; el único suelo del nivel además de la meta.
-- **Árboles** (troncos de 4-6 celdas de ancho) en las cols ≈ 30, 90, 150, 215, 275, 335 y 395. Sus **copas** de 8-14 celdas están
-  a alturas distintas: filas 22, 16, 24, 10, 18, 8 y 12. Ramas gruesas (6-12 celdas) salen de los troncos a otras alturas.
-- Entre copas hay vacíos de **10 a 22 celdas**, imposibles de saltar: hay que usar **lianas** (colgadas de ramas altas, 8-10
-  celdas) o ramas intermedias.
-- **Hueco 1 (árbol 1 → 2, 20 celdas)**: una liana de 9 celdas (primera, sola, para aprender).
-- **Hueco 2 (árbol 2 → 3, 18 celdas)**: una **seta vertical** en una rama que lanza a la copa del árbol 3 (fila 24 → 16).
-- **Hueco 3 (árbol 3 → 4, 22 celdas)**: **dos lianas encadenadas** (hay que soltar y enganchar la segunda).
-- **Huecos 4-6**: liana larga + rama intermedia; los dos últimos tramos suben a las copas altas (fila 8 y 12).
-- **Último árbol (col 395)**: la meta (fila 12).
+### Subsuelo explorable: «La Red del Tronco» (troncos 4 y 5, y la rama hueca que los une)
+Un sistema de **cavidades dentro de la madera**: dos troncos huecos unidos por una gran rama hueca. 5 espacios, 3 entradas y 3 salidas.
+- **Entradas**: **E1** boca baja del tronco 4 (col 218, fila 27); **E2** agujero en la rama alta del tronco 5 (fila 20, desde la copa 5);
+  **E3** ventana oculta (T con SALTO) en el costado del tronco 4 (fila 20).
+- **T4 «Tronco hueco» (5 × 14, cols 214-219, filas 14-28)**: cámara vertical con salientes alternos; es el nudo del sistema.
+- **«Rama hueca» (56 × 3, cols 218-274, filas 22-24)**: túnel horizontal dentro de la rama gruesa que une el tronco 4 y el 5; a mitad, una **bifurcación**:
+  arriba (escalera a una ventana, salida X2) y abajo (la **despensa** secreta).
+- **T5 «Tronco 5» (6 × 10, cols 272-278, filas 10-20)**: sube a la copa 5 (salida X3, justo en el punto de control).
+- **«Despensa de la ardilla» (12 × 6)**: **habitación secreta** (pared de ladrillos): orbe de barrera, 25 monedas y la **gema 2**.
+- **«Nido del pájaro» (10 × 5)**: tras una **puerta con cerradura** en lo alto del tronco 4 (fila 14); gema 3 y una vida.
+- **Salidas**: **X1** cima del tronco 4 (fila 14, a una rama alta), **X2** ventana de la rama hueca, **X3** cima del tronco 5.
 
-**Recorrido principal (alto)**: lianas encadenadas, copas más altas; más rápido pero exige el timing de las lianas.
-**Ruta baja**: ramas gruesas a fila 26 con **tres saltos largos de 5 celdas** que evitan las lianas (más lento y con murciélagos).
+### Recorrido y rutas opcionales
+| Ruta | Dónde | Coste | Premio |
+|---|---|---|---|
+| **Principal (alta)** | lianas encadenadas por las copas | pide timing | meta |
+| Ruta baja | ramas gruesas (fila 26) con 3 saltos de 5 celdas | más lenta, con murciélagos | llave A (nido bajo col 245) |
+| Red del tronco (atajo) | E1 → T4 → rama hueca → T5 | ~45 s (ahorra ~80) | se salta los huecos 3 y 4 (sin lianas) |
+| Red completa | + despensa + nido | ~100 s | llave A y B, gema 2 y 3, orbe, vida, reloj +30 s |
+| Liana de repaso | cerca del árbol 6 | ~20 s | gema 1 |
+| Salida secreta | rama sobre la meta (col 408, fila 3) | ~25 s | casa 1-7 (bonus) |
 
-**Túneles, cuevas y puertas**
-- **Hueco del tronco del árbol 4** (boca baja col 218, fila 27 → boca alta col 218, fila 17): sala vertical de **5 × 8** con
-  **salientes alternos** que se suben saltando; en su cima hay una **puerta con cerradura** (col 222, fila 14) que lleva al
-  **nido del pájaro**, sala de **10 × 5** con la **gema 3** y monedas.
-- No hay otros túneles (el nivel es abierto).
+### Enemigos y su función
+- **Murciélago (col 120)**: protege el aterrizaje de la liana 1; castiga soltarse demasiado pronto.
+- **Murciélago (col 300)**: vigila la salida de la ventana de la rama hueca; hace que el atajo no sea gratis.
+- **Murciélago (col 360)**: sobre la última liana; examen final de timing.
+- **Volador (col 190, hueco 3)**: pasa a media altura; obliga a esperar el momento de soltar.
+- **Volador (col 310, hueco 5)**: mismo papel en el tramo siguiente, con la liana más larga.
+No hay enemigos terrestres ni dentro de los troncos. 5 en total.
 
-**Enemigos y ubicación**
-- **Murciélagos** ×4: colgados **bajo ramas gruesas altas**, cols 120, 180, 300 y 360; pican al pasar bajo ellos o al aterrizar
-  de una liana.
-- **Voladores** ×3: cruzan los huecos 3, 5 y 6 (cols 190, 310, 350) a media altura; no se pueden evitar, hay que cronometrar.
-- **Sin enemigos terrestres**.
+### Trampas
+Ninguna; el reto es el vacío y el balanceo.
 
-**Trampas y obstáculos**: no hay trampas; el reto es el timing de las lianas y el vacío.
+### Mecánica especial
+**Lianas** (se agarran en el aire; SALTO suelta con la velocidad del balanceo), con una seta de apoyo.
 
-**Mecánica especial**: **lianas** (balanceo real; se agarran en el aire, SALTO suelta con la velocidad del balanceo), con una
-seta de apoyo. Debutan aquí.
+### Llaves y cerraduras
+| Llave | Dónde (libre) | Cerradura | Obligatoria |
+|---|---|---|---|
+| Llave A | nido de la ruta baja (col 245, fila 27) | Nido del pájaro (tronco 4) | No |
+| Llave B | final de la rama hueca | Terraza del atardecer (puerta en la copa 5: 40 monedas y orbe de gigante) | No |
+2 llaves para 2 cerraduras; ambas opcionales y libres.
 
-**Secretos y recompensas**
-- **Gema 1**: sobre la rama alta del árbol 2 (alcanzada con la seta vertical). **Gema 2**: en una liana de repaso (hay que
-  balancearse más lejos de la ruta). **Gema 3**: nido del pájaro (puerta con llave).
-- **Llave**: en un nido de la ruta baja (col 245, fila 27).
-- **Salida secreta**: una rama por encima de la meta (col 408, fila 3), alcanzable con una liana larga de 12 celdas desde la copa
-  del árbol 7; lleva a la **casa 1-7**.
+### Secretos y recompensas
+Gema 1 (liana de repaso) · gema 2 (despensa) · gema 3 (nido) · 2 orbes (barrera, gigante) · vida (nido) · 1 reloj +30 s en la rama hueca ·
+**salida secreta** a la casa 1-7.
 
-**Diferencias concretas respecto a los demás**
-- Único nivel con **7 árboles como único apoyo** (casi todo el recorrido sin suelo, en altura 32).
-- Los enemigos son **solo aéreos** como en 1-2, pero aquí cuelgan de ramas y el reto principal es el balanceo, no el agua.
-- Las lianas son la **mecánica nueva**; en 1-11 aparecen encadenadas en un abismo horizontal, y aquí se combinan con una seta
-  y con subidas verticales.
-- Su túnel es **un hueco de tronco de 5 × 8**, el más pequeño de la fase.
+### Diferencias concretas respecto a los demás
+- Único con **7 árboles como único apoyo**; casi todo el recorrido sin suelo, en altura 32.
+- Su subsuelo es una **red de cavidades dentro de la madera** (troncos y una rama hueca de 56 celdas): vertical, horizontal y con bifurcación.
+- Enemigos **solo aéreos y con funciones de timing**; no hay trampas.
+- Las lianas son la mecánica; en 1-11 se encadenan en un abismo horizontal y aquí se mezclan con la seta y la subida.
 
 ---
 
