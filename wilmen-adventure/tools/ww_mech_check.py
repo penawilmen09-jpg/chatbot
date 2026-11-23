@@ -11,7 +11,7 @@ Comprueba, por nivel (incluido el taller ww_950), que cada mecanica esta bien co
   : . ,  corrientes: zonas rectangulares de >= 2 celdas.
   " `    lanzadardos: con suelo debajo; ! pendulo: ancla solida arriba.
   z D 0  topo, guardian y lanzarrocas: sobre suelo firme; Y murcielago: colgado bajo un techo solido.
-  ~      prensa: tramo de 2-3 celdas con techo solido encima y suelo debajo a >= 4 celdas.
+  @press x,y,w  prensa: 2-3 celdas con techo solido encima y suelo debajo a >= 4 celdas.
   n b    orbital: radio libre de 3 celdas; ascensor: 6 celdas libres encima y parada baja a ras del foso.
 Altura: entre 20 y 40 filas; con mas de 20 filas, el nivel debe tener suelo/plataforma en la zona baja (sin vacio total).
 Uso: python3 tools/ww_mech_check.py [archivos...]   (sin argumentos: todos los niveles de levels/world)
@@ -23,10 +23,16 @@ WORLD = os.path.join(HERE, "..", "levels", "world")
 SOLID = set("#=B?")
 
 
+PRESSES = {}
+
+
 def load(path):
     rows = []
+    PRESSES[path] = []
     for l in open(path, encoding="utf-8").read().split("\n"):
         l = l.rstrip("\r")
+        if l.startswith("@press"):
+            PRESSES[path].append(tuple(int(v) for v in l[6:].replace(" ", "").split(",")))
         if l.startswith(";") or l.startswith("@"):
             continue
         rows.append(l)
@@ -36,7 +42,7 @@ def load(path):
     return [r.ljust(w) for r in rows]
 
 
-def check(rows):
+def check(rows, presses=()):
     errs = []
     H, W = len(rows), len(rows[0])
 
@@ -74,19 +80,6 @@ def check(rows):
                 errs.append("enemigo '%s' (%d,%d) sin suelo debajo" % (ch, x, y))
             elif ch == "Y" and not solid(x, y - 1):
                 errs.append("murcielago (%d,%d) sin techo solido encima" % (x, y))
-            elif ch == "~" and c(x - 1, y) != "~":
-                n = 0
-                while c(x + n, y) == "~":
-                    n += 1
-                if not (2 <= n <= 3):
-                    errs.append("prensa (%d,%d) de %d celdas (2..3)" % (x, y, n))
-                if not all(solid(x + i, y - 1) for i in range(n)):
-                    errs.append("prensa (%d,%d) sin techo solido encima" % (x, y))
-                fy = y + 1
-                while fy < H and not solid(x, fy):
-                    fy += 1
-                if fy - y < 5:
-                    errs.append("prensa (%d,%d) con menos de 4 celdas libres hasta el suelo" % (x, y))
             elif ch in "&'" and not solid(x, y + 1):
                 errs.append("tolva (%d,%d) sin suelo debajo" % (x, y))
             elif ch in "\"`" and False:
@@ -116,6 +109,16 @@ def check(rows):
                     if solid(x, y - dy) or solid(x + 1, y - dy):
                         errs.append("ascensor (%d,%d) con terreno en su recorrido" % (x, y))
                         break
+    for (px, py, pw) in presses:
+        if not (2 <= pw <= 3):
+            errs.append("prensa (%d,%d) de %d celdas (2..3)" % (px, py, pw))
+        if not all(solid(px + i, py - 1) for i in range(pw)):
+            errs.append("prensa (%d,%d) sin techo solido encima" % (px, py))
+        fy = py + 1
+        while fy < H and not solid(px, fy):
+            fy += 1
+        if fy - py < 5:
+            errs.append("prensa (%d,%d) con menos de 4 celdas libres hasta el suelo" % (px, py))
     for g in (1, 2):
         if blocks[g] != sw[g]:
             errs.append("grupo %d: bloques=%s e interruptor=%s no coinciden" % (g, blocks[g], sw[g]))
@@ -180,7 +183,7 @@ def main():
     files = sys.argv[1:] or sorted(glob.glob(os.path.join(WORLD, "ww_*.txt")))
     bad = 0
     for f in files:
-        errs = check(load(f))
+        errs = check(load(f), PRESSES.get(f, ()))
         print("%s: %s" % (os.path.basename(f), "OK" if not errs else "ERRORES"))
         for e in errs:
             print("    x " + e)

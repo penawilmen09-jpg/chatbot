@@ -5,11 +5,11 @@ Un recorrido de 450x30 con una estacion por cada mecanica nueva, en orden de dif
 guarda (se abre desde Menu > Taller de mecanicas en el mapa). Sirve para probar las mecanicas en el telefono antes de usarlas
 en los niveles definitivos. Estaciones (columna aproximada): 1 setas 30-70 | 2 lianas 72-116 | 3 troncos 118-160 |
 4 plataformas que desaparecen 164-200 | 5 puente que se derrumba 206-236 | 6 interruptores 240-310 | 7 corrientes 312-380 |
-8 dardos y pendulo 382-404 | 9 orbital y ascensor 405-450.
+8 dardos y pendulo 382-404 | 9 orbital y ascensor 405-450 | 10 enemigos nuevos, prensas, puertas y tunel 436-540.
 """
 import os
 
-W, H, GT = 450, 30, 25  # ancho, alto y fila del suelo
+W, H, GT = 540, 30, 25  # ancho, alto y fila del suelo
 g = [[" "] * W for _ in range(H)]
 
 
@@ -35,7 +35,7 @@ def coins(x, y, n):
 
 for a, b in [(0, 57), (67, 82), (91, 100), (109, 164), (197, 206), (237, 405), (416, 429)]:
     ground(a, b)
-fill(432, 20, 450, H, "#")
+fill(432, 20, W, H, "#")
 
 put(3, GT - 1, "P")
 
@@ -106,12 +106,30 @@ for k in range(7):
 put(410, 23, "n")
 put(420, GT - 1, "C")
 put(429, 25, "b")
-put(442, 19, "F")
+
+# 10) ENEMIGOS Y TRAMPAS NUEVOS sobre la repisa alta (fila 20), puertas y tunel
+put(436, 19, "A")
+put(530, 19, "A")
+put(438, 19, "T")
+put(532, 19, "T")
+put(448, 19, "z")
+put(454, 19, "z")
+put(466, 19, "D")
+fill(488, 12, 504, 14, "#")
+put(494, 14, "Y")
+put(500, 14, "Y")
+put(512, 19, "0")
+fill(518, 12, 528, 13, "#")
+presses = [(521, 13, 2), (525, 13, 2)]
+put(538, 19, "F")
 
 out = "; WILMEN WORLD - Taller de mecanicas (tanda 0). Nivel de pruebas: no cuenta para el progreso ni se guarda.\n"
 out += "; Generado por tools/ww_lab.py. Estaciones: setas, lianas, troncos, plataformas que desaparecen, puente, interruptores,\n"
 out += "; corrientes, dardos y pendulo, orbital y ascensor.\n"
 out += "@title Taller de mecanicas\n@region 1\n@theme 1\n@time 900\n@difficulty 2\n@kind normal\n@zone 0\n"
+out += "@warp 436,19 -> 530,19 door\n@warp 438,19 -> 532,19 tunnel\n"
+for (px, py, pw) in presses:
+    out += "@press %d,%d,%d\n" % (px, py, pw)
 out += "\n".join("".join(r).rstrip() for r in g) + "\n"
 path = os.path.join(os.path.dirname(__file__), "..", "levels", "world", "ww_950.txt")
 open(path, "w").write(out)

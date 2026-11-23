@@ -79,5 +79,5 @@ Cada uno tiene un comportamiento propio (no son variantes de aspecto). Arte: `to
 | `D` | Guardián: escudo al frente; carga contra ti si le miras de frente y al chocar queda aturdido (solo entonces se le pisa o dispara). Sobre su cabeza rebotas sin daño |
 | `Y` | Murciélago: colgado de un techo sólido; si pasas debajo bate las alas, se lanza en picado y vuelve a su sitio |
 | `0` | Lanzarrocas: estático; lanza rocas en parábola calculando tu posición. Se pisa |
-| `~` | Prensa (tramo de 2-3 celdas bajo un techo sólido): tiembla, cae al suelo, espera y sube |
+| `@press x,y,ancho` | Prensa (directiva, sin glifo; 2-3 celdas bajo un techo sólido, `x,y` = posición elevada): tiembla, cae al suelo, espera y sube |
 Los enemigos de WILMEN ADVENTURE que ya existían siguen disponibles: `w` caminante, `s` pinchudo, `j` saltarín, `f` volador, `t` disparador.

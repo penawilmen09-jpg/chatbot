@@ -29,6 +29,7 @@ const OrbitScript := preload("res://items/ww_orbit.gd")
 
 signal switch_changed(group: int)
 
+var presses_def: Array = []
 var sw: Array = [false, false]  # estado de los interruptores del grupo 1 y 2
 const RESPAWN_MIN := 60.0  # al reaparecer siempre quedan al menos estos segundos (evita bucles de muerte por tiempo)
 
@@ -54,6 +55,7 @@ func _ready() -> void:
 	var data: Dictionary = WW.parse_level(WW.test_text if WW.test_text != "" else FileAccess.get_file_as_string(WW.level_path(number)))
 	meta = data["meta"]
 	warps_def = data["warps"]
+	presses_def = data.get("presses", [])
 	world = int(meta["theme"])
 	rep_level = (world - 1) * 10 + 5
 	is_boss = int(meta.get("boss", 0)) > 0
@@ -265,7 +267,7 @@ func _spawn_mechanics() -> void:
 					ob.kind = "orbit" if c == "n" else "elevator"
 					ob.position = pos if c == "n" else Vector2(x * TILE + 16, y * TILE + 12)
 					add_child(ob)
-	for r in _runs("~"):
+	for r in presses_def:
 		var pr = PressScript.new()
 		pr.level = self
 		pr.cells = int(r["w"])

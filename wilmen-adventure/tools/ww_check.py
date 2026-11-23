@@ -424,7 +424,7 @@ def main():
         bad += 1
     import ww_mech_check as mc
     for f in files + [os.path.join(WORLD_DIR, "ww_950.txt")]:
-        for e in mc.check(mc.load(f)):
+        for e in mc.check(mc.load(f), mc.PRESSES.get(f, ())):
             print("%s: x %s" % (os.path.basename(f), e))
             bad += 1
     print("niveles revisados: %d | errores: %d" % (len(files), bad))

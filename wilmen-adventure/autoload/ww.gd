@@ -252,11 +252,13 @@ func start_level(n: int) -> bool:
 func parse_level(text: String) -> Dictionary:
 	## Formato: filas del mapa (mismos glifos que WILMEN ADVENTURE + glifos nuevos) y líneas `@clave valor`:
 	##   @title Nombre  ·  @region 1..6  ·  @theme 1..10  ·  @time segundos  ·  @difficulty 1..5
+	##   @press x,y,ancho   (prensa: bloque de 2-3 celdas cuya posición elevada es x,y; baja hasta el suelo)
 	##   @warp x,y -> x,y tunnel|door [key=N] [dir=1|-1]   (conecta dos celdas: túnel o puerta; `key` solo en el extremo A)
 	## Las líneas que empiezan por `;` son comentarios.
 	var rows: Array = []
 	var meta: Dictionary = {"title": "Nivel", "region": 1, "theme": 1, "time": 300, "difficulty": 1, "kind": "normal", "zone": -1, "boss": 0}
 	var warps: Array = []
+	var presses: Array = []
 	for line in text.split("\n"):
 		var l: String = String(line).trim_suffix("\r")
 		if l.begins_with(";"):
@@ -272,6 +274,10 @@ func parse_level(text: String) -> Dictionary:
 					meta["kind"] = val
 				"region", "theme", "time", "difficulty", "zone", "boss":
 					meta[key] = int(val)
+				"press":
+					var pp: PackedStringArray = val.replace(" ", "").split(",")
+					if pp.size() >= 3:
+						presses.append({"x": int(pp[0]), "y": int(pp[1]), "w": clampi(int(pp[2]), 2, 3)})
 				"warp":
 					var w: Dictionary = _parse_warp(val)
 					if not w.is_empty():
@@ -288,7 +294,7 @@ func parse_level(text: String) -> Dictionary:
 	for i in range(rows.size()):
 		rows[i] = String(rows[i]).rpad(cols, " ")
 	meta["theme"] = clampi(int(meta["theme"]), 1, 10)
-	return {"rows": rows, "cols": cols, "meta": meta, "warps": warps}
+	return {"rows": rows, "cols": cols, "meta": meta, "warps": warps, "presses": presses}
 
 
 func _parse_warp(val: String) -> Dictionary:

@@ -3279,7 +3279,7 @@ func _test_ww_lab() -> void:
 	print("Taller de mecánicas (nivel real ww_950): cada estación se supera jugando")
 	var lvl = await _lab_open()
 	var pl = lvl.player
-	_check(lvl.nrows == 30 and lvl.cols == 450, "el taller mide 450x30 (%dx%d)" % [lvl.cols, lvl.nrows])
+	_check(lvl.nrows == 30 and lvl.cols == 540, "el taller mide 540x30 (%dx%d)" % [lvl.cols, lvl.nrows])
 	# 1a) seta vertical: andando hacia ella se llega a la repisa alta
 	await _lab_put(lvl, 31, 24)
 	var ok1: bool = await _hold("move_right", 240, func(): return pl.is_on_floor() and pl.global_position.y < 19 * 16 and pl.global_position.x > 37 * 16)
@@ -3721,9 +3721,8 @@ func _test_ww_enemies() -> void:
 	g = Grid.new(60, 20)
 	g.ground(0, 60, 15)
 	g.fill(28, 2, 32, 3, "#")
-	g.fill(29, 4, 31, 5, "~")
 	g.put(5, 14, "P")
-	lvl = await _mini(g)
+	lvl = await _mini(g, "@press 29,4,2\n")
 	pl = lvl.player
 	var pr = lvl.get_children().filter(func(n): return n.get_script() != null and n.get_script().resource_path == "res://items/ww_press.gd")
 	_check(pr.size() == 1 and pr[0].cells == 2 and pr[0].drop_px > 100.0, "la prensa de 2 celdas llega hasta el suelo (%.0f px)" % (pr[0].drop_px if pr.size() > 0 else 0.0))
