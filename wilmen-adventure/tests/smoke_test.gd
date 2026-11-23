@@ -2364,9 +2364,14 @@ func _test_ww_levels() -> void:
 	var wc = lvl.warps[2]
 	_stand_at(lvl, _cell_of(wc))
 	var cave_x: float = lvl.player.global_position.x
+	await _frames(120)
+	_check(absf(lvl.player.global_position.x - cave_x) < 30.0, "permanecer 2 s sobre la boca NO entra solo")
+	Input.action_press("jump")
+	await _frames(2)
+	Input.action_release("jump")
 	await _until(func(): return absf(lvl.player.global_position.x - cave_x) > 200.0, 120)
 	await _frames(20)
-	_check(lvl.player.global_position.distance_to(lvl.warps[3].arrive) < 40.0, "permanecer sobre la boca también transporta (atajo hacia el tramo final)")
+	_check(lvl.player.global_position.distance_to(lvl.warps[3].arrive) < 40.0, "pulsar SALTO sobre la boca entra (atajo hacia el tramo final)")
 	# ---- puerta con llave ----
 	var door = lvl.warps[4]
 	_check(door.kind == "door" and door.need_key == 1 and door.is_locked(), "la puerta del nivel 1 está cerrada con cerradura")
@@ -2374,9 +2379,21 @@ func _test_ww_levels() -> void:
 	_stand_at(lvl, _cell_of(door))
 	var door_x: float = lvl.player.global_position.x
 	await _frames(40)
-	_check(absf(lvl.player.global_position.x - door_x) < 30.0 and _ww.key_count() == 0 and door.is_locked(), "sin llave la puerta no se abre")
+	_check(absf(lvl.player.global_position.x - door_x) < 30.0 and door.is_locked(), "junto a la puerta no se entra solo")
+	Input.action_press("jump")
+	await _frames(2)
+	Input.action_release("jump")
+	await _frames(40)
+	_check(absf(lvl.player.global_position.x - door_x) < 30.0 and _ww.key_count() == 0 and door.is_locked(), "sin llave, SALTO no abre la puerta")
 	_ww.keys = {"bronce": 1}
 	_stand_at(lvl, _cell_of(door))
+	await _frames(30)
+	_check(absf(lvl.player.global_position.x - door_x) < 60.0 and _ww.key_count() == 1, "con llave pero sin pulsar SALTO tampoco entra ni gasta la llave")
+	_stand_at(lvl, _cell_of(door))
+	await _frames(4)
+	Input.action_press("jump")
+	await _frames(2)
+	Input.action_release("jump")
 	await _until(func(): return absf(lvl.player.global_position.x - door_x) > 200.0, 120)
 	await _frames(20)
 	_check(absf(lvl.player.global_position.x - door_x) > 1500.0, "con llave la puerta se abre y entras en la cámara")
@@ -2385,6 +2402,10 @@ func _test_ww_levels() -> void:
 	await _frames(60)
 	var back_door = door.partner
 	_stand_at(lvl, _cell_of(back_door))
+	await _frames(20)
+	Input.action_press("jump")
+	await _frames(2)
+	Input.action_release("jump")
 	await _until(func(): return absf(lvl.player.global_position.x - vault_arrive.x) > 200.0, 120)
 	await _frames(20)
 	_check(lvl.player.global_position.distance_to(door.arrive) < 50.0, "la puerta abierta sirve de ida y vuelta (sin gastar más llaves)")
@@ -3456,9 +3477,108 @@ func _end_lab(lvl) -> void:
 	await _free_level(lvl)
 
 
+func _warp_moved(lvl, x0: float) -> bool:
+	return absf(lvl.player.global_position.x - x0) > 200.0
+
+
+func _tap_jump() -> void:
+	Input.action_press("jump")
+	await _frames(2)
+	Input.action_release("jump")
+
+
+func _test_ww_doors() -> void:
+	print("Puertas y túneles: solo se entra pulsando SALTO junto a ellos (jamás automáticamente)")
+	var g := Grid.new(90, 20)
+	g.ground(0, 90, 15)
+	g.put(5, 14, "P")
+	g.put(20, 14, "A")
+	g.put(60, 14, "A")
+	g.put(30, 14, "T")
+	g.put(70, 14, "T")
+	g.put(40, 14, "A")
+	g.put(80, 14, "A")
+	var lvl = await _mini(g, "@warp 20,14 -> 60,14 door\n@warp 30,14 -> 70,14 tunnel\n@warp 40,14 -> 80,14 door key=1\n")
+	var pl = lvl.player
+	_ww.keys = {}
+	# 1) caminar atravesando la puerta y el túnel no entra
+	pl.global_position = Vector2(15 * 16, 14 * 16)
+	await _frames(8)
+	for i in range(160):
+		Input.action_press("move_right")
+		await physics_frame
+	Input.action_release("move_right")
+	_check(pl.global_position.x > 32 * 16 and pl.global_position.x < 40 * 16 - 8 and not lvl.warping, "caminar atravesando una puerta y un túnel no entra (x=%.0f)" % pl.global_position.x)
+	# 2) quedarse junto a la puerta no entra aunque pasen los segundos
+	pl.global_position = Vector2(20 * 16 + 8, 14 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(150)
+	_check(not _warp_moved(lvl, 20 * 16.0) and not lvl.warping, "permanecer junto a la puerta 2,5 s no entra")
+	# 3) caer sobre la puerta no entra
+	pl.global_position = Vector2(20 * 16 + 8, 8 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(70)
+	_check(not _warp_moved(lvl, 20 * 16.0), "caer sobre la puerta no entra")
+	# 4) SALTO en el aire cerca de la puerta (doble salto) no entra
+	pl.global_position = Vector2(20 * 16 + 8, 11 * 16)
+	pl.velocity = Vector2(0, -40)
+	await _frames(4)
+	await _tap_jump()
+	await _frames(30)
+	_check(not _warp_moved(lvl, 20 * 16.0), "pulsar SALTO en el aire junto a la puerta no entra")
+	# 5) lejos de cualquier entrada, SALTO es un salto normal
+	pl.global_position = Vector2(50 * 16, 14 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(20)
+	var y0: float = pl.global_position.y
+	var top: float = y0
+	Input.action_press("jump")
+	for i in range(20):
+		await physics_frame
+		top = minf(top, pl.global_position.y)
+	Input.action_release("jump")
+	_check(y0 - top > 25.0, "lejos de las puertas SALTO sigue saltando (%.0f px)" % (y0 - top))
+	# 6) junto a la puerta y en el suelo: SALTO entra
+	pl.global_position = Vector2(20 * 16 + 8, 14 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(30)
+	await _tap_jump()
+	await _until(func(): return _warp_moved(lvl, 20 * 16.0), 120)
+	await _frames(20)
+	_check(pl.global_position.distance_to(lvl.warps[1].arrive) < 40.0 or _warp_moved(lvl, 20 * 16.0), "junto a la puerta, SALTO entra (x=%.0f)" % pl.global_position.x)
+	await _frames(60)
+	# 7) túnel: igual
+	pl.global_position = Vector2(30 * 16 + 8, 14 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(100)
+	_check(not _warp_moved(lvl, 30 * 16.0), "permanecer sobre la boca del túnel no entra")
+	await _tap_jump()
+	await _until(func(): return _warp_moved(lvl, 30 * 16.0), 120)
+	await _frames(20)
+	_check(_warp_moved(lvl, 30 * 16.0), "SALTO sobre la boca del túnel entra (x=%.0f)" % pl.global_position.x)
+	await _frames(60)
+	# 8) puerta con llave: sin llave se queda fuera; con llave entra
+	pl.global_position = Vector2(40 * 16 + 8, 14 * 16)
+	pl.velocity = Vector2.ZERO
+	await _frames(30)
+	await _tap_jump()
+	await _frames(40)
+	_check(not _warp_moved(lvl, 40 * 16.0), "sin llave, SALTO no abre la puerta cerrada")
+	_ww.keys = {"bronce": 1}
+	await _frames(30)
+	_check(not _warp_moved(lvl, 40 * 16.0) and _ww.key_count() == 1, "con llave, sin SALTO no entra ni gasta la llave")
+	await _tap_jump()
+	await _until(func(): return _warp_moved(lvl, 40 * 16.0), 120)
+	await _frames(20)
+	_check(_warp_moved(lvl, 40 * 16.0) and _ww.key_count() == 0, "con llave y SALTO entra y gasta la llave")
+	_ww.keys = {}
+	await _end_mini(lvl)
+
+
 func _test_ww_mechanics() -> void:
 	_wipe_ww_files()
 	_ww.reset()
+	await _test_ww_doors()
 	await _test_ww_mech_shrooms()
 	await _test_ww_mech_vine()
 	await _test_ww_mech_logs()

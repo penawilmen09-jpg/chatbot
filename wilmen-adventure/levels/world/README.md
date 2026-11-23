@@ -6,8 +6,8 @@
 ## Glifos nuevos
 | Carácter | Significado |
 |---|---|
-| `T` | Boca de túnel (se entra con SALTO estando encima, o permaneciendo 0,35 s). Va sobre suelo firme |
-| `A` | Puerta (se entra caminando hacia ella; si tiene cerradura gasta 1 llave la primera vez y queda abierta). Sobre suelo |
+| `T` | Boca de túnel: se entra SOLO pulsando SALTO estando encima, en el suelo (nunca automáticamente). Va sobre suelo firme |
+| `A` | Puerta: se entra SOLO pulsando SALTO junto a ella, en el suelo; si tiene cerradura gasta 1 llave la primera vez y queda abierta (sin llave avisa y no entra). Sobre suelo |
 | `Q` | Verja con candado: columna de `Q` (mínimo 3 celdas). Cuesta 1 llave y queda abierta para siempre |
 | `U` | Llave (cada llave se recoge una sola vez por partida; se gasta en verjas y puertas con cerradura) |
 | `I` / `M` | Reloj de tiempo extra: +15 s / +30 s |

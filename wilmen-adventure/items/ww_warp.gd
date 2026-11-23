@@ -1,8 +1,9 @@
 extends Area2D
 ## Túnel o puerta de WILMEN WORLD que lleva a otra zona del nivel (cada extremo es un nodo distinto).
-##  - túnel: se entra con SALTO estando sobre la boca, o permaneciendo encima 0,35 s.
-##  - puerta: se entra caminando hacia ella; si tiene cerradura gasta 1 llave la primera vez y queda abierta.
-## Tras aparecer en el otro extremo, ese extremo no se reactiva hasta que el jugador sale de su zona.
+## NUNCA se entra solo: hay que estar junto a la entrada, en el suelo, y pulsar SALTO (el botón de siempre).
+##  - Lejos de una entrada, SALTO sigue siendo un salto normal. Caminar, correr, caer o saltar cerca NO entra.
+##  - Puerta con cerradura: gasta 1 llave la primera vez y queda abierta; sin llave avisa y te quedas fuera.
+##  - Sobre la entrada flota una flecha que indica que se puede entrar con SALTO.
 
 const SHEET := preload("res://assets/items/ww_items.png")
 const DOOR := preload("res://assets/items/ww_door.png")
@@ -16,7 +17,9 @@ var arrive: Vector2 = Vector2.ZERO  # dónde aparece el jugador al llegar a ESTE
 var armed: bool = true
 var grace: float = 0.0  # tras llegar aquí se ignora el extremo un instante (el motor tarda un fotograma en actualizar los solapes)
 
-var _hold: float = 0.0
+var _near: bool = false
+var _was_near: bool = false
+var _floor_prev: bool = false
 var _t: float = 0.0
 var _msg_cd: float = 0.0
 var _sprite: Sprite2D
@@ -62,48 +65,56 @@ func _refresh_sprite() -> void:
 func _physics_process(delta: float) -> void:
 	_t += delta
 	_msg_cd = maxf(0.0, _msg_cd - delta)
-	if kind == "tunnel":
-		_refresh_sprite()
+	_refresh_sprite()
 	if level == null or level.player == null:
 		return
 	if grace > 0.0:
 		grace -= delta
-		_hold = 0.0
+		_near = false
 		return
 	var p = level.player
-	if not overlaps_body(p):
-		armed = true
-		_hold = 0.0
+	var floor_now: bool = p.is_on_floor()
+	_near = overlaps_body(p) and not p.dead and not level.finished and not level.warping
+	var grounded: bool = floor_now or _floor_prev  # el salto del jugador ya pudo despegarle en este mismo fotograma
+	_floor_prev = floor_now
+	if _near != _was_near:
+		_was_near = _near
+		queue_redraw()
+	if not _near or not grounded:
 		return
-	if not armed or p.dead or level.finished or level.warping:
+	if not Input.is_action_just_pressed("jump"):
 		return
-	if kind == "tunnel":
-		if not p.is_on_floor():
-			_hold = 0.0
-			return
-		_hold += delta
-		if Input.is_action_just_pressed("jump") or _hold >= 0.35:
+	if is_locked():
+		if WW.use_key(need_key):
+			WW.mark_open(level.number, warp_id)
+			WW.save_game()
+			Audio.play_sfx("checkpoint", 0.8)
+			level.popup("Puerta abierta (-%d llave)" % need_key, global_position + Vector2(0, -36))
+			_refresh_sprite()
 			_enter()
+		elif _msg_cd <= 0.0:
+			_msg_cd = 1.2
+			level.popup("Necesita %d llave" % need_key if need_key == 1 else "Necesita %d llaves" % need_key, global_position + Vector2(0, -36))
+			Audio.play_sfx("shield", 0.6)
 	else:
-		_hold += delta
-		if _hold >= 0.1:
-			if is_locked():
-				if WW.use_key(need_key):
-					WW.mark_open(level.number, warp_id)
-					WW.save_game()
-					Audio.play_sfx("checkpoint", 0.8)
-					level.popup("Puerta abierta (-%d llave)" % need_key, global_position + Vector2(0, -36))
-					_refresh_sprite()
-					_enter()
-				elif _msg_cd <= 0.0:
-					_msg_cd = 1.6
-					level.popup("Necesita %d llave" % need_key if need_key == 1 else "Necesita %d llaves" % need_key, global_position + Vector2(0, -36))
-					Audio.play_sfx("shield", 0.6)
-			else:
-				_enter()
+		_enter()
+
+
+func _draw() -> void:
+	## Indicador de entrada: flecha que rebota sobre la entrada cuando el jugador está cerca (roja y con candado si falta la llave).
+	if not _near:
+		return
+	var locked: bool = is_locked() and WW.key_count() < need_key
+	var col: Color = Color(1.0, 0.45, 0.4) if locked else Color(1.0, 0.95, 0.5)
+	var by: float = -34.0 if kind == "door" else -26.0
+	by += sin(_t * 7.0) * 2.0
+	draw_colored_polygon(PackedVector2Array([Vector2(-5, by), Vector2(5, by), Vector2(0, by + 7)]), col)
+	draw_polyline(PackedVector2Array([Vector2(-5, by), Vector2(5, by), Vector2(0, by + 7), Vector2(-5, by)]), Color(0.1, 0.05, 0.15), 1.0)
+	if locked:
+		draw_rect(Rect2(-3, by - 8, 6, 5), Color(0.9, 0.75, 0.2))
+		draw_arc(Vector2(0, by - 8), 2.5, PI, TAU, 8, Color(0.9, 0.75, 0.2), 1.2)
 
 
 func _enter() -> void:
-	_hold = 0.0
 	if partner != null:
 		level.warp_player(self, partner)
