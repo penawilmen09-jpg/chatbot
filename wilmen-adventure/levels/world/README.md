@@ -88,3 +88,11 @@ Se validan con `python3 tools/ww_t1_check.py` (grafo de movimientos con setas, l
 la meta se alcanza sin abrir puertas, todas las llaves son libres, hay tantas llaves como cerraduras, nunca se queda uno atrapado y el
 reloj cubre explorarlo todo) y con `godot ... smoke_test.gd -- --t1` (recorrido real de cada mecánica en el motor).
 Comparación visual: `python3 tools/ww_t1_sheet.py salida.png` (ver `docs/ww_tanda1_comparacion.png` y `docs/ww_tanda1_capturas.png`).
+
+## Progreso y desbloqueo de regiones
+- Un nivel se completa al llegar a su meta; abre el camino hacia el siguiente (`edges` de `map.json`, tipo `done`) y las salidas
+  secretas abren los caminos ocultos (tipo `secret`).
+- Una región está **superada** al completar su castillo (el nivel 20, 40, ...). Ese castillo abre el puente a la región siguiente.
+- Una región es **jugable** si tiene niveles construidos (`ww_NNN.txt`); si no, se muestra «en construcción». Se deduce del contenido real,
+  no de un indicador a mano: al añadir los niveles de una región, el mapa los ofrece y el desbloqueo funciona solo.
+- El contador del mapa muestra el progreso de la región (`Bosque Esmeralda 19/20 · Secretos 3/4 · Total 19/120`).

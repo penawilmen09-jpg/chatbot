@@ -2240,10 +2240,23 @@ func _test_ww_map() -> void:
 			edge_secret = e
 	_check(not edge_secret.is_empty() and _ww.edge_unlocked(edge_secret), "la salida secreta del 1-9 abre un túnel bajo la montaña hasta el 1-15")
 	_check(_ww.node_state(20) == "locked" and _ww.node_state(21) == "construction", "el castillo sigue bloqueado y la región 2 sin construir")
-	# la región siguiente no se puede pisar aunque se complete el castillo
+	# la región siguiente solo está en construcción porque no tiene niveles: sin ellos no se puede pisar
 	_ww_done(19)
 	_ww_done(20)
-	_check(_ww.node_state(21) == "construction" and not _ww.can_enter(21), "aunque se supere el castillo, la región 2 sigue en construcción y no jugable")
+	_check(_ww.region_cleared(1) and _ww.node_state(21) == "construction" and not _ww.can_enter(21), "con el castillo superado, la región 2 sigue sin niveles (en construcción) y no se puede pisar")
+	# ... pero el desbloqueo es real: en cuanto existe un nivel de la región 2, el mapa lo ofrece y se puede jugar
+	_ww.test_levels = [21]
+	_ww.test_text = FileAccess.get_file_as_string("res://tests/fixtures/ww_old_001.txt")
+	_check(_ww.region_status(2) == "playable" and _ww.node_state(21) == "available" and _ww.can_enter(21), "con un nivel construido en la región 2, el castillo superado lo desbloquea de verdad (estado=%s)" % _ww.node_state(21))
+	_ww.save_game()
+	_ww.reset()
+	_ww.load_game()
+	_check(_ww.is_done(20) and _ww.region_cleared(1) and _ww.node_state(21) == "available", "tras cerrar y abrir el juego, el progreso y el desbloqueo se conservan")
+	_ww.reset()
+	_check(_ww.node_state(21) != "available", "sin completar el castillo, la región 2 no se abre aunque tenga niveles")
+	_ww.test_levels = []
+	_ww.test_text = ""
+	_check(_ww.region_progress_text(1).contains("0/20") and _ww.region_progress_text(1).contains("Secretos 0/4"), "el contador del mapa muestra el progreso por región y los secretos (%s)" % _ww.region_progress_text(1))
 	_wipe_ww_files()
 	_ww.reset()
 	# ---- escena del mapa ----

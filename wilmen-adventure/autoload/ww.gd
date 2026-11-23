@@ -227,7 +227,12 @@ func level_path(n: int) -> String:
 	return LEVEL_DIR + "ww_%03d.txt" % n
 
 
+var test_levels: Array = []  # solo pruebas: niveles que se dan por existentes aunque no haya fichero (se leen de `test_text`)
+
+
 func has_level(n: int) -> bool:
+	if test_levels.has(n):
+		return true
 	return ((n >= 1 and n <= LEVEL_COUNT) or n == LAB) and FileAccess.file_exists(level_path(n))
 
 
@@ -316,7 +321,7 @@ func _parse_warp(val: String) -> Dictionary:
 func level_info(n: int) -> Dictionary:
 	if not has_level(n):
 		return {}
-	var d: Dictionary = parse_level(FileAccess.get_file_as_string(level_path(n)))
+	var d: Dictionary = parse_level(test_text if (test_levels.has(n) and test_text != "") else FileAccess.get_file_as_string(level_path(n)))
 	return d["meta"]
 
 
@@ -448,11 +453,59 @@ func map_node_data(id: int) -> Dictionary:
 	return map_data().get("_by", {}).get(id, {})
 
 
+func region_levels_built(region: int) -> int:
+	## Cuántos niveles de la región existen de verdad (ficheros ww_NNN.txt).
+	var c: int = 0
+	for n in range((region - 1) * LEVELS_PER_REGION + 1, region * LEVELS_PER_REGION + 1):
+		if has_level(n):
+			c += 1
+	return c
+
+
 func region_status(region: int) -> String:
-	for r in map_data().get("regions", []):
-		if int(r["id"]) == region:
-			return str(r["status"])
-	return "construction"
+	## `playable` si la región tiene niveles construidos; `construction` si todavía no. Se deduce del contenido real (ya no depende
+	## de un indicador escrito a mano en map.json): en cuanto existan los niveles de una región, el mapa los ofrece y el desbloqueo
+	## sigue la regla de siempre (completar el castillo de la región anterior abre el puente).
+	return "playable" if region_levels_built(region) > 0 else "construction"
+
+
+func region_cleared(region: int) -> bool:
+	## Una región está superada cuando se ha completado su castillo (el último nivel, con su jefe).
+	return is_done(region * LEVELS_PER_REGION)
+
+
+func region_cleared_node(region: int) -> int:
+	return region * LEVELS_PER_REGION
+
+
+func region_name(region: int) -> String:
+	return REGION_NAMES[clampi(region - 1, 0, REGION_NAMES.size() - 1)]
+
+
+func secrets_total(region: int) -> int:
+	var seen: Dictionary = {}
+	for e in map_data()["edges"]:
+		var need: Dictionary = e["need"]
+		if str(need["type"]) == "secret" and int(map_node_data(int(need["node"])).get("region", 0)) == region:
+			seen[int(need["node"])] = true
+	return seen.size()
+
+
+func secrets_found(region: int) -> int:
+	var c: int = 0
+	for e in map_data()["edges"]:
+		pass
+	var seen: Dictionary = {}
+	for e in map_data()["edges"]:
+		var need: Dictionary = e["need"]
+		if str(need["type"]) == "secret" and int(map_node_data(int(need["node"])).get("region", 0)) == region and secret_done(int(need["node"])):
+			seen[int(need["node"])] = true
+	c = seen.size()
+	return c
+
+
+func region_progress_text(region: int) -> String:
+	return "%s %d/%d · Secretos %d/%d · Total %d/%d" % [region_name(region), completed_in_region(region), LEVELS_PER_REGION, secrets_found(region), secrets_total(region), completed_count(), LEVEL_COUNT]
 
 
 func secret_done(n: int) -> bool:

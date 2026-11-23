@@ -158,7 +158,7 @@ func _build_region_labels(data: Dictionary) -> void:
 		l.position = Vector2(float(b[0]) + 14.0, float(b[1]) - 4.0)
 		l.z_index = 5
 		add_child(l)
-		if str(r["status"]) != "playable":
+		if WW.region_status(int(r["id"])) != "playable":
 			var c := UiTheme.label("región en construcción", 9, Color("#ffd27a"))
 			c.position = Vector2(float(b[0]) + 16.0, float(b[1]) + 14.0)
 			c.z_index = 5
@@ -270,7 +270,7 @@ func _refresh_all() -> void:
 	for n in data["nodes"]:
 		_refresh_node(int(n["id"]))
 	_stats.text = "Vidas %d   Monedas %d   Gemas %d   Llaves %d" % [WW.lives, WW.coins, _total_gems(), WW.key_count()]
-	_prog.text = "Niveles completados %d/%d" % [WW.completed_count(), WW.LEVEL_COUNT]
+	_prog.text = WW.region_progress_text(int(WW.map_node_data(at_node).get("region", 1)))
 	_update_info()
 
 
@@ -349,6 +349,11 @@ func _update_info() -> void:
 		_enter_btn.text = "EN OBRAS"
 	elif st == "locked":
 		_enter_btn.text = "BLOQUEADO"
+	if st == "construction":
+		var rg2: int = int(n.get("region", 1))
+		_info2.text = ("Región completada: %s aún no tiene niveles" % WW.region_name(rg2 - 1)) if WW.region_cleared(rg2 - 1) else "Región sin niveles todavía"
+	elif id == WW.region_cleared_node(int(n.get("region", 1))) and WW.is_done(id):
+		_info2.text += "   ★ Región completada"
 
 
 func _announce_region(first: bool = false) -> void:
@@ -361,7 +366,7 @@ func _announce_region(first: bool = false) -> void:
 	for r in WW.map_data()["regions"]:
 		if int(r["id"]) == rg:
 			nm = str(r["name"])
-			status = str(r["status"])
+			status = WW.region_status(rg)
 	_banner.text = nm if status == "playable" else "%s\n(región en construcción)" % nm
 	var tw := create_tween()
 	tw.tween_property(_banner, "modulate:a", 1.0, 0.3)
@@ -512,7 +517,11 @@ func _msg_for(target: int) -> void:
 	var st: String = WW.node_state(target)
 	var t: String = "Aún no hay camino hasta ahí: completa niveles para abrirlo"
 	if st == "construction":
-		t = "Región en construcción: llegará en una próxima etapa"
+		var rg: int = int(WW.map_node_data(target).get("region", 1))
+		if WW.region_cleared(rg - 1):
+			t = "¡%s completado! %s todavía no tiene niveles construidos: se abrirá en cuanto estén listos" % [WW.region_name(rg - 1), WW.region_name(rg)]
+		else:
+			t = "%s: región todavía sin niveles. Antes hay que superar el castillo de %s" % [WW.region_name(rg), WW.region_name(rg - 1)]
 	elif st == "locked":
 		t = "Nivel bloqueado: completa el nivel anterior"
 	_info2.text = t
