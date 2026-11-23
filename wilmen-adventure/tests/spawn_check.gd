@@ -64,10 +64,16 @@ func _run() -> void:
 				var l1: int = game.lives
 				lvl.set_checkpoint(Vector2(x * 16 + 8, y * 16 + 6))
 				p.die()
-				await _frames(150)
+				await _frames(20)
+				for k in range(600):  # esperar a que reaparezca
+					await physics_frame
+					if not p.dead and game.lives < l1 and k > 60:
+						break
+				await _frames(8)
+				var here: bool = p.is_on_floor() and p.global_position.distance_to(lvl.respawn_pos) < 3.0
 				await _frames(120)
-				_chk(p.is_on_floor() and p.global_position.distance_to(lvl.respawn_pos) < 3.0 and game.lives == l1 - 1,
-					"%d: punto de control (%d,%d): reaparece apoyado y pierde solo 1 vida (pos %s, vidas %d->%d)" % [n, x, y, str(p.global_position), l1, game.lives])
+				_chk(here and game.lives == l1 - 1,
+					"%d: punto de control (%d,%d): reaparece apoyado en su sitio y pierde solo 1 vida (vidas %d->%d)" % [n, x, y, l1, game.lives])
 		lives0 = game.lives
 		await _frames(240)
 		_chk(game.lives == lives0, "%d: tras 4 s sin tocar nada no pierde más vidas (vidas %d)" % [n, game.lives])

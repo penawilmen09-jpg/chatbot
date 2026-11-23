@@ -23,7 +23,12 @@ func _ready() -> void:
 	cs.one_way_collision_margin = 4.0
 	add_child(cs)
 	var sp := Sprite2D.new()
-	sp.texture = load("res://assets/tiles/mplatform_w%d.png" % world)
+	if Game.world_active() and world == 3:
+		# WILMEN WORLD (desierto): bloque de arenisca tallada, algo más grueso que la colisión (la superficie queda a la misma altura)
+		sp.texture = load("res://assets/tiles/mplatform_stone.png")
+		sp.offset = Vector2(0, 4)
+	else:
+		sp.texture = load("res://assets/tiles/mplatform_w%d.png" % world)
 	add_child(sp)
 
 
